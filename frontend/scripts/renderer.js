@@ -380,7 +380,7 @@ async function performSymbolicRegression(params) {
         // 转换结果格式
         return {
             id: Date.now(),
-            model_id: result.result.model_id,
+            model_id: result.result.id || Date.now(),
             expression: result.result.expression || '',
             r2: result.result.r2 || 0,
             mse: result.result.mse || 0,
@@ -533,6 +533,9 @@ function renderLatexFormula(expression, targetColumn) {
     // 格式化LaTeX公式
     const latexFormula = formatFormulaToLatex(expression, targetColumn);
     
+    // 清空容器
+    formulaContainer.innerHTML = '';
+    
     // 创建公式元素
     const formulaElement = document.createElement('div');
     formulaElement.className = 'formula-content';
@@ -550,45 +553,67 @@ function renderLatexFormula(expression, targetColumn) {
     // 使用MathJax渲染
     formulaElement.innerHTML = `$$${latexFormula}$$`;
     
-    // 清空容器并添加新公式
-    formulaContainer.innerHTML = '';
+    // 添加到容器
     formulaContainer.appendChild(formulaElement);
     
     // 触发MathJax重新渲染
-    if (window.MathJax) {
-        MathJax.typesetPromise([formulaElement]).catch((err) => {
+    if (window.MathJax && window.MathJax.typesetPromise) {
+        console.log('Using MathJax to render formula');
+        MathJax.typesetPromise([formulaElement]).then(() => {
+            console.log('MathJax rendering completed');
+        }).catch((err) => {
             console.error('MathJax rendering failed:', err);
             // 降级到普通文本显示
-            formulaElement.innerHTML = `<code style="color: #4a9eff; font-size: 14px;">${latexFormula}</code>`;
+            formulaElement.innerHTML = `<code style="color: #4a9eff; font-size: 14px; white-space: pre-wrap;">${latexFormula}</code>`;
         });
     } else {
+        console.log('MathJax not available, using fallback');
         // 如果MathJax不可用，使用普通文本
-        formulaElement.innerHTML = `<code style="color: #4a9eff; font-size: 14px;">${latexFormula}</code>`;
+        formulaElement.innerHTML = `<code style="color: #4a9eff; font-size: 14px; white-space: pre-wrap;">${latexFormula}</code>`;
     }
 }
 
 // 更新性能指标
 function updatePerformanceMetrics(result) {
+    console.log('Updating performance metrics:', result);
+    
     const r2Value = document.getElementById('r2-value');
     const mseValue = document.getElementById('mse-value');
     const maeValue = document.getElementById('mae-value');
     const rmseValue = document.getElementById('rmse-value');
     
-    if (r2Value) r2Value.textContent = result.r2.toFixed(3);
-    if (mseValue) mseValue.textContent = result.mse.toFixed(3);
+    if (r2Value) {
+        r2Value.textContent = (result.r2 || 0).toFixed(3);
+        console.log('Updated R²:', (result.r2 || 0).toFixed(3));
+    }
+    if (mseValue) {
+        mseValue.textContent = (result.mse || 0).toFixed(3);
+        console.log('Updated MSE:', (result.mse || 0).toFixed(3));
+    }
     
     // 计算MAE和RMSE
     if (result.predictions && result.predictions.actual && result.predictions.predicted) {
         const actual = result.predictions.actual;
         const predicted = result.predictions.predicted;
         
-        // 计算MAE
-        const mae = actual.reduce((sum, val, i) => sum + Math.abs(val - predicted[i]), 0) / actual.length;
-        if (maeValue) maeValue.textContent = mae.toFixed(3);
-        
-        // 计算RMSE
-        const rmse = Math.sqrt(result.mse);
-        if (rmseValue) rmseValue.textContent = rmse.toFixed(3);
+        if (actual.length > 0 && predicted.length > 0) {
+            // 计算MAE
+            const mae = actual.reduce((sum, val, i) => sum + Math.abs(val - predicted[i]), 0) / actual.length;
+            if (maeValue) {
+                maeValue.textContent = mae.toFixed(3);
+                console.log('Updated MAE:', mae.toFixed(3));
+            }
+            
+            // 计算RMSE
+            const rmse = Math.sqrt(result.mse || 0);
+            if (rmseValue) {
+                rmseValue.textContent = rmse.toFixed(3);
+                console.log('Updated RMSE:', rmse.toFixed(3));
+            }
+        } else {
+            if (maeValue) maeValue.textContent = '0.000';
+            if (rmseValue) rmseValue.textContent = '0.000';
+        }
     } else {
         if (maeValue) maeValue.textContent = '0.000';
         if (rmseValue) rmseValue.textContent = '0.000';
@@ -686,6 +711,13 @@ function generateFormulaTree(result) {
     
     console.log('Generating formula tree for result:', result);
     
+    // 检查D3.js是否可用
+    if (typeof d3 === 'undefined') {
+        console.error('D3.js not available');
+        treeContainer.innerHTML = '<p style="color: #ef4444;">D3.js库未加载，无法显示公式树</p>';
+        return;
+    }
+    
     // 清空容器
     treeContainer.innerHTML = '';
     
@@ -696,98 +728,103 @@ function generateFormulaTree(result) {
     const width = treeContainer.clientWidth || 600;
     const height = 400;
     
-    // 创建SVG容器
-    const svg = d3.select(treeContainer)
-        .append('svg')
-        .attr('width', width)
-        .attr('height', height)
-        .style('border', '1px solid #333')
-        .style('background', '#1a1a1a');
-    
-    // 创建树形布局
-    const treeLayout = d3.tree()
-        .size([width - 100, height - 100]);
-    
-    // 创建层次结构
-    const root = d3.hierarchy(syntaxTree);
-    
-    // 计算树形布局
-    treeLayout(root);
-    
-    // 绘制连接线
-    const links = svg.selectAll('.link')
-        .data(root.links())
-        .enter()
-        .append('path')
-        .attr('class', 'link')
-        .attr('d', d3.linkVertical()
-            .x(d => d.x + 50)
-            .y(d => d.y + 50))
-        .style('fill', 'none')
-        .style('stroke', '#666')
-        .style('stroke-width', '2');
-    
-    // 创建节点组
-    const nodes = svg.selectAll('.node')
-        .data(root.descendants())
-        .enter()
-        .append('g')
-        .attr('class', 'node')
-        .attr('transform', d => `translate(${d.x + 50},${d.y + 50})`);
-    
-    // 绘制节点圆圈
-    nodes.append('circle')
-        .attr('r', d => d.data.type === 'operator' ? 25 : 20)
-        .style('fill', d => {
-            if (d.data.type === 'operator') {
-                return '#4a9eff';
-            }
-            // 根据权重返回颜色
-            const weightClass = d.data.weight || 'weight-5';
-            const colors = {
-                'weight-1': '#ef4444', 'weight-2': '#f56565', 'weight-3': '#f97316',
-                'weight-4': '#eab308', 'weight-5': '#84cc16', 'weight-6': '#22c55e',
-                'weight-7': '#16a34a', 'weight-8': '#15803d', 'weight-9': '#166534'
-            };
-            return colors[weightClass] || '#84cc16';
-        })
-        .style('stroke', '#333')
-        .style('stroke-width', '2')
-        .style('cursor', 'pointer')
-        .on('click', function(event, d) {
-            showNodeInfo(event, d);
-        })
-        .on('contextmenu', function(event, d) {
-            event.preventDefault();
-            showContextMenu(event, d);
-        });
-    
-    // 添加节点文本
-    nodes.append('text')
-        .attr('dy', '.35em')
-        .attr('text-anchor', 'middle')
-        .style('fill', 'white')
-        .style('font-size', '12px')
-        .style('font-weight', 'bold')
-        .text(d => {
-            if (d.data.type === 'operator') {
-                return d.data.operator || d.data.name;
-            } else {
-                return d.data.name;
-            }
-        });
-    
-    // 添加系数标签（对于变量节点）
-    nodes.filter(d => d.data.type === 'variable')
-        .append('text')
-        .attr('dy', '1.5em')
-        .attr('text-anchor', 'middle')
-        .style('fill', '#ccc')
-        .style('font-size', '10px')
-        .text(d => d.data.coefficient.toFixed(3));
-    
-    // 添加右键菜单事件
-    setupContextMenu();
+    try {
+        // 创建SVG容器
+        const svg = d3.select(treeContainer)
+            .append('svg')
+            .attr('width', width)
+            .attr('height', height)
+            .style('border', '1px solid #333')
+            .style('background', '#1a1a1a');
+        
+        // 创建树形布局
+        const treeLayout = d3.tree()
+            .size([width - 100, height - 100]);
+        
+        // 创建层次结构
+        const root = d3.hierarchy(syntaxTree);
+        
+        // 计算树形布局
+        treeLayout(root);
+        
+        // 绘制连接线
+        const links = svg.selectAll('.link')
+            .data(root.links())
+            .enter()
+            .append('path')
+            .attr('class', 'link')
+            .attr('d', d3.linkVertical()
+                .x(d => d.x + 50)
+                .y(d => d.y + 50))
+            .style('fill', 'none')
+            .style('stroke', '#666')
+            .style('stroke-width', '2');
+        
+        // 创建节点组
+        const nodes = svg.selectAll('.node')
+            .data(root.descendants())
+            .enter()
+            .append('g')
+            .attr('class', 'node')
+            .attr('transform', d => `translate(${d.x + 50},${d.y + 50})`);
+        
+        // 绘制节点圆圈
+        nodes.append('circle')
+            .attr('r', d => d.data.type === 'operator' ? 25 : 20)
+            .style('fill', d => {
+                if (d.data.type === 'operator') {
+                    return '#4a9eff';
+                }
+                // 根据权重返回颜色
+                const weightClass = d.data.weight || 'weight-5';
+                const colors = {
+                    'weight-1': '#ef4444', 'weight-2': '#f56565', 'weight-3': '#f97316',
+                    'weight-4': '#eab308', 'weight-5': '#84cc16', 'weight-6': '#22c55e',
+                    'weight-7': '#16a34a', 'weight-8': '#15803d', 'weight-9': '#166534'
+                };
+                return colors[weightClass] || '#84cc16';
+            })
+            .style('stroke', '#333')
+            .style('stroke-width', '2')
+            .style('cursor', 'pointer')
+            .on('click', function(event, d) {
+                showNodeInfo(event, d);
+            })
+            .on('contextmenu', function(event, d) {
+                event.preventDefault();
+                showContextMenu(event, d);
+            });
+        
+        // 添加节点文本
+        nodes.append('text')
+            .attr('dy', '.35em')
+            .attr('text-anchor', 'middle')
+            .style('fill', 'white')
+            .style('font-size', '12px')
+            .style('font-weight', 'bold')
+            .text(d => {
+                if (d.data.type === 'operator') {
+                    return d.data.operator || d.data.name;
+                } else {
+                    return d.data.name;
+                }
+            });
+        
+        // 添加系数标签（对于变量节点）
+        nodes.filter(d => d.data.type === 'variable')
+            .append('text')
+            .attr('dy', '1.5em')
+            .attr('text-anchor', 'middle')
+            .style('fill', '#ccc')
+            .style('font-size', '10px')
+            .text(d => d.data.coefficient.toFixed(3));
+        
+        console.log('Formula tree generated successfully');
+        
+    } catch (error) {
+        console.error('Error generating formula tree:', error);
+        treeContainer.innerHTML = `<p style="color: #ef4444;">生成公式树时出错: ${error.message}</p>`;
+    }
 }
 
 // 显示节点信息
