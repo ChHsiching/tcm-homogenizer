@@ -34,6 +34,7 @@ tcm-homogenizer/
 │   ├── venv/          # Python虚拟环境
 │   └── main.py        # 服务入口
 ├── docs/             # 项目文档
+│   └── Windows虚拟机打包指南.md  # Windows打包指南
 ├── scripts/          # 自动化脚本
 │   ├── start-dev.sh  # 启动开发环境
 │   ├── stop-dev.sh   # 停止开发环境
@@ -208,6 +209,34 @@ tail -f backend/backend.log
    - 🔄 多平台打包
    - 🔄 用户文档
 
+## Windows打包
+
+### 打包方式
+
+本项目采用**Windows虚拟机打包**的方式生成Windows安装程序。
+
+### 打包步骤
+
+1. **准备Windows虚拟机**：
+   - Windows 10/11 (x64)
+   - 安装Python 3.10+、Node.js、Git
+   - 确保网络连接稳定
+
+2. **获取项目代码**：
+   - 将项目复制到Windows虚拟机中
+   - 或从Git仓库克隆
+
+3. **执行打包**：
+   - 按照 `docs/Windows虚拟机打包指南.md` 进行操作
+   - 生成Windows安装程序
+
+### 打包结果
+
+打包完成后会生成：
+- `中药多组分均化分析客户端 Setup.exe` - Windows安装程序
+- 支持一键安装和卸载
+- 自动创建桌面和开始菜单快捷方式
+
 ## 常见问题
 
 ### Q: 后端服务启动失败
@@ -222,6 +251,9 @@ A: 使用 `./scripts/stop-dev.sh` 停止所有服务，或修改配置文件中�
 ### Q: 虚拟环境问题
 A: 删除 `backend/venv` 目录，重新运行 `./scripts/setup-dev.sh`
 
+### Q: Windows打包失败
+A: 参考 `docs/Windows虚拟机打包指南.md` 进行故障排除
+
 ## 项目状态
 
 ### 当前版本：M1 原型版本
@@ -231,7 +263,7 @@ A: 删除 `backend/venv` 目录，重新运行 `./scripts/setup-dev.sh`
 - ✅ 前后端通信
 - ✅ 用户界面框架
 - ✅ 开发工具链
-- ✅ Windows便携式打包
+- ✅ Windows虚拟机打包指南
 
 **进行中功能：**
 - 🔄 核心算法实现
