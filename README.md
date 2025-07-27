@@ -222,18 +222,27 @@ A: 使用 `./scripts/stop-dev.sh` 停止所有服务，或修改配置文件中�
 ### Q: 虚拟环境问题
 A: 删除 `backend/venv` 目录，重新运行 `./scripts/setup-dev.sh`
 
-## 贡献指南
+## 项目状态
 
-1. Fork 项目
-2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'feat: Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 创建 Pull Request
+### 当前版本：M1 原型版本
 
-## 许可证
+**已完成功能：**
+- ✅ 基础架构搭建
+- ✅ 前后端通信
+- ✅ 用户界面框架
+- ✅ 开发工具链
+- ✅ Windows便携式打包
 
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+**进行中功能：**
+- 🔄 核心算法实现
+- 🔄 数据可视化
 
-## 联系方式
+**计划功能：**
+- 📋 符号回归算法集成
+- 📋 蒙特卡罗模拟
+- 📋 完整用户交互
+- 📋 性能优化
 
-如有问题或建议，请通过 GitHub Issues 联系我们。 
+---
+
+**注意**：这是一个私有项目，用于参加比赛。请勿对外分享或使用。 
