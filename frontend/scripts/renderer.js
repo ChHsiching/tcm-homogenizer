@@ -100,10 +100,8 @@ function switchTab(tabName) {
         targetButton.classList.add('active');
     }
     
-    // 特殊处理
-    if (tabName === 'regression') {
-        updateRegressionModelList();
-    }
+    // 更新状态栏
+    updateStatusBar();
 }
 
 // 处理文件上传
@@ -111,23 +109,20 @@ async function handleFileUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
     
-    showLoading('正在解析数据文件...');
+    showLoading('正在解析文件...');
     
     try {
         const data = await parseFile(file);
         currentData = data;
         
-        // 更新目标变量选择
+        // 更新UI
         updateTargetColumnSelect(data.columns);
-        
-        // 更新特征变量选择
         updateFeatureColumnsCheckboxes(data.columns);
         
-        showNotification('数据文件加载成功', 'success');
-        console.log('📊 数据加载完成:', data);
+        showNotification(`文件解析成功，共 ${data.data.length} 行数据`, 'success');
+        
     } catch (error) {
-        showNotification('数据文件解析失败: ' + error.message, 'error');
-        console.error('❌ 数据解析错误:', error);
+        showNotification('文件解析失败: ' + error.message, 'error');
     } finally {
         hideLoading();
     }
@@ -148,8 +143,7 @@ async function parseFile(file) {
                 } else if (file.name.endsWith('.json')) {
                     data = JSON.parse(content);
                 } else {
-                    reject(new Error('不支持的文件格式'));
-                    return;
+                    throw new Error('不支持的文件格式');
                 }
                 
                 resolve(data);
@@ -158,7 +152,9 @@ async function parseFile(file) {
             }
         };
         
-        reader.onerror = () => reject(new Error('文件读取失败'));
+        reader.onerror = function() {
+            reject(new Error('文件读取失败'));
+        };
         
         if (file.name.endsWith('.csv')) {
             reader.readAsText(file);
@@ -171,14 +167,26 @@ async function parseFile(file) {
 // 解析CSV
 function parseCSV(content) {
     const lines = content.trim().split('\n');
+    if (lines.length < 2) {
+        throw new Error('CSV文件至少需要包含标题行和一行数据');
+    }
+    
     const headers = lines[0].split(',').map(h => h.trim());
     const data = [];
     
     for (let i = 1; i < lines.length; i++) {
         const values = lines[i].split(',').map(v => v.trim());
+        if (values.length !== headers.length) {
+            console.warn(`第 ${i + 1} 行数据列数不匹配，跳过`);
+            continue;
+        }
+        
         const row = {};
         headers.forEach((header, index) => {
-            row[header] = values[index] || '';
+            const value = values[index];
+            // 尝试转换为数字
+            const numValue = parseFloat(value);
+            row[header] = isNaN(numValue) ? value : numValue;
         });
         data.push(row);
     }
@@ -210,41 +218,39 @@ function updateFeatureColumnsCheckboxes(columns) {
     
     container.innerHTML = '';
     columns.forEach(column => {
-        const label = document.createElement('label');
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.value = column;
-        checkbox.checked = true;
-        
-        label.appendChild(checkbox);
-        label.appendChild(document.createTextNode(column));
-        container.appendChild(label);
+        const div = document.createElement('div');
+        div.className = 'checkbox-item';
+        div.innerHTML = `
+            <input type="checkbox" id="feature-${column}" value="${column}">
+            <label for="feature-${column}">${column}</label>
+        `;
+        container.appendChild(div);
     });
 }
 
 // 开始符号回归
 async function startRegression() {
     if (!currentData) {
-        showNotification('请先选择数据文件', 'warning');
+        showNotification('请先上传数据文件', 'warning');
         return;
     }
     
     const targetColumn = document.getElementById('target-column').value;
-    const featureColumns = Array.from(document.querySelectorAll('#feature-columns input:checked'))
-        .map(input => input.value);
+    const featureCheckboxes = document.querySelectorAll('#feature-columns input[type="checkbox"]:checked');
     
     if (!targetColumn) {
         showNotification('请选择目标变量', 'warning');
         return;
     }
     
-    if (featureColumns.length === 0) {
+    if (featureCheckboxes.length === 0) {
         showNotification('请选择至少一个特征变量', 'warning');
         return;
     }
     
-    const populationSize = parseInt(document.getElementById('population-size').value);
-    const generations = parseInt(document.getElementById('generations').value);
+    const featureColumns = Array.from(featureCheckboxes).map(cb => cb.value);
+    const populationSize = parseInt(document.getElementById('population-size').value) || 100;
+    const generations = parseInt(document.getElementById('generations').value) || 50;
     
     showLoading('正在进行符号回归分析...');
     
@@ -257,39 +263,76 @@ async function startRegression() {
             generations
         });
         
-        displayRegressionResults(result);
+        // 保存模型
         regressionModels.push(result);
         updateRegressionModelList();
         
+        // 显示结果
+        displayRegressionResults(result);
+        
         showNotification('符号回归分析完成', 'success');
+        
     } catch (error) {
         showNotification('符号回归分析失败: ' + error.message, 'error');
-        console.error('❌ 回归分析错误:', error);
     } finally {
         hideLoading();
     }
 }
 
-// 执行符号回归（模拟）
+// 执行符号回归（调用后端API）
 async function performSymbolicRegression(params) {
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // 模拟结果
-    return {
-        id: Date.now(),
-        expression: `${params.featureColumns[0]} * 0.5 + ${params.featureColumns[1]} * 0.3 + 0.1`,
-        r2: 0.85,
-        mse: 0.12,
-        featureImportance: params.featureColumns.map((col, i) => ({
-            feature: col,
-            importance: 0.8 - i * 0.2
-        })),
-        predictions: params.data.data.map((row, i) => ({
-            actual: parseFloat(row[params.targetColumn]) || 0,
-            predicted: Math.random() * 10
-        }))
-    };
+    try {
+        // 检查后端连接
+        const isConnected = await testBackendConnection();
+        if (!isConnected) {
+            throw new Error('后端服务未连接，请检查服务状态');
+        }
+        
+        // 准备请求数据
+        const requestData = {
+            data: params.data,
+            target_column: params.targetColumn,
+            feature_columns: params.featureColumns,
+            population_size: params.populationSize,
+            generations: params.generations
+        };
+        
+        // 调用后端API
+        const response = await fetch(`http://127.0.0.1:${currentSettings.backendPort}/api/regression/analyze`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestData)
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || '分析失败');
+        }
+        
+        // 转换结果格式
+        return {
+            id: Date.now(),
+            model_id: result.result.get('model_id'),
+            expression: result.result.get('expression', ''),
+            r2: result.result.get('r2', 0),
+            mse: result.result.get('mse', 0),
+            featureImportance: result.result.get('feature_importance', []),
+            predictions: result.result.get('predictions', {}),
+            parameters: result.result.get('parameters', {})
+        };
+        
+    } catch (error) {
+        console.error('符号回归API调用失败:', error);
+        throw error;
+    }
 }
 
 // 显示回归结果
@@ -320,7 +363,7 @@ function displayRegressionResults(result) {
         
         <div class="result-item">
             <h4>预测结果</h4>
-            <p>样本数量: ${result.predictions.length}</p>
+            <p>样本数量: ${result.predictions.actual ? result.predictions.actual.length : 0}</p>
             <button class="btn-secondary" onclick="visualizeResults(${result.id})">查看图表</button>
         </div>
     `;
@@ -334,8 +377,8 @@ function updateRegressionModelList() {
     select.innerHTML = '<option value="">请选择回归模型</option>';
     regressionModels.forEach(model => {
         const option = document.createElement('option');
-        option.value = model.id;
-        option.textContent = `模型 ${model.id} (R²=${model.r2.toFixed(3)})`;
+        option.value = model.model_id || model.id;
+        option.textContent = `模型 ${model.model_id || model.id} (R²=${model.r2.toFixed(3)})`;
         select.appendChild(option);
     });
 }
@@ -361,7 +404,7 @@ async function startMonteCarlo() {
     
     try {
         const result = await performMonteCarloAnalysis({
-            modelId: parseInt(modelId),
+            modelId,
             iterations,
             targetEfficacy,
             tolerance
@@ -369,38 +412,84 @@ async function startMonteCarlo() {
         
         displayMonteCarloResults(result);
         showNotification('蒙特卡罗分析完成', 'success');
+        
     } catch (error) {
         showNotification('蒙特卡罗分析失败: ' + error.message, 'error');
-        console.error('❌ 蒙特卡罗分析错误:', error);
     } finally {
         hideLoading();
     }
 }
 
-// 执行蒙特卡罗分析（模拟）
+// 执行蒙特卡罗分析（调用后端API）
 async function performMonteCarloAnalysis(params) {
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    // 模拟结果
-    return {
-        iterations: params.iterations,
-        targetEfficacy: params.targetEfficacy,
-        tolerance: params.tolerance,
-        validSamples: Math.floor(params.iterations * 0.15),
-        optimalRanges: [
-            { component: '成分A', min: 0.2, max: 0.4, mean: 0.3 },
-            { component: '成分B', min: 0.1, max: 0.3, mean: 0.2 },
-            { component: '成分C', min: 0.05, max: 0.15, mean: 0.1 }
-        ],
-        distribution: Array.from({length: 100}, () => Math.random() * 2)
-    };
+    try {
+        // 检查后端连接
+        const isConnected = await testBackendConnection();
+        if (!isConnected) {
+            throw new Error('后端服务未连接，请检查服务状态');
+        }
+        
+        // 准备请求数据
+        const requestData = {
+            model_id: params.modelId,
+            target_efficacy: params.targetEfficacy,
+            iterations: params.iterations,
+            tolerance: params.tolerance
+        };
+        
+        // 调用后端API
+        const response = await fetch(`http://127.0.0.1:${currentSettings.backendPort}/api/monte-carlo/analyze`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestData)
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || '分析失败');
+        }
+        
+        // 转换结果格式
+        const analysisResult = result.result;
+        return {
+            analysis_id: analysisResult.get('analysis_id'),
+            iterations: analysisResult.get('iterations', 0),
+            targetEfficacy: analysisResult.get('target_efficacy', 0),
+            tolerance: analysisResult.get('tolerance', 0),
+            validSamples: analysisResult.get('valid_samples_count', 0),
+            validRate: analysisResult.get('valid_rate', 0),
+            componentStatistics: analysisResult.get('component_statistics', {}),
+            distributionData: analysisResult.get('distribution_data', {}),
+            sampleData: analysisResult.get('sample_data', {})
+        };
+        
+    } catch (error) {
+        console.error('蒙特卡罗分析API调用失败:', error);
+        throw error;
+    }
 }
 
 // 显示蒙特卡罗结果
 function displayMonteCarloResults(result) {
     const container = document.getElementById('monte-carlo-results');
     if (!container) return;
+    
+    // 转换成分统计信息为表格格式
+    const optimalRanges = Object.entries(result.componentStatistics).map(([component, stats]) => ({
+        component,
+        min: stats.min,
+        max: stats.max,
+        mean: stats.mean,
+        std: stats.std
+    }));
     
     container.innerHTML = `
         <div class="result-item">
@@ -413,7 +502,7 @@ function displayMonteCarloResults(result) {
         <div class="result-item">
             <h4>有效样本</h4>
             <p>符合条件样本数: ${result.validSamples.toLocaleString()}</p>
-            <p>有效率: ${((result.validSamples / result.iterations) * 100).toFixed(2)}%</p>
+            <p>有效率: ${(result.validRate * 100).toFixed(2)}%</p>
         </div>
         
         <div class="result-item">
@@ -425,15 +514,17 @@ function displayMonteCarloResults(result) {
                         <th>最小值</th>
                         <th>最大值</th>
                         <th>平均值</th>
+                        <th>标准差</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${result.optimalRanges.map(range => `
+                    ${optimalRanges.map(range => `
                         <tr>
                             <td>${range.component}</td>
                             <td>${range.min.toFixed(3)}</td>
                             <td>${range.max.toFixed(3)}</td>
                             <td>${range.mean.toFixed(3)}</td>
+                            <td>${range.std.toFixed(3)}</td>
                         </tr>
                     `).join('')}
                 </tbody>
@@ -441,7 +532,7 @@ function displayMonteCarloResults(result) {
         </div>
         
         <div class="result-item">
-            <button class="btn-secondary" onclick="exportMonteCarloResults(${result.iterations})">导出结果</button>
+            <button class="btn-secondary" onclick="exportMonteCarloResults('${result.analysis_id}')">导出结果</button>
         </div>
     `;
 }
@@ -479,7 +570,7 @@ async function startBackendService() {
             showNotification('后端服务启动成功', 'success');
         } else {
             updateConnectionStatus('连接失败');
-            showNotification('后端服务启动失败', 'error');
+            showNotification('后端服务启动失败: ' + result.error, 'error');
         }
     } catch (error) {
         updateConnectionStatus('连接失败');
@@ -489,25 +580,30 @@ async function startBackendService() {
 
 // 测试后端连接
 async function testBackendConnection() {
-    showLoading('正在测试后端连接...');
-    
     try {
-        // 模拟连接测试
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        showNotification('后端连接测试成功', 'success');
+        const response = await fetch(`http://127.0.0.1:${currentSettings.backendPort}/api/health`, {
+            method: 'GET',
+            timeout: 5000
+        });
+        
+        if (response.ok) {
+            updateConnectionStatus('已连接');
+            return true;
+        } else {
+            updateConnectionStatus('连接失败');
+            return false;
+        }
     } catch (error) {
-        showNotification('后端连接测试失败: ' + error.message, 'error');
-    } finally {
-        hideLoading();
+        updateConnectionStatus('连接失败');
+        return false;
     }
 }
 
 // 保存设置
 async function saveSettings() {
     try {
-        // 这里应该保存到本地存储或配置文件
         localStorage.setItem('tcm-settings', JSON.stringify(currentSettings));
-        showNotification('设置保存成功', 'success');
+        showNotification('设置已保存', 'success');
     } catch (error) {
         showNotification('设置保存失败: ' + error.message, 'error');
     }
@@ -518,10 +614,11 @@ function loadSettings() {
     try {
         const saved = localStorage.getItem('tcm-settings');
         if (saved) {
-            currentSettings = { ...currentSettings, ...JSON.parse(saved) };
+            const settings = JSON.parse(saved);
+            currentSettings = { ...currentSettings, ...settings };
         }
         
-        // 应用设置到界面
+        // 更新UI
         Object.keys(currentSettings).forEach(key => {
             const element = document.getElementById(key);
             if (element) {
@@ -532,6 +629,7 @@ function loadSettings() {
                 }
             }
         });
+        
     } catch (error) {
         console.error('加载设置失败:', error);
     }
@@ -540,24 +638,28 @@ function loadSettings() {
 // 更新设置
 function updateSetting(key, value) {
     currentSettings[key] = value;
+    saveSettings();
 }
 
 // 更新连接状态
 function updateConnectionStatus(status) {
-    const element = document.getElementById('connection-status');
-    if (element) {
-        element.textContent = `后端服务：${status}`;
+    const statusElement = document.getElementById('connection-status');
+    if (statusElement) {
+        statusElement.textContent = status;
+        statusElement.className = status === '已连接' ? 'status-connected' : 'status-disconnected';
     }
 }
 
 // 更新状态栏
 function updateStatusBar() {
-    const timeElement = document.getElementById('current-time');
-    if (timeElement) {
+    const statusBar = document.getElementById('status-bar');
+    if (statusBar) {
         const updateTime = () => {
             const now = new Date();
-            timeElement.textContent = now.toLocaleString('zh-CN');
+            const timeString = now.toLocaleTimeString();
+            statusBar.textContent = `就绪 | ${timeString}`;
         };
+        
         updateTime();
         setInterval(updateTime, 1000);
     }
@@ -565,68 +667,54 @@ function updateStatusBar() {
 
 // 显示加载状态
 function showLoading(text = '正在处理...') {
-    const overlay = document.getElementById('loading-overlay');
-    const textElement = document.getElementById('loading-text');
-    
-    if (overlay) {
-        overlay.classList.remove('hidden');
-    }
-    if (textElement) {
-        textElement.textContent = text;
+    const loading = document.getElementById('loading');
+    if (loading) {
+        const textElement = loading.querySelector('.loading-text');
+        if (textElement) {
+            textElement.textContent = text;
+        }
+        loading.style.display = 'flex';
     }
 }
 
 // 隐藏加载状态
 function hideLoading() {
-    const overlay = document.getElementById('loading-overlay');
-    if (overlay) {
-        overlay.classList.add('hidden');
+    const loading = document.getElementById('loading');
+    if (loading) {
+        loading.style.display = 'none';
     }
 }
 
 // 显示通知
 function showNotification(message, type = 'info') {
-    const container = document.getElementById('notification-container');
-    if (!container) return;
-    
     const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
+    notification.className = `notification notification-${type}`;
     notification.innerHTML = `
-        <div class="notification-content">
-            <p>${message}</p>
-        </div>
+        <span class="notification-message">${message}</span>
+        <button class="notification-close" onclick="this.parentElement.remove()">×</button>
     `;
     
-    container.appendChild(notification);
+    document.body.appendChild(notification);
     
-    // 自动移除通知
+    // 自动移除
     setTimeout(() => {
-        if (notification.parentNode) {
-            notification.parentNode.removeChild(notification);
+        if (notification.parentElement) {
+            notification.remove();
         }
     }, 5000);
 }
 
 // 显示关于对话框
 function showAboutDialog() {
-    showNotification('中药多组分均化分析客户端 v1.0.0', 'info');
+    alert('中药多组分均化分析客户端 v1.0.0\n\n基于符号回归和蒙特卡罗模拟的中药配比优化工具');
 }
 
 // 可视化结果
 function visualizeResults(modelId) {
-    showNotification('图表功能开发中...', 'warning');
+    showNotification('图表功能开发中...', 'info');
 }
 
 // 导出蒙特卡罗结果
-function exportMonteCarloResults(iterations) {
-    showNotification(`导出 ${iterations.toLocaleString()} 次模拟结果`, 'success');
-}
-
-// 全局函数（供HTML调用）
-window.switchTab = switchTab;
-window.startRegression = startRegression;
-window.startMonteCarlo = startMonteCarlo;
-window.importData = importData;
-window.exportResults = exportResults;
-window.testBackendConnection = testBackendConnection;
-window.saveSettings = saveSettings; 
+function exportMonteCarloResults(analysisId) {
+    showNotification('导出功能开发中...', 'info');
+} 

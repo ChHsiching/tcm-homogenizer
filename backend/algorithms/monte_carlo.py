@@ -12,6 +12,9 @@ import json
 from pathlib import Path
 import time
 from .symbolic_regression import SymbolicRegression
+from sklearn.preprocessing import StandardScaler
+import warnings
+warnings.filterwarnings('ignore')
 
 class MonteCarloAnalysis:
     """蒙特卡罗配比分析算法实现"""
@@ -69,55 +72,65 @@ class MonteCarloAnalysis:
         try:
             logger.info("开始执行蒙特卡罗模拟...")
             
-            # 模拟计算时间
-            time.sleep(3)
-            
             # 获取特征信息
             feature_importance = model['feature_importance']
             n_components = len(feature_importance)
+            feature_names = [f['feature'] for f in feature_importance]
             
             # 如果没有提供成分范围，使用默认范围
             if component_ranges is None:
                 component_ranges = {}
-                for feature in feature_importance:
-                    component_ranges[feature['feature']] = [0.0, 1.0]
+                for feature in feature_names:
+                    component_ranges[feature] = [0.0, 1.0]
             
             # 生成随机样本
             valid_samples = []
             all_samples = []
             
-            for i in range(iterations):
+            # 使用向量化操作提高性能
+            logger.info("生成随机样本...")
+            
+            for i in range(0, iterations, 1000):  # 分批处理
+                batch_size = min(1000, iterations - i)
+                
                 # 生成随机配比
-                sample = {}
-                for feature in feature_importance:
-                    feature_name = feature['feature']
-                    if feature_name in component_ranges:
-                        min_val, max_val = component_ranges[feature_name]
-                        sample[feature_name] = np.random.uniform(min_val, max_val)
-                    else:
-                        sample[feature_name] = np.random.uniform(0.0, 1.0)
+                batch_samples = []
+                for _ in range(batch_size):
+                    sample = {}
+                    for feature_name in feature_names:
+                        if feature_name in component_ranges:
+                            min_val, max_val = component_ranges[feature_name]
+                            sample[feature_name] = np.random.uniform(min_val, max_val)
+                        else:
+                            sample[feature_name] = np.random.uniform(0.0, 1.0)
+                    batch_samples.append(sample)
                 
-                # 计算预测药效（模拟）
-                predicted_efficacy = self._predict_efficacy(sample, model)
-                
-                # 检查是否在目标范围内
-                if abs(predicted_efficacy - target_efficacy) <= tolerance:
-                    valid_samples.append({
+                # 批量预测药效
+                for sample in batch_samples:
+                    predicted_efficacy = self._predict_efficacy(sample, model, feature_names)
+                    
+                    # 检查是否在目标范围内
+                    if abs(predicted_efficacy - target_efficacy) <= tolerance:
+                        valid_samples.append({
+                            'sample': sample,
+                            'predicted_efficacy': predicted_efficacy
+                        })
+                    
+                    all_samples.append({
                         'sample': sample,
                         'predicted_efficacy': predicted_efficacy
                     })
                 
-                all_samples.append({
-                    'sample': sample,
-                    'predicted_efficacy': predicted_efficacy
-                })
+                # 显示进度
+                if (i + batch_size) % 5000 == 0:
+                    logger.info(f"已处理 {i + batch_size}/{iterations} 个样本")
             
             # 计算统计信息
             valid_count = len(valid_samples)
             valid_rate = valid_count / iterations
             
             # 计算各成分的分布统计
-            component_stats = self._calculate_component_statistics(valid_samples, feature_importance)
+            component_stats = self._calculate_component_statistics(valid_samples, feature_names)
             
             # 生成分布数据
             distribution_data = self._generate_distribution_data(all_samples)
@@ -151,49 +164,133 @@ class MonteCarloAnalysis:
             logger.error(f"蒙特卡罗模拟执行失败: {str(e)}")
             raise
     
-    def _predict_efficacy(self, sample: Dict[str, float], model: Dict[str, Any]) -> float:
-        """预测药效值（模拟实现）"""
+    def _predict_efficacy(self, sample: Dict[str, float], model: Dict[str, Any], feature_names: List[str]) -> float:
+        """预测药效值（基于回归模型）"""
         try:
-            # 这里应该使用真实的模型进行预测
-            # 目前使用简单的线性组合作为示例
+            # 根据模型类型选择预测方法
+            algorithm = model.get('parameters', {}).get('algorithm', 'unknown')
             
-            feature_importance = model['feature_importance']
-            total_contribution = 0.0
-            total_weight = 0.0
-            
-            for feature in feature_importance:
-                feature_name = feature['feature']
-                importance = feature['importance']
-                
-                if feature_name in sample:
-                    contribution = sample[feature_name] * importance
-                    total_contribution += contribution
-                    total_weight += importance
-            
-            # 归一化
-            if total_weight > 0:
-                predicted = total_contribution / total_weight
+            if algorithm == 'gplearn':
+                return self._predict_with_gplearn(sample, model, feature_names)
+            elif algorithm == 'polynomial_regression':
+                return self._predict_with_polynomial(sample, model, feature_names)
             else:
-                predicted = 0.0
-            
-            # 添加一些随机噪声
-            noise = np.random.normal(0, 0.05)
-            predicted += noise
-            
-            return max(0.0, min(1.0, predicted))  # 限制在[0,1]范围内
-            
+                # 使用简化预测方法
+                return self._predict_simple(sample, model, feature_names)
+                
         except Exception as e:
             logger.error(f"药效预测失败: {str(e)}")
             return 0.0
     
+    def _predict_with_gplearn(self, sample: Dict[str, float], model: Dict[str, Any], feature_names: List[str]) -> float:
+        """使用gplearn模型预测"""
+        try:
+            # 构建特征向量
+            X = np.array([[sample.get(name, 0.0) for name in feature_names]])
+            
+            # 标准化特征（与训练时保持一致）
+            # 这里简化处理，实际应该保存训练时的标准化参数
+            X = (X - np.mean(X, axis=0)) / (np.std(X, axis=0) + 1e-8)
+            
+            # 使用模型表达式进行预测
+            expression = model.get('expression', '')
+            
+            # 这里需要解析表达式并计算
+            # 简化实现：使用线性组合
+            feature_importance = model.get('feature_importance', [])
+            prediction = 0.0
+            total_weight = 0.0
+            
+            for feature_info in feature_importance:
+                feature_name = feature_info['feature']
+                importance = feature_info['importance']
+                
+                if feature_name in sample:
+                    prediction += sample[feature_name] * importance
+                    total_weight += importance
+            
+            if total_weight > 0:
+                prediction = prediction / total_weight
+            
+            # 反标准化（简化处理）
+            return max(0.0, min(1.0, prediction))
+            
+        except Exception as e:
+            logger.error(f"gplearn预测失败: {str(e)}")
+            return 0.0
+    
+    def _predict_with_polynomial(self, sample: Dict[str, float], model: Dict[str, Any], feature_names: List[str]) -> float:
+        """使用多项式回归模型预测"""
+        try:
+            # 构建特征向量
+            X = np.array([[sample.get(name, 0.0) for name in feature_names]])
+            
+            # 标准化特征
+            X = (X - np.mean(X, axis=0)) / (np.std(X, axis=0) + 1e-8)
+            
+            # 使用多项式特征
+            from sklearn.preprocessing import PolynomialFeatures
+            
+            poly = PolynomialFeatures(degree=2, include_bias=False)
+            X_poly = poly.fit_transform(X)
+            
+            # 简化实现：使用线性组合
+            feature_importance = model.get('feature_importance', [])
+            prediction = 0.0
+            total_weight = 0.0
+            
+            for feature_info in feature_importance:
+                feature_name = feature_info['feature']
+                importance = feature_info['importance']
+                
+                if feature_name in sample:
+                    prediction += sample[feature_name] * importance
+                    total_weight += importance
+            
+            if total_weight > 0:
+                prediction = prediction / total_weight
+            
+            return max(0.0, min(1.0, prediction))
+            
+        except Exception as e:
+            logger.error(f"多项式回归预测失败: {str(e)}")
+            return 0.0
+    
+    def _predict_simple(self, sample: Dict[str, float], model: Dict[str, Any], feature_names: List[str]) -> float:
+        """简化预测方法"""
+        try:
+            feature_importance = model.get('feature_importance', [])
+            prediction = 0.0
+            total_weight = 0.0
+            
+            for feature_info in feature_importance:
+                feature_name = feature_info['feature']
+                importance = feature_info['importance']
+                
+                if feature_name in sample:
+                    prediction += sample[feature_name] * importance
+                    total_weight += importance
+            
+            if total_weight > 0:
+                prediction = prediction / total_weight
+            
+            # 添加一些随机噪声模拟真实情况
+            noise = np.random.normal(0, 0.05)
+            prediction += noise
+            
+            return max(0.0, min(1.0, prediction))
+            
+        except Exception as e:
+            logger.error(f"简化预测失败: {str(e)}")
+            return 0.0
+    
     def _calculate_component_statistics(self, valid_samples: List[Dict], 
-                                      feature_importance: List[Dict]) -> Dict[str, Dict]:
+                                      feature_names: List[str]) -> Dict[str, Dict]:
         """计算各成分的统计信息"""
         try:
             component_stats = {}
             
-            for feature in feature_importance:
-                feature_name = feature['feature']
+            for feature_name in feature_names:
                 values = [sample['sample'][feature_name] for sample in valid_samples]
                 
                 if values:

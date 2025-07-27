@@ -11,6 +11,19 @@ from loguru import logger
 import json
 from pathlib import Path
 import time
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
+import warnings
+warnings.filterwarnings('ignore')
+
+try:
+    from gplearn.genetic import SymbolicRegressor
+    from gplearn.functions import make_function
+    from gplearn.fitness import make_fitness
+    GPLEARN_AVAILABLE = True
+except ImportError:
+    GPLEARN_AVAILABLE = False
+    logger.warning("gplearn未安装，将使用简化实现")
 
 class SymbolicRegression:
     """符号回归算法实现"""
@@ -44,9 +57,15 @@ class SymbolicRegression:
             # 数据预处理
             X, y = self._prepare_data(data, target_column, feature_columns)
             
-            # 执行符号回归（这里使用模拟实现）
-            result = self._perform_symbolic_regression(X, y, feature_columns, 
-                                                     population_size, generations)
+            # 执行符号回归
+            if GPLEARN_AVAILABLE:
+                result = self._perform_symbolic_regression_gplearn(
+                    X, y, feature_columns, population_size, generations
+                )
+            else:
+                result = self._perform_symbolic_regression_simple(
+                    X, y, feature_columns, population_size, generations
+                )
             
             # 保存模型
             model_id = self._save_model(result)
@@ -87,6 +106,17 @@ class SymbolicRegression:
             X = np.nan_to_num(X, nan=0.0)
             y = np.nan_to_num(y, nan=0.0)
             
+            # 数据标准化
+            X_mean = np.mean(X, axis=0)
+            X_std = np.std(X, axis=0)
+            X_std[X_std == 0] = 1  # 避免除零
+            X = (X - X_mean) / X_std
+            
+            y_mean = np.mean(y)
+            y_std = np.std(y)
+            if y_std > 0:
+                y = (y - y_mean) / y_std
+            
             logger.info(f"数据准备完成，特征形状: {X.shape}, 目标形状: {y.shape}")
             return X, y
             
@@ -94,55 +124,59 @@ class SymbolicRegression:
             logger.error(f"数据准备失败: {str(e)}")
             raise
     
-    def _perform_symbolic_regression(self, X: np.ndarray, y: np.ndarray, 
-                                   feature_names: List[str], population_size: int, 
-                                   generations: int) -> Dict[str, Any]:
-        """执行符号回归算法（模拟实现）"""
+    def _perform_symbolic_regression_gplearn(self, X: np.ndarray, y: np.ndarray, 
+                                           feature_names: List[str], population_size: int, 
+                                           generations: int) -> Dict[str, Any]:
+        """使用gplearn执行符号回归算法"""
         try:
-            # 这里使用模拟实现，实际项目中应该使用真实的符号回归库
-            # 如 PySR, gplearn 等
+            logger.info("开始执行gplearn符号回归算法...")
             
-            logger.info("开始执行符号回归算法...")
+            # 分割训练和测试数据
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.2, random_state=42
+            )
             
-            # 模拟计算时间
-            time.sleep(2)
+            # 创建符号回归器
+            est_gp = SymbolicRegressor(
+                population_size=population_size,
+                generations=generations,
+                stopping_criteria=0.01,
+                p_crossover=0.7,
+                p_subtree_mutation=0.1,
+                p_hoist_mutation=0.05,
+                p_point_mutation=0.1,
+                max_samples=0.9,
+                verbose=1,
+                random_state=42,
+                n_jobs=-1
+            )
             
-            # 生成模拟结果
-            n_features = X.shape[1]
+            # 训练模型
+            est_gp.fit(X_train, y_train)
             
-            # 简单的线性组合作为示例
-            coefficients = np.random.rand(n_features) * 2 - 1
-            intercept = np.random.rand() * 2 - 1
-            
-            # 构建表达式
-            expression_parts = []
-            for i, (coef, name) in enumerate(zip(coefficients, feature_names)):
-                if abs(coef) > 0.01:  # 只保留显著系数
-                    if coef >= 0 and i > 0:
-                        expression_parts.append(f"+ {coef:.3f} * {name}")
-                    else:
-                        expression_parts.append(f"{coef:.3f} * {name}")
-            
-            expression = " + ".join(expression_parts)
-            if intercept >= 0:
-                expression += f" + {intercept:.3f}"
-            else:
-                expression += f" - {abs(intercept):.3f}"
-            
-            # 计算预测值
-            y_pred = np.dot(X, coefficients) + intercept
+            # 预测
+            y_pred_train = est_gp.predict(X_train)
+            y_pred_test = est_gp.predict(X_test)
             
             # 计算性能指标
-            mse = np.mean((y - y_pred) ** 2)
-            r2 = 1 - np.sum((y - y_pred) ** 2) / np.sum((y - np.mean(y)) ** 2)
+            r2_train = r2_score(y_train, y_pred_train)
+            r2_test = r2_score(y_test, y_pred_test)
+            mse_train = mean_squared_error(y_train, y_pred_train)
+            mse_test = mean_squared_error(y_test, y_pred_test)
             
-            # 特征重要性（基于系数绝对值）
+            # 获取最佳表达式
+            best_program = est_gp._program
+            expression = str(best_program)
+            
+            # 计算特征重要性（基于系数）
             feature_importance = []
-            for name, coef in zip(feature_names, coefficients):
+            for i, name in enumerate(feature_names):
+                # 这里简化处理，实际应该分析程序结构
+                importance = abs(np.corrcoef(X[:, i], y)[0, 1]) if len(y) > 1 else 0
                 feature_importance.append({
                     'feature': name,
-                    'coefficient': float(coef),
-                    'importance': float(abs(coef))
+                    'coefficient': 0.0,  # gplearn不直接提供系数
+                    'importance': float(importance)
                 })
             
             # 按重要性排序
@@ -150,27 +184,133 @@ class SymbolicRegression:
             
             result = {
                 'expression': expression,
-                'r2': float(r2),
-                'mse': float(mse),
+                'r2': float(r2_test),
+                'mse': float(mse_test),
+                'r2_train': float(r2_train),
+                'mse_train': float(mse_train),
                 'feature_importance': feature_importance,
                 'predictions': {
-                    'actual': y.tolist(),
-                    'predicted': y_pred.tolist()
+                    'actual': y_test.tolist(),
+                    'predicted': y_pred_test.tolist()
                 },
                 'parameters': {
                     'population_size': population_size,
                     'generations': generations,
-                    'n_features': n_features,
-                    'n_samples': len(y)
+                    'n_features': X.shape[1],
+                    'n_samples': len(y),
+                    'algorithm': 'gplearn'
                 },
                 'timestamp': time.time()
             }
             
-            logger.info(f"符号回归完成，R² = {r2:.3f}, MSE = {mse:.3f}")
+            logger.info(f"gplearn符号回归完成，R² = {r2_test:.3f}, MSE = {mse_test:.3f}")
             return result
             
         except Exception as e:
-            logger.error(f"符号回归执行失败: {str(e)}")
+            logger.error(f"gplearn符号回归执行失败: {str(e)}")
+            raise
+    
+    def _perform_symbolic_regression_simple(self, X: np.ndarray, y: np.ndarray, 
+                                          feature_names: List[str], population_size: int, 
+                                          generations: int) -> Dict[str, Any]:
+        """简化版符号回归算法（当gplearn不可用时使用）"""
+        try:
+            logger.info("开始执行简化版符号回归算法...")
+            
+            # 分割训练和测试数据
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.2, random_state=42
+            )
+            
+            # 使用多项式回归作为简化实现
+            from sklearn.preprocessing import PolynomialFeatures
+            from sklearn.linear_model import LinearRegression
+            from sklearn.pipeline import Pipeline
+            
+            # 创建多项式特征
+            poly = PolynomialFeatures(degree=2, include_bias=False)
+            lr = LinearRegression()
+            
+            # 创建管道
+            model = Pipeline([
+                ('poly', poly),
+                ('linear', lr)
+            ])
+            
+            # 训练模型
+            model.fit(X_train, y_train)
+            
+            # 预测
+            y_pred_train = model.predict(X_train)
+            y_pred_test = model.predict(X_test)
+            
+            # 计算性能指标
+            r2_train = r2_score(y_train, y_pred_train)
+            r2_test = r2_score(y_test, y_pred_test)
+            mse_train = mean_squared_error(y_train, y_pred_train)
+            mse_test = mean_squared_error(y_test, y_pred_test)
+            
+            # 获取特征重要性
+            feature_importance = []
+            coefficients = model.named_steps['linear'].coef_
+            feature_names_poly = model.named_steps['poly'].get_feature_names_out(feature_names)
+            
+            # 计算原始特征的重要性
+            for i, name in enumerate(feature_names):
+                # 找到包含该特征的所有多项式项
+                importance = 0
+                for j, poly_name in enumerate(feature_names_poly):
+                    if name in poly_name:
+                        importance += abs(coefficients[j])
+                
+                feature_importance.append({
+                    'feature': name,
+                    'coefficient': 0.0,
+                    'importance': float(importance)
+                })
+            
+            # 按重要性排序
+            feature_importance.sort(key=lambda x: x['importance'], reverse=True)
+            
+            # 生成表达式字符串
+            expression_parts = []
+            for i, (name, coef) in enumerate(zip(feature_names, coefficients[:len(feature_names)])):
+                if abs(coef) > 0.01:
+                    if coef >= 0 and i > 0:
+                        expression_parts.append(f"+ {coef:.3f} * {name}")
+                    else:
+                        expression_parts.append(f"{coef:.3f} * {name}")
+            
+            expression = " + ".join(expression_parts)
+            if len(expression_parts) == 0:
+                expression = "0"
+            
+            result = {
+                'expression': expression,
+                'r2': float(r2_test),
+                'mse': float(mse_test),
+                'r2_train': float(r2_train),
+                'mse_train': float(mse_train),
+                'feature_importance': feature_importance,
+                'predictions': {
+                    'actual': y_test.tolist(),
+                    'predicted': y_pred_test.tolist()
+                },
+                'parameters': {
+                    'population_size': population_size,
+                    'generations': generations,
+                    'n_features': X.shape[1],
+                    'n_samples': len(y),
+                    'algorithm': 'polynomial_regression'
+                },
+                'timestamp': time.time()
+            }
+            
+            logger.info(f"简化版符号回归完成，R² = {r2_test:.3f}, MSE = {mse_test:.3f}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"简化版符号回归执行失败: {str(e)}")
             raise
     
     def _save_model(self, result: Dict[str, Any]) -> str:
