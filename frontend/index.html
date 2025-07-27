@@ -186,33 +186,32 @@
                                 </div>
                             </div>
                             
-                            <!-- 公式树和剪枝控制 -->
+                            <!-- 公式结构树 -->
                             <div class="formula-tree-container">
-                                <div class="formula-tree">
-                                    <h4>公式结构树</h4>
-                                    <div id="formula-tree" class="tree-content">
-                                        <p class="placeholder">公式树将在分析完成后显示</p>
-                                    </div>
+                                <div class="formula-tree-section">
+                                    <h3>公式结构树</h3>
+                                    <div id="formula-tree" class="formula-tree"></div>
                                 </div>
-                                
-                                <div class="formula-tree">
-                                    <h4>剪枝控制</h4>
-                                    <div class="pruning-controls">
-                                        <button class="btn-prune" onclick="pruneSelectedNodes()">删除选中节点</button>
-                                        <button class="btn-reset" onclick="resetFormula()">重置公式</button>
-                                        <button class="btn-recalculate" onclick="recalculateRegression()">重新计算</button>
-                                    </div>
-                                    <div class="pruning-info">
-                                        <p><strong>使用说明：</strong></p>
-                                        <ul>
-                                            <li>红色节点：权重低，可考虑删除</li>
-                                            <li>橙色节点：权重较低，可选择性删除</li>
-                                            <li>黄色节点：权重中等，建议保留</li>
-                                            <li>绿色节点：权重高，建议保留</li>
-                                            <li>右键点击节点可查看详细信息和删除选项</li>
-                                            <li>删除节点后点击"重新计算"获得简化公式</li>
-                                        </ul>
-                                    </div>
+                            </div>
+                            
+                            <!-- 剪枝控制 -->
+                            <div class="pruning-control-section">
+                                <h3>剪枝控制</h3>
+                                <div class="pruning-controls">
+                                    <button id="delete-selected" class="btn btn-danger">删除选中节点</button>
+                                    <button id="reset-formula" class="btn btn-secondary">重置公式</button>
+                                    <button id="recalculate" class="btn btn-primary">重新计算</button>
+                                </div>
+                                <div class="pruning-instructions">
+                                    <h4>使用说明</h4>
+                                    <ul>
+                                        <li><span class="color-red">红色节点</span>: 权重低, 可考虑删除</li>
+                                        <li><span class="color-orange">橙色节点</span>: 权重较低, 可选择性删除</li>
+                                        <li><span class="color-yellow">黄色节点</span>: 权重中等, 建议保留</li>
+                                        <li><span class="color-green">绿色节点</span>: 权重高, 建议保留</li>
+                                        <li>右键点击节点可查看详细信息和删除选项</li>
+                                        <li>删除节点后点击"重新计算"获得简化公式</li>
+                                    </ul>
                                 </div>
                             </div>
                         </div>

@@ -81,6 +81,9 @@ function setupEventListeners() {
             updateSetting(this.id, this.value || this.checked);
         });
     });
+
+    // 绑定剪枝控制按钮事件
+    bindPruningControls();
 }
 
 // 切换标签页
@@ -509,7 +512,7 @@ function formatFormulaToLatex(expression, targetColumn) {
     return `${targetColumn} = ${latex}`;
 }
 
-// 渲染LaTeX公式（连续显示）
+// 渲染LaTeX公式（分段渲染但统一背景）
 function renderLatexFormula(expression, targetColumn) {
     const formulaContainer = document.getElementById('formula-latex');
     if (!formulaContainer) {
@@ -525,10 +528,10 @@ function renderLatexFormula(expression, targetColumn) {
     // 清空容器
     formulaContainer.innerHTML = '';
     
-    // 创建单个公式容器
-    const formulaElement = document.createElement('div');
-    formulaElement.className = 'formula-content';
-    formulaElement.style.cssText = `
+    // 创建统一背景容器
+    const backgroundContainer = document.createElement('div');
+    backgroundContainer.className = 'formula-background';
+    backgroundContainer.style.cssText = `
         padding: 20px;
         background: #2a2a2a;
         border-radius: 8px;
@@ -538,31 +541,55 @@ function renderLatexFormula(expression, targetColumn) {
         word-wrap: break-word;
         overflow-wrap: break-word;
         max-width: 100%;
-        font-size: 16px;
-        line-height: 1.5;
     `;
     
-    // 使用MathJax渲染
-    formulaElement.innerHTML = `$$${latexFormula}$$`;
+    // 分段处理公式（每3项为一段）
+    const terms = latexFormula.split(' + ');
+    const maxTermsPerLine = 3;
+    const lines = [];
     
-    // 添加到容器
-    formulaContainer.appendChild(formulaElement);
-    
-    // 触发MathJax重新渲染
-    if (window.MathJax && window.MathJax.typesetPromise) {
-        console.log('Using MathJax to render formula');
-        MathJax.typesetPromise([formulaElement]).then(() => {
-            console.log('MathJax rendering completed');
-        }).catch((err) => {
-            console.error('MathJax rendering failed:', err);
-            // 降级到普通文本显示
-            formulaElement.innerHTML = `<code style="color: #4a9eff; font-size: 16px; white-space: pre-wrap; line-height: 1.5;">${latexFormula}</code>`;
-        });
-    } else {
-        console.log('MathJax not available, using fallback');
-        // 如果MathJax不可用，使用普通文本
-        formulaElement.innerHTML = `<code style="color: #4a9eff; font-size: 16px; white-space: pre-wrap; line-height: 1.5;">${latexFormula}</code>`;
+    for (let i = 0; i < terms.length; i += maxTermsPerLine) {
+        const line = terms.slice(i, i + maxTermsPerLine).join(' + ');
+        lines.push(line);
     }
+    
+    // 在统一背景内创建分段
+    lines.forEach((line, index) => {
+        const lineElement = document.createElement('div');
+        lineElement.className = 'formula-line';
+        lineElement.style.cssText = `
+            margin: ${index === 0 ? '0' : '8px'} 0 8px 0;
+            font-size: 16px;
+            line-height: 1.5;
+            color: #4a9eff;
+        `;
+        
+        // 第一行包含等号
+        const formulaText = index === 0 ? line : line;
+        lineElement.innerHTML = `$$${formulaText}$$`;
+        
+        // 添加到背景容器
+        backgroundContainer.appendChild(lineElement);
+        
+        // 触发MathJax重新渲染
+        if (window.MathJax && window.MathJax.typesetPromise) {
+            console.log('Using MathJax to render line:', index);
+            MathJax.typesetPromise([lineElement]).then(() => {
+                console.log('MathJax rendering completed for line:', index);
+            }).catch((err) => {
+                console.error('MathJax rendering failed for line:', index, err);
+                // 降级到普通文本显示
+                lineElement.innerHTML = `<code style="color: #4a9eff; font-size: 16px; white-space: pre-wrap; line-height: 1.5;">${formulaText}</code>`;
+            });
+        } else {
+            console.log('MathJax not available, using fallback for line:', index);
+            // 如果MathJax不可用，使用普通文本
+            lineElement.innerHTML = `<code style="color: #4a9eff; font-size: 16px; white-space: pre-wrap; line-height: 1.5;">${formulaText}</code>`;
+        }
+    });
+    
+    // 将背景容器添加到主容器
+    formulaContainer.appendChild(backgroundContainer);
 }
 
 // 更新性能指标
@@ -742,9 +769,9 @@ function generateFormulaTree(result) {
     // 解析表达式生成语法树
     const syntaxTree = parseExpressionToSyntaxTree(result.expression, result.featureImportance);
     
-    // 设置更大的树形图尺寸
-    const width = Math.max(treeContainer.clientWidth || 800, 800);
-    const height = Math.max(treeContainer.clientHeight || 600, 600);
+    // 设置更大的树形图尺寸（独占一行）
+    const width = Math.max(treeContainer.clientWidth || 1200, 1200);
+    const height = Math.max(treeContainer.clientHeight || 800, 800);
     
     try {
         // 创建SVG容器
@@ -757,8 +784,8 @@ function generateFormulaTree(result) {
         
         // 创建树形布局，增加间距
         const treeLayout = d3.tree()
-            .size([width - 200, height - 200])
-            .separation((a, b) => (a.parent === b.parent ? 1.5 : 2)); // 增加节点间距
+            .size([width - 300, height - 200])
+            .separation((a, b) => (a.parent === b.parent ? 2 : 3)); // 进一步增加节点间距
         
         // 创建层次结构
         const root = d3.hierarchy(syntaxTree);
@@ -773,7 +800,7 @@ function generateFormulaTree(result) {
             .append('path')
             .attr('class', 'link')
             .attr('d', d3.linkVertical()
-                .x(d => d.x + 100)
+                .x(d => d.x + 150)
                 .y(d => d.y + 100))
             .style('fill', 'none')
             .style('stroke', '#666')
@@ -785,14 +812,16 @@ function generateFormulaTree(result) {
             .enter()
             .append('g')
             .attr('class', 'node')
-            .attr('transform', d => `translate(${d.x + 100},${d.y + 100})`);
+            .attr('transform', d => `translate(${d.x + 150},${d.y + 100})`);
         
-        // 绘制更大的节点圆圈
-        nodes.append('circle')
-            .attr('r', d => d.data.type === 'operator' ? 35 : 30) // 增大节点半径
+        // 绘制椭圆形节点
+        nodes.append('ellipse')
+            .attr('rx', d => d.data.type === 'operator' ? 45 : 40) // 椭圆形半径
+            .attr('ry', d => d.data.type === 'operator' ? 35 : 30)
             .style('fill', d => {
                 if (d.data.type === 'operator') {
-                    return '#4a9eff';
+                    // 运算符节点使用灰阶色调
+                    return '#666666';
                 }
                 // 根据权重返回颜色
                 const weightClass = d.data.weight || 'weight-5';
@@ -1440,4 +1469,23 @@ function visualizeResults(modelId) {
 // 导出蒙特卡罗结果
 function exportMonteCarloResults(analysisId) {
     showNotification('导出功能开发中...', 'info');
+} 
+
+// 绑定剪枝控制按钮事件
+function bindPruningControls() {
+    const deleteSelectedBtn = document.getElementById('delete-selected');
+    const resetFormulaBtn = document.getElementById('reset-formula');
+    const recalculateBtn = document.getElementById('recalculate');
+    
+    if (deleteSelectedBtn) {
+        deleteSelectedBtn.addEventListener('click', deleteSelectedNodes);
+    }
+    
+    if (resetFormulaBtn) {
+        resetFormulaBtn.addEventListener('click', resetFormula);
+    }
+    
+    if (recalculateBtn) {
+        recalculateBtn.addEventListener('click', recalculateRegression);
+    }
 } 
