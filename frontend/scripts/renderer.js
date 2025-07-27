@@ -436,7 +436,7 @@ function displayRegressionResults(result) {
         formulaDisplay.style.display = 'block';
         
         // 更新LaTeX公式
-        renderLatexFormula(result.expression);
+        renderLatexFormula(result.expression, document.getElementById('target-column').value);
         
         // 更新性能指标
         updatePerformanceMetrics(result);
@@ -446,13 +446,13 @@ function displayRegressionResults(result) {
     }
 }
 
-// 格式化公式为LaTeX
+// 格式化公式为LaTeX（支持换行）
 function formatFormulaToLatex(expression) {
     // 清理表达式
     let cleaned = expression
-        .replace(/\+\s*\+/g, '+')  // 移除重复的加号
-        .replace(/\+\s*-/g, '-')   // 处理正负号
-        .replace(/\s+/g, ' ')      // 统一空格
+        .replace(/\+\s*\+/g, '+')
+        .replace(/\+\s*-/g, '-')
+        .replace(/\s+/g, ' ')
         .trim();
     
     // 分割各项
@@ -481,30 +481,42 @@ function formatFormulaToLatex(expression) {
         return term;
     }).filter(term => term !== '');
     
-    // 组合公式
+    // 组合公式，支持换行
     let latex = formattedTerms.join(' + ');
     
     // 处理特殊情况
     if (latex === '') latex = '0';
     if (latex.startsWith('+ ')) latex = latex.substring(2);
     
-    // 返回LaTeX格式
+    // 添加换行支持（每5项换一行）
+    const maxTermsPerLine = 5;
+    if (formattedTerms.length > maxTermsPerLine) {
+        const lines = [];
+        for (let i = 0; i < formattedTerms.length; i += maxTermsPerLine) {
+            const line = formattedTerms.slice(i, i + maxTermsPerLine).join(' + ');
+            lines.push(line);
+        }
+        latex = lines.join(' \\\\ ');
+    }
+    
     return latex;
 }
 
 // 渲染LaTeX公式
-function renderLatexFormula(expression) {
+function renderLatexFormula(expression, targetColumn) {
     const formulaLatex = document.getElementById('formula-latex');
     if (formulaLatex) {
         const latex = formatFormulaToLatex(expression);
-        formulaLatex.innerHTML = `$$${latex}$$`;
+        // 添加目标变量和等号
+        const fullFormula = `${targetColumn} = ${latex}`;
+        formulaLatex.innerHTML = `$$${fullFormula}$$`;
         
         // 重新渲染MathJax
         if (window.MathJax) {
             MathJax.typesetPromise([formulaLatex]).catch((err) => {
                 console.error('MathJax渲染失败:', err);
                 // 如果MathJax失败，显示原始文本
-                formulaLatex.innerHTML = `<code>${latex}</code>`;
+                formulaLatex.innerHTML = `<code>${fullFormula}</code>`;
             });
         }
     }
@@ -533,17 +545,69 @@ function updatePerformanceMetrics(result) {
     }
 }
 
-// 生成公式树
+// 解析表达式为语法树（参考HeuristicLab实现）
+function parseExpressionToSyntaxTree(expression, featureImportance) {
+    // 清理表达式
+    let cleaned = expression
+        .replace(/\+\s*\+/g, '+')
+        .replace(/\+\s*-/g, '-')
+        .replace(/\s+/g, ' ')
+        .trim();
+    
+    // 分割各项
+    const terms = cleaned.split(/(?=[+-])/).filter(term => term.trim());
+    
+    // 创建根节点（加法节点）
+    const rootNode = {
+        id: 'root',
+        type: 'operator',
+        operator: '+',
+        children: [],
+        level: 0
+    };
+    
+    // 解析每个项
+    terms.forEach((term, index) => {
+        term = term.trim();
+        if (term.startsWith('+')) {
+            term = term.substring(1);
+        }
+        
+        // 处理系数和变量
+        const parts = term.split('*');
+        if (parts.length === 2) {
+            const coefficient = parseFloat(parts[0].trim());
+            const variable = parts[1].trim();
+            
+            if (coefficient !== 0) {
+                const termNode = {
+                    id: `term_${index}`,
+                    type: 'term',
+                    coefficient: coefficient,
+                    variable: variable,
+                    importance: featureImportance[variable] || 0.1,
+                    weight: getWeightClass(featureImportance[variable] || 0.1),
+                    level: 1
+                };
+                rootNode.children.push(termNode);
+            }
+        }
+    });
+    
+    return rootNode;
+}
+
+// 生成公式树（使用语法树）
 function generateFormulaTree(result) {
     const treeContainer = document.getElementById('formula-tree');
     if (!treeContainer) return;
     
-    // 解析表达式生成树结构
-    const treeData = parseExpressionToTree(result.expression, result.featureImportance);
+    // 解析表达式生成语法树
+    const syntaxTree = parseExpressionToSyntaxTree(result.expression, result.featureImportance);
     
     treeContainer.innerHTML = '';
     
-    // 创建SVG容器用于绘制连接线
+    // 创建SVG容器
     const svgContainer = document.createElement('div');
     svgContainer.className = 'tree-svg-container';
     svgContainer.style.position = 'relative';
@@ -570,83 +634,130 @@ function generateFormulaTree(result) {
     nodesContainer.style.zIndex = '2';
     treeContainer.appendChild(nodesContainer);
     
-    // 渲染树节点
-    const nodePositions = renderTreeNodesWithSVG(nodesContainer, svg, treeData);
+    // 渲染语法树
+    const nodePositions = renderSyntaxTree(nodesContainer, svg, syntaxTree);
     
     // 添加右键菜单事件
     setupContextMenu();
 }
 
-// 渲染树节点（带SVG连接线）
-function renderTreeNodesWithSVG(container, svg, node, level = 0, xOffset = 0) {
+// 渲染语法树
+function renderSyntaxTree(container, svg, node, level = 0, xOffset = 0, parentX = null, parentY = null) {
     const nodePositions = [];
     
-    if (node.type === 'expression') {
-        const expressionDiv = document.createElement('div');
-        expressionDiv.className = 'tree-expression';
-        expressionDiv.innerHTML = '<strong>药效预测公式结构</strong>';
-        expressionDiv.style.textAlign = 'center';
-        expressionDiv.style.marginBottom = '20px';
-        container.appendChild(expressionDiv);
-        
-        // 计算子节点布局
-        const childCount = node.children.length;
-        const totalWidth = 800; // 总宽度
-        const nodeWidth = 200; // 每个节点宽度
-        const spacing = (totalWidth - childCount * nodeWidth) / (childCount + 1);
-        
-        node.children.forEach((child, index) => {
-            const childX = spacing + index * (nodeWidth + spacing);
-            const childY = 80 + level * 120;
-            
-            const childPositions = renderTreeNodesWithSVG(container, svg, child, level + 1, childX);
-            nodePositions.push(...childPositions);
-            
-            // 绘制连接线
-            if (level === 0) {
-                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                line.setAttribute('x1', '400'); // 根节点中心
-                line.setAttribute('y1', '40');
-                line.setAttribute('x2', childX + 100); // 子节点中心
-                line.setAttribute('y2', childY);
-                line.setAttribute('stroke', '#666');
-                line.setAttribute('stroke-width', '2');
-                svg.appendChild(line);
-            }
-        });
-    } else if (node.type === 'term') {
-        const nodeDiv = document.createElement('div');
-        nodeDiv.className = `tree-node ${node.weight}`;
-        nodeDiv.setAttribute('data-node-id', node.id);
-        nodeDiv.setAttribute('data-feature', node.feature);
-        nodeDiv.setAttribute('data-importance', node.importance);
-        nodeDiv.setAttribute('data-coefficient', node.coefficient);
+    if (node.type === 'operator') {
+        // 渲染运算符节点
+        const operatorDiv = document.createElement('div');
+        operatorDiv.className = 'tree-operator-node';
+        operatorDiv.setAttribute('data-node-id', node.id);
+        operatorDiv.setAttribute('data-operator', node.operator);
         
         // 设置节点位置
-        nodeDiv.style.position = 'absolute';
-        nodeDiv.style.left = `${xOffset}px`;
-        nodeDiv.style.top = `${80 + level * 120}px`;
-        nodeDiv.style.width = '200px';
+        operatorDiv.style.position = 'absolute';
+        operatorDiv.style.left = `${xOffset}px`;
+        operatorDiv.style.top = `${50 + level * 100}px`;
+        operatorDiv.style.width = '80px';
+        operatorDiv.style.height = '60px';
+        
+        operatorDiv.innerHTML = `
+            <div class="operator-content">
+                <div class="operator-symbol">${node.operator}</div>
+                <div class="operator-label">运算符</div>
+            </div>
+        `;
+        
+        container.appendChild(operatorDiv);
+        
+        const operatorX = xOffset + 40;
+        const operatorY = 50 + level * 100 + 30;
+        
+        nodePositions.push({
+            id: node.id,
+            x: operatorX,
+            y: operatorY,
+            element: operatorDiv
+        });
+        
+        // 绘制到父节点的连接线
+        if (parentX !== null && parentY !== null) {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', parentX);
+            line.setAttribute('y1', parentY);
+            line.setAttribute('x2', operatorX);
+            line.setAttribute('y2', operatorY);
+            line.setAttribute('stroke', '#666');
+            line.setAttribute('stroke-width', '2');
+            svg.appendChild(line);
+        }
+        
+        // 渲染子节点
+        if (node.children && node.children.length > 0) {
+            const childCount = node.children.length;
+            const totalWidth = Math.max(800, childCount * 200);
+            const nodeWidth = 200;
+            const spacing = (totalWidth - childCount * nodeWidth) / (childCount + 1);
+            
+            node.children.forEach((child, index) => {
+                const childX = spacing + index * (nodeWidth + spacing);
+                const childY = 50 + (level + 1) * 100;
+                
+                const childPositions = renderSyntaxTree(
+                    container, svg, child, level + 1, childX, 
+                    operatorX, operatorY
+                );
+                nodePositions.push(...childPositions);
+            });
+        }
+        
+    } else if (node.type === 'term') {
+        // 渲染项节点
+        const termDiv = document.createElement('div');
+        termDiv.className = `tree-node ${node.weight}`;
+        termDiv.setAttribute('data-node-id', node.id);
+        termDiv.setAttribute('data-feature', node.variable);
+        termDiv.setAttribute('data-importance', node.importance);
+        termDiv.setAttribute('data-coefficient', node.coefficient);
+        
+        // 设置节点位置
+        termDiv.style.position = 'absolute';
+        termDiv.style.left = `${xOffset}px`;
+        termDiv.style.top = `${50 + level * 100}px`;
+        termDiv.style.width = '200px';
         
         // 创建节点内容
         const coefficient = node.coefficient > 0 ? `+${node.coefficient.toFixed(3)}` : node.coefficient.toFixed(3);
         
-        nodeDiv.innerHTML = `
+        termDiv.innerHTML = `
             <div class="node-content">
                 <div class="node-coefficient">${coefficient}</div>
-                <div class="node-feature">× ${node.feature}</div>
+                <div class="node-feature">× ${node.variable}</div>
                 <div class="node-importance">权重: ${node.importance.toFixed(3)}</div>
             </div>
         `;
         
-        container.appendChild(nodeDiv);
+        container.appendChild(termDiv);
+        
+        const termX = xOffset + 100;
+        const termY = 50 + level * 100 + 30;
         
         nodePositions.push({
             id: node.id,
-            x: xOffset + 100, // 节点中心X
-            y: 80 + level * 120 + 30, // 节点中心Y
-            element: nodeDiv
+            x: termX,
+            y: termY,
+            element: termDiv
         });
+        
+        // 绘制到父节点的连接线
+        if (parentX !== null && parentY !== null) {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', parentX);
+            line.setAttribute('y1', parentY);
+            line.setAttribute('x2', termX);
+            line.setAttribute('y2', termY);
+            line.setAttribute('stroke', '#666');
+            line.setAttribute('stroke-width', '2');
+            svg.appendChild(line);
+        }
     }
     
     return nodePositions;
@@ -663,53 +774,6 @@ function getWeightClass(importance) {
     if (importance >= 0.2) return 'weight-3';
     if (importance >= 0.1) return 'weight-2';
     return 'weight-1';
-}
-
-// 解析表达式为树结构
-function parseExpressionToTree(expression, featureImportance) {
-    // 清理表达式
-    let cleaned = expression
-        .replace(/\+\s*\+/g, '+')
-        .replace(/\+\s*-/g, '-')
-        .replace(/\s+/g, ' ')
-        .trim();
-    
-    // 分割各项
-    const terms = cleaned.split(/(?=[+-])/).filter(term => term.trim());
-    
-    // 创建树节点
-    const nodes = [];
-    terms.forEach((term, index) => {
-        term = term.trim();
-        if (term.startsWith('+')) {
-            term = term.substring(1);
-        }
-        
-        // 处理系数和变量
-        const parts = term.split('*');
-        if (parts.length === 2) {
-            const coefficient = parseFloat(parts[0].trim());
-            const variable = parts[1].trim();
-            
-            // 找到特征的重要性
-            const importance = featureImportance.find(f => f.feature === variable)?.importance || 0;
-            
-            nodes.push({
-                id: `node-${index}`,
-                type: 'term',
-                coefficient: coefficient,
-                feature: variable,
-                importance: importance,
-                weight: getWeightClass(importance),
-                weightValue: importance
-            });
-        }
-    });
-    
-    return {
-        type: 'expression',
-        children: nodes
-    };
 }
 
 // 设置右键菜单
