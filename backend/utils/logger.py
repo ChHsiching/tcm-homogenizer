@@ -4,6 +4,7 @@
 日志配置模块
 """
 
+import os
 import sys
 from pathlib import Path
 from loguru import logger
@@ -13,9 +14,10 @@ def setup_logger():
     # 移除默认的日志处理器
     logger.remove()
     
-    # 创建日志目录
-    log_dir = Path("logs")
-    log_dir.mkdir(exist_ok=True)
+    # 获取日志目录
+    log_dir = os.environ.get('LOG_DIR', 'logs')
+    log_dir = Path(log_dir)
+    log_dir.mkdir(exist_ok=True, parents=True)
     
     # 控制台日志格式
     console_format = (
@@ -62,4 +64,5 @@ def setup_logger():
     )
     
     logger.info("📝 日志系统初始化完成")
+    logger.info(f"📁 日志目录: {log_dir}")
     return logger 
