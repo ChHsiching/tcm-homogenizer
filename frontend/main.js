@@ -1,46 +1,54 @@
-const { app, BrowserWindow, Menu, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, dialog, ipcMain } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 
-// 保持对窗口对象的全局引用，如果不这么做的话，当JavaScript对象被
-// 垃圾回收的时候，窗口会被自动地关闭
+// 禁用SSL证书验证（仅用于开发环境）
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
+// 全局变量
 let mainWindow;
+let backendProcess = null;
+const backendPort = 5000;
 
 function createWindow() {
-  // 创建浏览器窗口
-  mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
-    },
-    icon: path.join(__dirname, 'assets/icon.png'), // 可选：应用图标
-    title: '中药多组分均化分析客户端',
-    show: false // 先不显示，等准备好再显示
-  });
+    // 创建浏览器窗口
+    mainWindow = new BrowserWindow({
+        width: 1400,
+        height: 900,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            enableRemoteModule: false,
+            preload: path.join(__dirname, 'preload.js'),
+            webSecurity: false, // 允许跨域请求
+            allowRunningInsecureContent: true // 允许不安全内容
+        },
+        icon: path.join(__dirname, 'assets', 'icon.png'),
+        show: false,
+        titleBarStyle: 'default'
+    });
 
-  // 加载应用的 index.html
-  mainWindow.loadFile('index.html');
+    // 加载应用
+    mainWindow.loadFile('index.html');
 
-  // 当窗口准备好显示时显示
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-  });
+    // 当窗口准备好时显示
+    mainWindow.once('ready-to-show', () => {
+        mainWindow.show();
+        
+        // 启动后端服务
+        startBackendService();
+    });
 
-  // 当窗口被关闭时发出
-  mainWindow.on('closed', () => {
-    // 取消引用 window 对象，如果你的应用支持多窗口的话，
-    // 通常会把多个 window 对象存放在一个数组里面，
-    // 与此同时，你应该删除相应的元素。
-    mainWindow = null;
-  });
+    // 当窗口关闭时
+    mainWindow.on('closed', () => {
+        mainWindow = null;
+        stopBackendService();
+    });
 
-  // 开发环境下打开开发者工具
-  if (process.env.NODE_ENV === 'development') {
-    mainWindow.webContents.openDevTools();
-  }
+    // 开发环境打开开发者工具
+    if (process.env.NODE_ENV === 'development') {
+        mainWindow.webContents.openDevTools();
+    }
 }
 
 // 当 Electron 完成初始化并准备创建浏览器窗口时调用此方法
@@ -153,3 +161,98 @@ ipcMain.handle('stop-backend', async () => {
   // 停止后端服务的逻辑
   return { success: true };
 }); 
+
+// 启动后端服务
+function startBackendService() {
+    if (backendProcess) {
+        console.log('Backend service already running');
+        return;
+    }
+
+    console.log('Starting backend service...');
+    
+    // 启动Python后端服务
+    backendProcess = spawn('python', ['../backend/main.py'], {
+        cwd: path.join(__dirname, '..', 'backend'),
+        stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    backendProcess.stdout.on('data', (data) => {
+        console.log('Backend stdout:', data.toString());
+    });
+
+    backendProcess.stderr.on('data', (data) => {
+        console.log('Backend stderr:', data.toString());
+    });
+
+    backendProcess.on('close', (code) => {
+        console.log('Backend process exited with code:', code);
+        backendProcess = null;
+    });
+
+    backendProcess.on('error', (error) => {
+        console.error('Backend process error:', error);
+        dialog.showErrorBox('后端服务错误', `启动后端服务失败: ${error.message}`);
+    });
+
+    // 等待后端服务启动
+    setTimeout(() => {
+        checkBackendHealth();
+    }, 2000);
+}
+
+// 停止后端服务
+function stopBackendService() {
+    if (backendProcess) {
+        console.log('Stopping backend service...');
+        backendProcess.kill();
+        backendProcess = null;
+    }
+}
+
+// 检查后端服务健康状态
+async function checkBackendHealth() {
+    try {
+        const response = await fetch(`http://localhost:${backendPort}/api/health`);
+        if (response.ok) {
+            console.log('Backend service is healthy');
+            if (mainWindow) {
+                mainWindow.webContents.send('backend-status', { connected: true });
+            }
+        } else {
+            console.log('Backend service health check failed');
+            if (mainWindow) {
+                mainWindow.webContents.send('backend-status', { connected: false });
+            }
+        }
+    } catch (error) {
+        console.log('Backend service not available:', error.message);
+        if (mainWindow) {
+            mainWindow.webContents.send('backend-status', { connected: false });
+        }
+    }
+}
+
+// 等待后端服务启动
+async function waitForBackend() {
+    const maxAttempts = 10;
+    let attempts = 0;
+    
+    while (attempts < maxAttempts) {
+        try {
+            const response = await fetch(`http://localhost:${backendPort}/api/health`);
+            if (response.ok) {
+                console.log('Backend service is ready');
+                return true;
+            }
+        } catch (error) {
+            console.log(`Backend not ready, attempt ${attempts + 1}/${maxAttempts}`);
+        }
+        
+        attempts++;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    console.log('Backend service failed to start');
+    return false;
+} 

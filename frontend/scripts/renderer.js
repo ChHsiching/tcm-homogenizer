@@ -463,7 +463,7 @@ function displayRegressionResults(result) {
     }
 }
 
-// 格式化公式为LaTeX（支持换行）
+// 格式化公式为LaTeX（支持分段渲染）
 function formatFormulaToLatex(expression, targetColumn) {
     // 清理表达式
     let cleaned = expression
@@ -498,29 +498,18 @@ function formatFormulaToLatex(expression, targetColumn) {
         return term;
     }).filter(term => term !== '');
     
-    // 组合公式，支持换行
+    // 组合公式
     let latex = formattedTerms.join(' + ');
     
     // 处理特殊情况
     if (latex === '') latex = '0';
     if (latex.startsWith('+ ')) latex = latex.substring(2);
     
-    // 添加换行支持（每3项换一行，避免过长）
-    const maxTermsPerLine = 3;
-    if (formattedTerms.length > maxTermsPerLine) {
-        const lines = [];
-        for (let i = 0; i < formattedTerms.length; i += maxTermsPerLine) {
-            const line = formattedTerms.slice(i, i + maxTermsPerLine).join(' + ');
-            lines.push(line);
-        }
-        latex = lines.join(' \\\\ ');
-    }
-    
     // 添加等号和目标变量
     return `${targetColumn} = ${latex}`;
 }
 
-// 渲染LaTeX公式
+// 渲染LaTeX公式（分段渲染）
 function renderLatexFormula(expression, targetColumn) {
     const formulaContainer = document.getElementById('formula-latex');
     if (!formulaContainer) {
@@ -536,41 +525,55 @@ function renderLatexFormula(expression, targetColumn) {
     // 清空容器
     formulaContainer.innerHTML = '';
     
-    // 创建公式元素
-    const formulaElement = document.createElement('div');
-    formulaElement.className = 'formula-content';
-    formulaElement.style.cssText = `
-        padding: 20px;
-        background: #2a2a2a;
-        border-radius: 8px;
-        margin: 10px 0;
-        overflow-x: auto;
-        word-wrap: break-word;
-        overflow-wrap: break-word;
-        max-width: 100%;
-    `;
+    // 分段渲染：每3项为一段
+    const terms = latexFormula.split(' + ');
+    const maxTermsPerSegment = 3;
+    const segments = [];
     
-    // 使用MathJax渲染
-    formulaElement.innerHTML = `$$${latexFormula}$$`;
-    
-    // 添加到容器
-    formulaContainer.appendChild(formulaElement);
-    
-    // 触发MathJax重新渲染
-    if (window.MathJax && window.MathJax.typesetPromise) {
-        console.log('Using MathJax to render formula');
-        MathJax.typesetPromise([formulaElement]).then(() => {
-            console.log('MathJax rendering completed');
-        }).catch((err) => {
-            console.error('MathJax rendering failed:', err);
-            // 降级到普通文本显示
-            formulaElement.innerHTML = `<code style="color: #4a9eff; font-size: 14px; white-space: pre-wrap;">${latexFormula}</code>`;
-        });
-    } else {
-        console.log('MathJax not available, using fallback');
-        // 如果MathJax不可用，使用普通文本
-        formulaElement.innerHTML = `<code style="color: #4a9eff; font-size: 14px; white-space: pre-wrap;">${latexFormula}</code>`;
+    for (let i = 0; i < terms.length; i += maxTermsPerSegment) {
+        const segment = terms.slice(i, i + maxTermsPerSegment).join(' + ');
+        segments.push(segment);
     }
+    
+    // 创建分段容器
+    segments.forEach((segment, index) => {
+        const segmentElement = document.createElement('div');
+        segmentElement.className = 'formula-segment';
+        segmentElement.style.cssText = `
+            padding: 15px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            margin: 10px 0;
+            text-align: center;
+            overflow-x: auto;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 100%;
+        `;
+        
+        // 如果是第一段，包含等号
+        const formulaText = index === 0 ? segment : segment;
+        segmentElement.innerHTML = `$$${formulaText}$$`;
+        
+        // 添加到容器
+        formulaContainer.appendChild(segmentElement);
+        
+        // 触发MathJax重新渲染
+        if (window.MathJax && window.MathJax.typesetPromise) {
+            console.log('Using MathJax to render segment:', index);
+            MathJax.typesetPromise([segmentElement]).then(() => {
+                console.log('MathJax rendering completed for segment:', index);
+            }).catch((err) => {
+                console.error('MathJax rendering failed for segment:', index, err);
+                // 降级到普通文本显示
+                segmentElement.innerHTML = `<code style="color: #4a9eff; font-size: 14px; white-space: pre-wrap;">${formulaText}</code>`;
+            });
+        } else {
+            console.log('MathJax not available, using fallback for segment:', index);
+            // 如果MathJax不可用，使用普通文本
+            segmentElement.innerHTML = `<code style="color: #4a9eff; font-size: 14px; white-space: pre-wrap;">${formulaText}</code>`;
+        }
+    });
 }
 
 // 更新性能指标
@@ -655,36 +658,20 @@ function parseExpressionToSyntaxTree(expression, featureImportance) {
         }
     }
     
-    // 创建根节点（加法节点）
-    const rootNode = {
-        id: 'root',
-        name: 'Addition',
-        type: 'operator',
-        operator: '+',
-        children: [],
-        importance: 1.0,
-        weight: 'weight-9'
-    };
-    
-    // 解析每个项
-    terms.forEach((term, index) => {
-        term = term.trim();
-        if (term.startsWith('+')) {
-            term = term.substring(1);
-        }
-        
-        // 处理系数和变量
-        const parts = term.split('*');
-        if (parts.length === 2) {
-            const coefficient = parseFloat(parts[0].trim());
-            const variable = parts[1].trim();
-            
-            if (coefficient !== 0) {
-                // 找到特征的重要性
+    // 创建真正的语法树结构
+    // 对于加法表达式，创建二叉树结构
+    const createBinaryTree = (terms, start, end) => {
+        if (start === end) {
+            // 单个项
+            const term = terms[start].trim();
+            const parts = term.split('*');
+            if (parts.length === 2) {
+                const coefficient = parseFloat(parts[0].trim());
+                const variable = parts[1].trim();
                 const importance = featureImportance.find(f => f.feature === variable)?.importance || 0.1;
                 
-                const termNode = {
-                    id: `term_${index}`,
+                return {
+                    id: `term_${start}`,
                     name: variable,
                     type: 'variable',
                     coefficient: coefficient,
@@ -692,10 +679,52 @@ function parseExpressionToSyntaxTree(expression, featureImportance) {
                     weight: getWeightClass(importance),
                     children: []
                 };
-                rootNode.children.push(termNode);
             }
         }
-    });
+        
+        if (end - start === 1) {
+            // 两个项，创建加法节点
+            const left = createBinaryTree(terms, start, start);
+            const right = createBinaryTree(terms, end, end);
+            
+            return {
+                id: `op_${start}_${end}`,
+                name: 'Addition',
+                type: 'operator',
+                operator: '+',
+                importance: 1.0,
+                weight: 'weight-9',
+                children: [left, right]
+            };
+        }
+        
+        // 多个项，递归创建二叉树
+        const mid = Math.floor((start + end) / 2);
+        const left = createBinaryTree(terms, start, mid);
+        const right = createBinaryTree(terms, mid + 1, end);
+        
+        return {
+            id: `op_${start}_${end}`,
+            name: 'Addition',
+            type: 'operator',
+            operator: '+',
+            importance: 1.0,
+            weight: 'weight-9',
+            children: [left, right]
+        };
+    };
+    
+    // 处理各项，确保格式正确
+    const processedTerms = terms.map(term => {
+        term = term.trim();
+        if (term.startsWith('+')) {
+            term = term.substring(1);
+        }
+        return term;
+    }).filter(term => term !== '');
+    
+    // 创建根节点
+    const rootNode = createBinaryTree(processedTerms, 0, processedTerms.length - 1);
     
     console.log('Parsed tree:', rootNode);
     return rootNode;
