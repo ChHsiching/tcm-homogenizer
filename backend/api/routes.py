@@ -18,7 +18,7 @@ monte_carlo_bp = Blueprint('monte_carlo', __name__)
 data_bp = Blueprint('data', __name__)
 
 # 全局实例
-regression_engine = SymbolicRegression()
+symbolic_regression_engine = SymbolicRegression()
 monte_carlo_engine = MonteCarloAnalysis()
 data_loader = DataLoader()
 
@@ -52,7 +52,7 @@ def symbolic_regression():
             return jsonify({'error': '至少需要选择一个特征变量'}), 400
         
         # 执行符号回归分析
-        result = regression_engine.analyze(
+        result = symbolic_regression_engine.analyze(
             data=input_data,
             target_column=target_column,
             feature_columns=feature_columns,
@@ -77,7 +77,7 @@ def symbolic_regression():
 def get_models():
     """获取已保存的模型列表"""
     try:
-        models = regression_engine.get_saved_models()
+        models = symbolic_regression_engine.get_saved_models()
         return jsonify({
             'success': True,
             'models': models
@@ -93,7 +93,7 @@ def get_models():
 def get_model(model_id):
     """获取特定模型详情"""
     try:
-        model = regression_engine.get_model(model_id)
+        model = symbolic_regression_engine.get_model(model_id)
         if model:
             return jsonify({
                 'success': True,

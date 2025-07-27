@@ -451,12 +451,45 @@ function displayRegressionResults(result) {
 
 // 格式化公式为LaTeX
 function formatFormulaToLatex(expression) {
-    // 简单的LaTeX格式化
-    let latex = expression
-        .replace(/\*/g, ' \\cdot ')
-        .replace(/\//g, ' \\div ')
-        .replace(/\^/g, '^')
-        .replace(/sqrt/g, '\\sqrt');
+    // 清理表达式
+    let cleaned = expression
+        .replace(/\+\s*\+/g, '+')  // 移除重复的加号
+        .replace(/\+\s*-/g, '-')   // 处理正负号
+        .replace(/\s+/g, ' ')      // 统一空格
+        .trim();
+    
+    // 分割各项
+    const terms = cleaned.split(/(?=[+-])/).filter(term => term.trim());
+    
+    // 格式化各项
+    const formattedTerms = terms.map(term => {
+        term = term.trim();
+        if (term.startsWith('+')) {
+            term = term.substring(1);
+        }
+        
+        // 处理系数和变量
+        const parts = term.split('*');
+        if (parts.length === 2) {
+            const coefficient = parseFloat(parts[0].trim());
+            const variable = parts[1].trim();
+            
+            if (coefficient === 0) return '';
+            if (coefficient === 1) return variable;
+            if (coefficient === -1) return `-${variable}`;
+            
+            return `${coefficient.toFixed(3)} \\cdot ${variable}`;
+        }
+        
+        return term;
+    }).filter(term => term !== '');
+    
+    // 组合公式
+    let latex = formattedTerms.join(' + ');
+    
+    // 处理特殊情况
+    if (latex === '') latex = '0';
+    if (latex.startsWith('+ ')) latex = latex.substring(2);
     
     return `$$${latex}$$`;
 }
@@ -501,26 +534,41 @@ function generateFormulaTree(result) {
 
 // 解析表达式为树结构
 function parseExpressionToTree(expression, featureImportance) {
-    // 简化的表达式解析
-    const nodes = [];
-    const terms = expression.split('+').map(term => term.trim());
+    // 清理表达式
+    let cleaned = expression
+        .replace(/\+\s*\+/g, '+')
+        .replace(/\+\s*-/g, '-')
+        .replace(/\s+/g, ' ')
+        .trim();
     
+    // 分割各项
+    const terms = cleaned.split(/(?=[+-])/).filter(term => term.trim());
+    
+    // 创建树节点
+    const nodes = [];
     terms.forEach((term, index) => {
+        term = term.trim();
+        if (term.startsWith('+')) {
+            term = term.substring(1);
+        }
+        
+        // 处理系数和变量
         const parts = term.split('*');
         if (parts.length === 2) {
-            const coefficient = parseFloat(parts[0]) || 1;
-            const feature = parts[1].trim();
+            const coefficient = parseFloat(parts[0].trim());
+            const variable = parts[1].trim();
             
             // 找到特征的重要性
-            const importance = featureImportance.find(f => f.feature === feature)?.importance || 0;
+            const importance = featureImportance.find(f => f.feature === variable)?.importance || 0;
             
             nodes.push({
                 id: `node-${index}`,
                 type: 'term',
                 coefficient: coefficient,
-                feature: feature,
+                feature: variable,
                 importance: importance,
-                weight: getWeightClass(importance)
+                weight: getWeightClass(importance),
+                weightValue: importance
             });
         }
     });
@@ -531,11 +579,17 @@ function parseExpressionToTree(expression, featureImportance) {
     };
 }
 
-// 获取权重类别
+// 获取权重类别（红到绿的渐变）
 function getWeightClass(importance) {
-    if (importance > 0.5) return 'high-weight';
-    if (importance > 0.2) return 'medium-weight';
-    return 'low-weight';
+    if (importance >= 0.8) return 'weight-9';
+    if (importance >= 0.7) return 'weight-8';
+    if (importance >= 0.6) return 'weight-7';
+    if (importance >= 0.5) return 'weight-6';
+    if (importance >= 0.4) return 'weight-5';
+    if (importance >= 0.3) return 'weight-4';
+    if (importance >= 0.2) return 'weight-3';
+    if (importance >= 0.1) return 'weight-2';
+    return 'weight-1';
 }
 
 // 渲染树节点
@@ -543,11 +597,24 @@ function renderTreeNodes(container, node, level = 0) {
     if (node.type === 'expression') {
         const expressionDiv = document.createElement('div');
         expressionDiv.className = 'tree-expression';
-        expressionDiv.innerHTML = '<strong>药效预测公式</strong>';
+        expressionDiv.innerHTML = '<strong>药效预测公式结构</strong>';
         container.appendChild(expressionDiv);
         
-        node.children.forEach(child => {
-            renderTreeNodes(container, child, level + 1);
+        // 创建树形容器
+        const treeContainer = document.createElement('div');
+        treeContainer.className = 'tree-structure';
+        container.appendChild(treeContainer);
+        
+        node.children.forEach((child, index) => {
+            renderTreeNodes(treeContainer, child, level + 1);
+            
+            // 添加连接线（除了最后一个节点）
+            if (index < node.children.length - 1) {
+                const connector = document.createElement('div');
+                connector.className = 'tree-connector';
+                connector.innerHTML = '└─';
+                treeContainer.appendChild(connector);
+            }
         });
     } else if (node.type === 'term') {
         const nodeDiv = document.createElement('div');
@@ -555,11 +622,17 @@ function renderTreeNodes(container, node, level = 0) {
         nodeDiv.setAttribute('data-node-id', node.id);
         nodeDiv.setAttribute('data-feature', node.feature);
         nodeDiv.setAttribute('data-importance', node.importance);
+        nodeDiv.setAttribute('data-coefficient', node.coefficient);
+        
+        // 创建节点内容
+        const coefficient = node.coefficient > 0 ? `+${node.coefficient.toFixed(3)}` : node.coefficient.toFixed(3);
         
         nodeDiv.innerHTML = `
-            <span class="node-coefficient">${node.coefficient > 0 ? '+' : ''}${node.coefficient.toFixed(3)}</span>
-            <span class="node-feature">× ${node.feature}</span>
-            <span class="node-importance">(权重: ${node.importance.toFixed(3)})</span>
+            <div class="node-content">
+                <span class="node-coefficient">${coefficient}</span>
+                <span class="node-feature">× ${node.feature}</span>
+                <span class="node-importance">(权重: ${node.importance.toFixed(3)})</span>
+            </div>
         `;
         
         container.appendChild(nodeDiv);
@@ -619,19 +692,39 @@ function toggleNodeSelection(node) {
 
 // 删除节点
 function deleteNode(nodeId) {
-    // 这里应该重新计算回归，删除指定节点
-    showNotification('节点删除功能开发中...', 'info');
+    const node = document.querySelector(`[data-node-id="${nodeId}"]`);
+    if (node) {
+        // 标记节点为删除状态
+        node.style.opacity = '0.3';
+        node.style.textDecoration = 'line-through';
+        node.classList.add('deleted');
+        
+        // 获取被删除的特征
+        const deletedFeature = node.getAttribute('data-feature');
+        const deletedFeatures = window.deletedFeatures || [];
+        deletedFeatures.push(deletedFeature);
+        window.deletedFeatures = deletedFeatures;
+        
+        showNotification(`已标记删除特征: ${deletedFeature}`, 'info');
+    }
 }
 
 // 删除低权重节点
 function deleteLowWeightNodes() {
-    // 删除所有低权重节点
-    const lowWeightNodes = document.querySelectorAll('.tree-node.low-weight');
+    const lowWeightNodes = document.querySelectorAll('.tree-node.weight-1, .tree-node.weight-2, .tree-node.weight-3');
+    const deletedFeatures = [];
+    
     lowWeightNodes.forEach(node => {
         node.style.opacity = '0.3';
         node.style.textDecoration = 'line-through';
+        node.classList.add('deleted');
+        
+        const feature = node.getAttribute('data-feature');
+        deletedFeatures.push(feature);
     });
-    showNotification('已标记低权重节点，可重新回归获得简化公式', 'info');
+    
+    window.deletedFeatures = deletedFeatures;
+    showNotification(`已标记删除 ${deletedFeatures.length} 个低权重特征`, 'info');
 }
 
 // 剪枝选中节点
@@ -642,8 +735,86 @@ function pruneSelectedNodes() {
         return;
     }
     
-    // 这里应该重新计算回归
-    showNotification(`已选择 ${selectedNodes.length} 个节点进行删除`, 'info');
+    const deletedFeatures = [];
+    selectedNodes.forEach(node => {
+        node.style.opacity = '0.3';
+        node.style.textDecoration = 'line-through';
+        node.classList.add('deleted');
+        
+        const feature = node.getAttribute('data-feature');
+        deletedFeatures.push(feature);
+    });
+    
+    window.deletedFeatures = deletedFeatures;
+    showNotification(`已标记删除 ${deletedFeatures.length} 个选中特征`, 'info');
+}
+
+// 重新计算回归（排除删除的特征）
+async function recalculateRegression() {
+    if (!window.deletedFeatures || window.deletedFeatures.length === 0) {
+        showNotification('没有需要排除的特征', 'warning');
+        return;
+    }
+    
+    if (!currentData) {
+        showNotification('没有可用的数据', 'warning');
+        return;
+    }
+    
+    const targetColumn = document.getElementById('target-column').value;
+    const featureCheckboxes = document.querySelectorAll('#feature-columns input[type="checkbox"]:checked');
+    
+    if (!targetColumn) {
+        showNotification('请选择目标变量', 'warning');
+        return;
+    }
+    
+    let featureColumns = Array.from(featureCheckboxes).map(cb => cb.value);
+    
+    // 排除已删除的特征
+    featureColumns = featureColumns.filter(feature => !window.deletedFeatures.includes(feature));
+    
+    if (featureColumns.length === 0) {
+        showNotification('没有可用的特征变量', 'warning');
+        return;
+    }
+    
+    const populationSize = parseInt(document.getElementById('population-size').value) || 100;
+    const generations = parseInt(document.getElementById('generations').value) || 50;
+    const testRatio = parseInt(document.getElementById('test-ratio').value) || 30;
+    
+    // 获取选择的运算符
+    const operators = [];
+    if (document.getElementById('op-add').checked) operators.push('add');
+    if (document.getElementById('op-sub').checked) operators.push('sub');
+    if (document.getElementById('op-mul').checked) operators.push('mul');
+    if (document.getElementById('op-div').checked) operators.push('div');
+    if (document.getElementById('op-pow').checked) operators.push('pow');
+    if (document.getElementById('op-sqrt').checked) operators.push('sqrt');
+    
+    showLoading('正在重新计算回归分析...');
+    
+    try {
+        const result = await performSymbolicRegression({
+            data: currentData,
+            targetColumn,
+            featureColumns,
+            populationSize,
+            generations,
+            testRatio,
+            operators
+        });
+        
+        // 更新结果
+        displayRegressionResults(result);
+        
+        showNotification('重新计算完成', 'success');
+        
+    } catch (error) {
+        showNotification('重新计算失败: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
 }
 
 // 重置公式
@@ -651,10 +822,13 @@ function resetFormula() {
     // 重置所有节点状态
     const nodes = document.querySelectorAll('.tree-node');
     nodes.forEach(node => {
-        node.classList.remove('selected');
+        node.classList.remove('selected', 'deleted');
         node.style.opacity = '1';
         node.style.textDecoration = 'none';
     });
+    
+    // 清除删除的特征记录
+    window.deletedFeatures = [];
     
     showNotification('公式已重置', 'success');
 }
