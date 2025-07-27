@@ -347,44 +347,34 @@ async function startRegression() {
     }
 }
 
-// 执行符号回归（调用后端API）
+// 执行符号回归分析
 async function performSymbolicRegression(params) {
     try {
-        // 检查后端连接
-        const isConnected = await testBackendConnection();
-        if (!isConnected) {
-            throw new Error('后端服务未连接，请检查服务状态');
-        }
-        
-        // 准备请求数据
-        const requestData = {
-            data: params.data,
-            target_column: params.targetColumn,
-            feature_columns: params.featureColumns,
-            population_size: params.populationSize,
-            generations: params.generations,
-            test_ratio: params.testRatio,
-            operators: params.operators
-        };
-        
-        // 调用后端API
-        const response = await fetch(`http://127.0.0.1:${currentSettings.backendPort}/api/regression/analyze`, {
+        const response = await fetch('http://localhost:5000/api/regression/symbolic-regression', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(requestData)
+            body: JSON.stringify({
+                data: params.data,
+                target_column: params.targetColumn,
+                feature_columns: params.featureColumns,
+                population_size: params.populationSize,
+                generations: params.generations,
+                test_ratio: params.testRatio,
+                operators: params.operators
+            })
         });
         
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.message || `HTTP ${response.status}`);
+            throw new Error(errorData.error || `HTTP ${response.status}`);
         }
         
         const result = await response.json();
         
         if (!result.success) {
-            throw new Error(result.message || '分析失败');
+            throw new Error(result.error || '分析失败');
         }
         
         // 转换结果格式
@@ -400,7 +390,7 @@ async function performSymbolicRegression(params) {
         };
         
     } catch (error) {
-        console.error('符号回归API调用失败:', error);
+        console.error('符号回归分析失败:', error);
         throw error;
     }
 }
@@ -720,41 +710,34 @@ async function startMonteCarlo() {
     }
 }
 
-// 执行蒙特卡罗分析（调用后端API）
+// 执行蒙特卡罗分析
 async function performMonteCarloAnalysis(params) {
     try {
-        // 检查后端连接
-        const isConnected = await testBackendConnection();
-        if (!isConnected) {
-            throw new Error('后端服务未连接，请检查服务状态');
-        }
-        
-        // 准备请求数据
-        const requestData = {
-            model_id: params.modelId,
-            target_efficacy: params.targetEfficacy,
-            iterations: params.iterations,
-            tolerance: params.tolerance
-        };
-        
-        // 调用后端API
-        const response = await fetch(`http://127.0.0.1:${currentSettings.backendPort}/api/monte-carlo/analyze`, {
+        const response = await fetch('http://localhost:5000/api/monte-carlo/analyze', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(requestData)
+            body: JSON.stringify({
+                data: params.data,
+                target_column: params.targetColumn,
+                feature_columns: params.featureColumns,
+                model_id: params.modelId,
+                iterations: params.iterations,
+                target_efficacy: params.targetEfficacy,
+                tolerance: params.tolerance
+            })
         });
         
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.message || `HTTP ${response.status}`);
+            throw new Error(errorData.error || `HTTP ${response.status}`);
         }
         
         const result = await response.json();
         
         if (!result.success) {
-            throw new Error(result.message || '分析失败');
+            throw new Error(result.error || '分析失败');
         }
         
         // 转换结果格式
@@ -772,7 +755,7 @@ async function performMonteCarloAnalysis(params) {
         };
         
     } catch (error) {
-        console.error('蒙特卡罗分析API调用失败:', error);
+        console.error('蒙特卡罗分析失败:', error);
         throw error;
     }
 }
@@ -866,14 +849,14 @@ async function startBackendService() {
     try {
         const result = await window.electronAPI.startBackend();
         if (result.success) {
-            updateConnectionStatus('已连接');
+            updateConnectionStatus(true);
             showNotification('后端服务启动成功', 'success');
         } else {
-            updateConnectionStatus('连接失败');
+            updateConnectionStatus(false);
             showNotification('后端服务启动失败: ' + result.error, 'error');
         }
     } catch (error) {
-        updateConnectionStatus('连接失败');
+        updateConnectionStatus(false);
         showNotification('后端服务启动失败: ' + error.message, 'error');
     }
 }
@@ -887,14 +870,14 @@ async function testBackendConnection() {
         });
         
         if (response.ok) {
-            updateConnectionStatus('已连接');
+            updateConnectionStatus(true);
             return true;
         } else {
-            updateConnectionStatus('连接失败');
+            updateConnectionStatus(false);
             return false;
         }
     } catch (error) {
-        updateConnectionStatus('连接失败');
+        updateConnectionStatus(false);
         return false;
     }
 }
@@ -942,11 +925,16 @@ function updateSetting(key, value) {
 }
 
 // 更新连接状态
-function updateConnectionStatus(status) {
+function updateConnectionStatus(isConnected) {
     const statusElement = document.getElementById('connection-status');
     if (statusElement) {
-        statusElement.textContent = status;
-        statusElement.className = status === '已连接' ? 'status-connected' : 'status-disconnected';
+        if (isConnected) {
+            statusElement.textContent = `后端服务：已连接 (localhost:${currentSettings.backendPort})`;
+            statusElement.className = 'status-connected';
+        } else {
+            statusElement.textContent = `后端服务：未连接 (localhost:${currentSettings.backendPort})`;
+            statusElement.className = 'status-disconnected';
+        }
     }
 }
 
@@ -987,16 +975,25 @@ function hideLoading() {
 
 // 显示通知
 function showNotification(message, type = 'info') {
+    // 移除现有通知
+    const existingNotifications = document.querySelectorAll('.notification');
+    existingNotifications.forEach(notification => {
+        notification.remove();
+    });
+    
+    // 创建新通知
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
+    
     notification.innerHTML = `
-        <span class="notification-message">${message}</span>
+        <div class="notification-message">${message}</div>
         <button class="notification-close" onclick="this.parentElement.remove()">×</button>
     `;
     
+    // 添加到页面
     document.body.appendChild(notification);
     
-    // 自动移除
+    // 自动移除通知
     setTimeout(() => {
         if (notification.parentElement) {
             notification.remove();

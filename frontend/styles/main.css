@@ -461,6 +461,10 @@ body {
     gap: var(--spacing-sm);
     animation: slideIn 0.3s ease-out;
     max-width: 400px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 12px var(--shadow-color);
+    border-left: 4px solid var(--accent-primary);
 }
 
 .notification-message {
@@ -482,19 +486,19 @@ body {
 }
 
 .notification-info {
-    background-color: var(--accent-primary);
+    border-left-color: var(--accent-primary);
 }
 
 .notification-success {
-    background-color: var(--accent-success);
+    border-left-color: var(--accent-success);
 }
 
 .notification-warning {
-    background-color: var(--accent-warning);
+    border-left-color: var(--accent-warning);
 }
 
 .notification-error {
-    background-color: var(--accent-error);
+    border-left-color: var(--accent-error);
 }
 
 @keyframes slideIn {
