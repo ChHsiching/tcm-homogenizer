@@ -663,51 +663,37 @@ body {
 
 /* 公式显示区域 */
 .formula-display {
-    background-color: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-lg);
     margin-top: var(--spacing-lg);
-    flex: 1;
     min-height: 400px;
     overflow-x: hidden;
     overflow-y: auto;
 }
 
 .formula-latex {
-    font-family: 'Times New Roman', serif;
-    font-size: var(--font-size-lg);
-    text-align: center;
-    padding: var(--spacing-md);
-    background-color: var(--bg-secondary);
-    border-radius: var(--radius-md);
-    margin-bottom: var(--spacing-md);
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
-    min-height: 80px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    margin-bottom: var(--spacing-lg);
     word-wrap: break-word;
     overflow-wrap: break-word;
     max-width: 100%;
-    line-height: 1.5;
     overflow-x: auto;
 }
 
-.formula-latex .MathJax {
-    max-width: 100%;
-    overflow-x: auto;
-    text-align: center;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-}
-
+.formula-latex .MathJax,
 .formula-latex .MathJax_Display {
-    margin: 0;
-    text-align: center;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
     max-width: 100%;
     overflow-x: auto;
+}
+
+.formula-content {
+    padding: 20px;
+    background: #2a2a2a;
+    border-radius: 8px;
+    margin: 10px 0;
+    overflow-x: auto;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
 }
 
 /* 公式树容器 */
@@ -850,18 +836,19 @@ body {
     color: #15803d;
 }
 
-/* 性能指标实时显示 */
+/* 性能指标 */
 .performance-metrics {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: var(--spacing-md);
-    margin-top: var(--spacing-md);
+    margin: var(--spacing-lg) 0;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
     max-width: 100%;
-    overflow-x: auto;
 }
 
 .metric-card {
-    background-color: var(--bg-secondary);
+    background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     padding: var(--spacing-md);
@@ -873,14 +860,14 @@ body {
 
 .metric-value {
     font-size: var(--font-size-xl);
-    font-weight: 600;
+    font-weight: 700;
     color: var(--accent-primary);
+    margin-bottom: var(--spacing-xs);
 }
 
 .metric-label {
     font-size: var(--font-size-sm);
-    color: var(--text-secondary);
-    margin-top: var(--spacing-xs);
+    color: var(--text-muted);
 }
 
 /* 右键菜单 */

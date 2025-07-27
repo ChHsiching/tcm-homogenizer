@@ -464,7 +464,7 @@ function displayRegressionResults(result) {
 }
 
 // 格式化公式为LaTeX（支持换行）
-function formatFormulaToLatex(expression) {
+function formatFormulaToLatex(expression, targetColumn) {
     // 清理表达式
     let cleaned = expression
         .replace(/\+\s*\+/g, '+')
@@ -516,26 +516,54 @@ function formatFormulaToLatex(expression) {
         latex = lines.join(' \\\\ ');
     }
     
-    return latex;
+    // 添加等号和目标变量
+    return `${targetColumn} = ${latex}`;
 }
 
 // 渲染LaTeX公式
 function renderLatexFormula(expression, targetColumn) {
-    const formulaLatex = document.getElementById('formula-latex');
-    if (formulaLatex) {
-        const latex = formatFormulaToLatex(expression);
-        // 添加目标变量和等号
-        const fullFormula = `${targetColumn} = ${latex}`;
-        formulaLatex.innerHTML = `$$${fullFormula}$$`;
-        
-        // 重新渲染MathJax
-        if (window.MathJax) {
-            MathJax.typesetPromise([formulaLatex]).catch((err) => {
-                console.error('MathJax渲染失败:', err);
-                // 如果MathJax失败，显示原始文本
-                formulaLatex.innerHTML = `<code style="word-wrap: break-word; overflow-wrap: break-word; max-width: 100%;">${fullFormula}</code>`;
-            });
-        }
+    const formulaContainer = document.getElementById('formula-latex');
+    if (!formulaContainer) {
+        console.error('formula-latex container not found');
+        return;
+    }
+    
+    console.log('Rendering LaTeX formula:', expression, targetColumn);
+    
+    // 格式化LaTeX公式
+    const latexFormula = formatFormulaToLatex(expression, targetColumn);
+    
+    // 创建公式元素
+    const formulaElement = document.createElement('div');
+    formulaElement.className = 'formula-content';
+    formulaElement.style.cssText = `
+        padding: 20px;
+        background: #2a2a2a;
+        border-radius: 8px;
+        margin: 10px 0;
+        overflow-x: auto;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        max-width: 100%;
+    `;
+    
+    // 使用MathJax渲染
+    formulaElement.innerHTML = `$$${latexFormula}$$`;
+    
+    // 清空容器并添加新公式
+    formulaContainer.innerHTML = '';
+    formulaContainer.appendChild(formulaElement);
+    
+    // 触发MathJax重新渲染
+    if (window.MathJax) {
+        MathJax.typesetPromise([formulaElement]).catch((err) => {
+            console.error('MathJax rendering failed:', err);
+            // 降级到普通文本显示
+            formulaElement.innerHTML = `<code style="color: #4a9eff; font-size: 14px;">${latexFormula}</code>`;
+        });
+    } else {
+        // 如果MathJax不可用，使用普通文本
+        formulaElement.innerHTML = `<code style="color: #4a9eff; font-size: 14px;">${latexFormula}</code>`;
     }
 }
 
@@ -569,6 +597,8 @@ function updatePerformanceMetrics(result) {
 
 // 解析表达式为真正的语法树（参考HeuristicLab实现）
 function parseExpressionToSyntaxTree(expression, featureImportance) {
+    console.log('Parsing expression:', expression);
+    
     // 清理表达式
     let cleaned = expression
         .replace(/\+\s*\+/g, '+')
@@ -579,15 +609,36 @@ function parseExpressionToSyntaxTree(expression, featureImportance) {
     // 分割各项
     const terms = cleaned.split(/(?=[+-])/).filter(term => term.trim());
     
+    // 如果只有一个项，直接返回
+    if (terms.length === 1) {
+        const term = terms[0].trim();
+        const parts = term.split('*');
+        if (parts.length === 2) {
+            const coefficient = parseFloat(parts[0].trim());
+            const variable = parts[1].trim();
+            const importance = featureImportance.find(f => f.feature === variable)?.importance || 0.1;
+            
+            return {
+                id: 'root',
+                name: variable,
+                type: 'variable',
+                coefficient: coefficient,
+                importance: importance,
+                weight: getWeightClass(importance),
+                children: []
+            };
+        }
+    }
+    
     // 创建根节点（加法节点）
     const rootNode = {
         id: 'root',
+        name: 'Addition',
         type: 'operator',
         operator: '+',
         children: [],
-        level: 0,
-        x: 400, // 根节点位置
-        y: 50
+        importance: 1.0,
+        weight: 'weight-9'
     };
     
     // 解析每个项
@@ -609,138 +660,146 @@ function parseExpressionToSyntaxTree(expression, featureImportance) {
                 
                 const termNode = {
                     id: `term_${index}`,
-                    type: 'term',
+                    name: variable,
+                    type: 'variable',
                     coefficient: coefficient,
-                    variable: variable,
                     importance: importance,
                     weight: getWeightClass(importance),
-                    level: 1,
-                    x: 100 + index * 200, // 水平分布
-                    y: 150
+                    children: []
                 };
                 rootNode.children.push(termNode);
             }
         }
     });
     
+    console.log('Parsed tree:', rootNode);
     return rootNode;
 }
 
-// 生成公式树（使用真正的语法树）
+// 使用D3.js生成真正的树形图
 function generateFormulaTree(result) {
     const treeContainer = document.getElementById('formula-tree');
-    if (!treeContainer) return;
+    if (!treeContainer) {
+        console.error('formula-tree container not found');
+        return;
+    }
+    
+    console.log('Generating formula tree for result:', result);
+    
+    // 清空容器
+    treeContainer.innerHTML = '';
     
     // 解析表达式生成语法树
     const syntaxTree = parseExpressionToSyntaxTree(result.expression, result.featureImportance);
     
-    treeContainer.innerHTML = '';
+    // 设置树形图尺寸
+    const width = treeContainer.clientWidth || 600;
+    const height = 400;
     
     // 创建SVG容器
-    const svgContainer = document.createElement('div');
-    svgContainer.className = 'tree-svg-container';
-    svgContainer.style.position = 'relative';
-    svgContainer.style.width = '100%';
-    svgContainer.style.height = '100%';
-    svgContainer.style.minHeight = '400px';
+    const svg = d3.select(treeContainer)
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height)
+        .style('border', '1px solid #333')
+        .style('background', '#1a1a1a');
     
-    // 创建SVG元素
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('width', '100%');
-    svg.setAttribute('height', '100%');
-    svg.style.position = 'absolute';
-    svg.style.top = '0';
-    svg.style.left = '0';
-    svg.style.pointerEvents = 'none';
-    svg.style.zIndex = '1';
+    // 创建树形布局
+    const treeLayout = d3.tree()
+        .size([width - 100, height - 100]);
     
-    svgContainer.appendChild(svg);
-    treeContainer.appendChild(svgContainer);
+    // 创建层次结构
+    const root = d3.hierarchy(syntaxTree);
     
-    // 创建节点容器
-    const nodesContainer = document.createElement('div');
-    nodesContainer.className = 'tree-nodes-container';
-    nodesContainer.style.position = 'relative';
-    nodesContainer.style.zIndex = '2';
-    nodesContainer.style.width = '100%';
-    nodesContainer.style.height = '100%';
-    treeContainer.appendChild(nodesContainer);
+    // 计算树形布局
+    treeLayout(root);
     
-    // 渲染语法树
-    renderSyntaxTree(nodesContainer, svg, syntaxTree);
+    // 绘制连接线
+    const links = svg.selectAll('.link')
+        .data(root.links())
+        .enter()
+        .append('path')
+        .attr('class', 'link')
+        .attr('d', d3.linkVertical()
+            .x(d => d.x + 50)
+            .y(d => d.y + 50))
+        .style('fill', 'none')
+        .style('stroke', '#666')
+        .style('stroke-width', '2');
+    
+    // 创建节点组
+    const nodes = svg.selectAll('.node')
+        .data(root.descendants())
+        .enter()
+        .append('g')
+        .attr('class', 'node')
+        .attr('transform', d => `translate(${d.x + 50},${d.y + 50})`);
+    
+    // 绘制节点圆圈
+    nodes.append('circle')
+        .attr('r', d => d.data.type === 'operator' ? 25 : 20)
+        .style('fill', d => {
+            if (d.data.type === 'operator') {
+                return '#4a9eff';
+            }
+            // 根据权重返回颜色
+            const weightClass = d.data.weight || 'weight-5';
+            const colors = {
+                'weight-1': '#ef4444', 'weight-2': '#f56565', 'weight-3': '#f97316',
+                'weight-4': '#eab308', 'weight-5': '#84cc16', 'weight-6': '#22c55e',
+                'weight-7': '#16a34a', 'weight-8': '#15803d', 'weight-9': '#166534'
+            };
+            return colors[weightClass] || '#84cc16';
+        })
+        .style('stroke', '#333')
+        .style('stroke-width', '2')
+        .style('cursor', 'pointer')
+        .on('click', function(event, d) {
+            showNodeInfo(event, d);
+        })
+        .on('contextmenu', function(event, d) {
+            event.preventDefault();
+            showContextMenu(event, d);
+        });
+    
+    // 添加节点文本
+    nodes.append('text')
+        .attr('dy', '.35em')
+        .attr('text-anchor', 'middle')
+        .style('fill', 'white')
+        .style('font-size', '12px')
+        .style('font-weight', 'bold')
+        .text(d => {
+            if (d.data.type === 'operator') {
+                return d.data.operator || d.data.name;
+            } else {
+                return d.data.name;
+            }
+        });
+    
+    // 添加系数标签（对于变量节点）
+    nodes.filter(d => d.data.type === 'variable')
+        .append('text')
+        .attr('dy', '1.5em')
+        .attr('text-anchor', 'middle')
+        .style('fill', '#ccc')
+        .style('font-size', '10px')
+        .text(d => d.data.coefficient.toFixed(3));
     
     // 添加右键菜单事件
     setupContextMenu();
 }
 
-// 渲染语法树
-function renderSyntaxTree(container, svg, node) {
-    if (node.type === 'operator') {
-        // 渲染运算符节点
-        const operatorDiv = document.createElement('div');
-        operatorDiv.className = 'tree-operator-node';
-        operatorDiv.setAttribute('data-node-id', node.id);
-        operatorDiv.setAttribute('data-operator', node.operator);
-        
-        // 设置节点位置
-        operatorDiv.style.position = 'absolute';
-        operatorDiv.style.left = `${node.x - 40}px`;
-        operatorDiv.style.top = `${node.y - 30}px`;
-        operatorDiv.style.width = '80px';
-        operatorDiv.style.height = '60px';
-        
-        operatorDiv.innerHTML = `
-            <div class="operator-content">
-                <div class="operator-symbol">${node.operator}</div>
-                <div class="operator-label">运算符</div>
-            </div>
-        `;
-        
-        container.appendChild(operatorDiv);
-        
-        // 渲染子节点并绘制连接线
-        node.children.forEach((child, index) => {
-            renderSyntaxTree(container, svg, child);
-            
-            // 绘制连接线
-            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line.setAttribute('x1', node.x);
-            line.setAttribute('y1', node.y);
-            line.setAttribute('x2', child.x);
-            line.setAttribute('y2', child.y);
-            line.setAttribute('stroke', '#666');
-            line.setAttribute('stroke-width', '2');
-            svg.appendChild(line);
-        });
-        
-    } else if (node.type === 'term') {
-        // 渲染项节点
-        const termDiv = document.createElement('div');
-        termDiv.className = `tree-node ${node.weight}`;
-        termDiv.setAttribute('data-node-id', node.id);
-        termDiv.setAttribute('data-feature', node.variable);
-        termDiv.setAttribute('data-importance', node.importance);
-        termDiv.setAttribute('data-coefficient', node.coefficient);
-        
-        // 设置节点位置
-        termDiv.style.position = 'absolute';
-        termDiv.style.left = `${node.x - 100}px`;
-        termDiv.style.top = `${node.y - 30}px`;
-        termDiv.style.width = '200px';
-        
-        // 创建节点内容
-        const coefficient = node.coefficient > 0 ? `+${node.coefficient.toFixed(3)}` : node.coefficient.toFixed(3);
-        
-        termDiv.innerHTML = `
-            <div class="node-content">
-                <div class="node-coefficient">${coefficient}</div>
-                <div class="node-feature">× ${node.variable}</div>
-                <div class="node-importance">权重: ${node.importance.toFixed(3)}</div>
-            </div>
-        `;
-        
-        container.appendChild(termDiv);
-    }
+// 显示节点信息
+function showNodeInfo(event, node) {
+    const info = {
+        name: node.data.name,
+        type: node.data.type,
+        coefficient: node.data.coefficient,
+        importance: node.data.importance
+    };
+    
+    showNotification(`节点信息: ${info.name}, 类型: ${info.type}, 系数: ${info.coefficient}, 重要性: ${info.importance.toFixed(3)}`, 'info');
 }
 
 // 获取权重类别（红到绿的渐变）
@@ -773,23 +832,29 @@ function setupContextMenu() {
 }
 
 // 显示右键菜单
-function showContextMenu(e, node) {
+function showContextMenu(event, node) {
     // 移除现有菜单
     const existingMenu = document.querySelector('.context-menu');
     if (existingMenu) existingMenu.remove();
     
     const menu = document.createElement('div');
     menu.className = 'context-menu';
-    menu.style.left = e.pageX + 'px';
-    menu.style.top = e.pageY + 'px';
+    menu.style.left = event.pageX + 'px';
+    menu.style.top = event.pageY + 'px';
     
-    const feature = node.getAttribute('data-feature');
-    const importance = parseFloat(node.getAttribute('data-importance'));
+    const info = {
+        name: node.data.name,
+        type: node.data.type,
+        coefficient: node.data.coefficient,
+        importance: node.data.importance
+    };
     
     menu.innerHTML = `
-        <div class="context-menu-item">特征: ${feature}</div>
-        <div class="context-menu-item">权重: ${importance.toFixed(3)}</div>
-        <div class="context-menu-item danger" onclick="deleteNode('${node.getAttribute('data-node-id')}')">删除此节点</div>
+        <div class="context-menu-item">节点: ${info.name}</div>
+        <div class="context-menu-item">类型: ${info.type}</div>
+        <div class="context-menu-item">系数: ${info.coefficient}</div>
+        <div class="context-menu-item">重要性: ${info.importance.toFixed(3)}</div>
+        <div class="context-menu-item danger" onclick="deleteNode('${node.data.id}')">删除此节点</div>
         <div class="context-menu-item danger" onclick="deleteLowWeightNodes()">删除所有低权重节点</div>
     `;
     
