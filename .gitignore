@@ -116,6 +116,7 @@ dmypy.json
 
 # Temporary files
 *.tmp
-*.temp *.tar.gz
+*.temp
+*.tar.gz
 *.zip
 *.7z
