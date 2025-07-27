@@ -670,7 +670,8 @@ body {
     margin-top: var(--spacing-lg);
     flex: 1;
     min-height: 400px;
-    overflow-x: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
 .formula-latex {
@@ -691,17 +692,22 @@ body {
     overflow-wrap: break-word;
     max-width: 100%;
     line-height: 1.5;
+    overflow-x: auto;
 }
 
 .formula-latex .MathJax {
     max-width: 100%;
     overflow-x: auto;
     text-align: center;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .formula-latex .MathJax_Display {
     margin: 0;
     text-align: center;
+    max-width: 100%;
+    overflow-x: auto;
 }
 
 /* 公式树容器 */
@@ -849,7 +855,9 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: var(--spacing-md);
-    margin-top: var(--spacing-lg);
+    margin-top: var(--spacing-md);
+    max-width: 100%;
+    overflow-x: auto;
 }
 
 .metric-card {
@@ -858,6 +866,9 @@ body {
     border-radius: var(--radius-md);
     padding: var(--spacing-md);
     text-align: center;
+    min-width: 120px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .metric-value {

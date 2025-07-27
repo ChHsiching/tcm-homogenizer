@@ -488,8 +488,8 @@ function formatFormulaToLatex(expression) {
     if (latex === '') latex = '0';
     if (latex.startsWith('+ ')) latex = latex.substring(2);
     
-    // 添加换行支持（每5项换一行）
-    const maxTermsPerLine = 5;
+    // 添加换行支持（每3项换一行，避免过长）
+    const maxTermsPerLine = 3;
     if (formattedTerms.length > maxTermsPerLine) {
         const lines = [];
         for (let i = 0; i < formattedTerms.length; i += maxTermsPerLine) {
@@ -516,7 +516,7 @@ function renderLatexFormula(expression, targetColumn) {
             MathJax.typesetPromise([formulaLatex]).catch((err) => {
                 console.error('MathJax渲染失败:', err);
                 // 如果MathJax失败，显示原始文本
-                formulaLatex.innerHTML = `<code>${fullFormula}</code>`;
+                formulaLatex.innerHTML = `<code style="word-wrap: break-word; overflow-wrap: break-word; max-width: 100%;">${fullFormula}</code>`;
             });
         }
     }
@@ -533,19 +533,24 @@ function updatePerformanceMetrics(result) {
     if (mseValue) mseValue.textContent = result.mse.toFixed(3);
     
     // 计算MAE和RMSE
-    if (result.predictions.actual && result.predictions.predicted) {
+    if (result.predictions && result.predictions.actual && result.predictions.predicted) {
         const actual = result.predictions.actual;
         const predicted = result.predictions.predicted;
         
+        // 计算MAE
         const mae = actual.reduce((sum, val, i) => sum + Math.abs(val - predicted[i]), 0) / actual.length;
-        const rmse = Math.sqrt(result.mse);
-        
         if (maeValue) maeValue.textContent = mae.toFixed(3);
+        
+        // 计算RMSE
+        const rmse = Math.sqrt(result.mse);
         if (rmseValue) rmseValue.textContent = rmse.toFixed(3);
+    } else {
+        if (maeValue) maeValue.textContent = '0.000';
+        if (rmseValue) rmseValue.textContent = '0.000';
     }
 }
 
-// 解析表达式为语法树（参考HeuristicLab实现）
+// 解析表达式为真正的语法树（参考HeuristicLab实现）
 function parseExpressionToSyntaxTree(expression, featureImportance) {
     // 清理表达式
     let cleaned = expression
@@ -563,7 +568,9 @@ function parseExpressionToSyntaxTree(expression, featureImportance) {
         type: 'operator',
         operator: '+',
         children: [],
-        level: 0
+        level: 0,
+        x: 400, // 根节点位置
+        y: 50
     };
     
     // 解析每个项
@@ -580,14 +587,19 @@ function parseExpressionToSyntaxTree(expression, featureImportance) {
             const variable = parts[1].trim();
             
             if (coefficient !== 0) {
+                // 找到特征的重要性
+                const importance = featureImportance.find(f => f.feature === variable)?.importance || 0.1;
+                
                 const termNode = {
                     id: `term_${index}`,
                     type: 'term',
                     coefficient: coefficient,
                     variable: variable,
-                    importance: featureImportance[variable] || 0.1,
-                    weight: getWeightClass(featureImportance[variable] || 0.1),
-                    level: 1
+                    importance: importance,
+                    weight: getWeightClass(importance),
+                    level: 1,
+                    x: 100 + index * 200, // 水平分布
+                    y: 150
                 };
                 rootNode.children.push(termNode);
             }
@@ -597,7 +609,7 @@ function parseExpressionToSyntaxTree(expression, featureImportance) {
     return rootNode;
 }
 
-// 生成公式树（使用语法树）
+// 生成公式树（使用真正的语法树）
 function generateFormulaTree(result) {
     const treeContainer = document.getElementById('formula-tree');
     if (!treeContainer) return;
@@ -613,6 +625,7 @@ function generateFormulaTree(result) {
     svgContainer.style.position = 'relative';
     svgContainer.style.width = '100%';
     svgContainer.style.height = '100%';
+    svgContainer.style.minHeight = '400px';
     
     // 创建SVG元素
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -632,19 +645,19 @@ function generateFormulaTree(result) {
     nodesContainer.className = 'tree-nodes-container';
     nodesContainer.style.position = 'relative';
     nodesContainer.style.zIndex = '2';
+    nodesContainer.style.width = '100%';
+    nodesContainer.style.height = '100%';
     treeContainer.appendChild(nodesContainer);
     
     // 渲染语法树
-    const nodePositions = renderSyntaxTree(nodesContainer, svg, syntaxTree);
+    renderSyntaxTree(nodesContainer, svg, syntaxTree);
     
     // 添加右键菜单事件
     setupContextMenu();
 }
 
 // 渲染语法树
-function renderSyntaxTree(container, svg, node, level = 0, xOffset = 0, parentX = null, parentY = null) {
-    const nodePositions = [];
-    
+function renderSyntaxTree(container, svg, node) {
     if (node.type === 'operator') {
         // 渲染运算符节点
         const operatorDiv = document.createElement('div');
@@ -654,8 +667,8 @@ function renderSyntaxTree(container, svg, node, level = 0, xOffset = 0, parentX 
         
         // 设置节点位置
         operatorDiv.style.position = 'absolute';
-        operatorDiv.style.left = `${xOffset}px`;
-        operatorDiv.style.top = `${50 + level * 100}px`;
+        operatorDiv.style.left = `${node.x - 40}px`;
+        operatorDiv.style.top = `${node.y - 30}px`;
         operatorDiv.style.width = '80px';
         operatorDiv.style.height = '60px';
         
@@ -668,46 +681,20 @@ function renderSyntaxTree(container, svg, node, level = 0, xOffset = 0, parentX 
         
         container.appendChild(operatorDiv);
         
-        const operatorX = xOffset + 40;
-        const operatorY = 50 + level * 100 + 30;
-        
-        nodePositions.push({
-            id: node.id,
-            x: operatorX,
-            y: operatorY,
-            element: operatorDiv
-        });
-        
-        // 绘制到父节点的连接线
-        if (parentX !== null && parentY !== null) {
+        // 渲染子节点并绘制连接线
+        node.children.forEach((child, index) => {
+            renderSyntaxTree(container, svg, child);
+            
+            // 绘制连接线
             const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line.setAttribute('x1', parentX);
-            line.setAttribute('y1', parentY);
-            line.setAttribute('x2', operatorX);
-            line.setAttribute('y2', operatorY);
+            line.setAttribute('x1', node.x);
+            line.setAttribute('y1', node.y);
+            line.setAttribute('x2', child.x);
+            line.setAttribute('y2', child.y);
             line.setAttribute('stroke', '#666');
             line.setAttribute('stroke-width', '2');
             svg.appendChild(line);
-        }
-        
-        // 渲染子节点
-        if (node.children && node.children.length > 0) {
-            const childCount = node.children.length;
-            const totalWidth = Math.max(800, childCount * 200);
-            const nodeWidth = 200;
-            const spacing = (totalWidth - childCount * nodeWidth) / (childCount + 1);
-            
-            node.children.forEach((child, index) => {
-                const childX = spacing + index * (nodeWidth + spacing);
-                const childY = 50 + (level + 1) * 100;
-                
-                const childPositions = renderSyntaxTree(
-                    container, svg, child, level + 1, childX, 
-                    operatorX, operatorY
-                );
-                nodePositions.push(...childPositions);
-            });
-        }
+        });
         
     } else if (node.type === 'term') {
         // 渲染项节点
@@ -720,8 +707,8 @@ function renderSyntaxTree(container, svg, node, level = 0, xOffset = 0, parentX 
         
         // 设置节点位置
         termDiv.style.position = 'absolute';
-        termDiv.style.left = `${xOffset}px`;
-        termDiv.style.top = `${50 + level * 100}px`;
+        termDiv.style.left = `${node.x - 100}px`;
+        termDiv.style.top = `${node.y - 30}px`;
         termDiv.style.width = '200px';
         
         // 创建节点内容
@@ -736,31 +723,7 @@ function renderSyntaxTree(container, svg, node, level = 0, xOffset = 0, parentX 
         `;
         
         container.appendChild(termDiv);
-        
-        const termX = xOffset + 100;
-        const termY = 50 + level * 100 + 30;
-        
-        nodePositions.push({
-            id: node.id,
-            x: termX,
-            y: termY,
-            element: termDiv
-        });
-        
-        // 绘制到父节点的连接线
-        if (parentX !== null && parentY !== null) {
-            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line.setAttribute('x1', parentX);
-            line.setAttribute('y1', parentY);
-            line.setAttribute('x2', termX);
-            line.setAttribute('y2', termY);
-            line.setAttribute('stroke', '#666');
-            line.setAttribute('stroke-width', '2');
-            svg.appendChild(line);
-        }
     }
-    
-    return nodePositions;
 }
 
 // 获取权重类别（红到绿的渐变）
@@ -774,6 +737,58 @@ function getWeightClass(importance) {
     if (importance >= 0.2) return 'weight-3';
     if (importance >= 0.1) return 'weight-2';
     return 'weight-1';
+}
+
+// 显示回归结果
+function displayRegressionResults(result) {
+    // 更新LaTeX公式
+    renderLatexFormula(result.expression, document.getElementById('target-column').value);
+    
+    // 更新性能指标
+    updatePerformanceMetrics(result);
+    
+    // 生成公式树
+    generateFormulaTree(result);
+    
+    // 显示结果区域
+    const resultSection = document.getElementById('regression-result');
+    if (resultSection) {
+        resultSection.style.display = 'block';
+    }
+    
+    // 显示公式显示区域
+    const formulaDisplay = document.getElementById('formula-display');
+    if (formulaDisplay) {
+        formulaDisplay.style.display = 'block';
+    }
+}
+
+// 更新性能指标
+function updatePerformanceMetrics(result) {
+    const r2Value = document.getElementById('r2-value');
+    const mseValue = document.getElementById('mse-value');
+    const maeValue = document.getElementById('mae-value');
+    const rmseValue = document.getElementById('rmse-value');
+    
+    if (r2Value) r2Value.textContent = result.r2.toFixed(3);
+    if (mseValue) mseValue.textContent = result.mse.toFixed(3);
+    
+    // 计算MAE和RMSE
+    if (result.predictions && result.predictions.actual && result.predictions.predicted) {
+        const actual = result.predictions.actual;
+        const predicted = result.predictions.predicted;
+        
+        // 计算MAE
+        const mae = actual.reduce((sum, val, i) => sum + Math.abs(val - predicted[i]), 0) / actual.length;
+        if (maeValue) maeValue.textContent = mae.toFixed(3);
+        
+        // 计算RMSE
+        const rmse = Math.sqrt(result.mse);
+        if (rmseValue) rmseValue.textContent = rmse.toFixed(3);
+    } else {
+        if (maeValue) maeValue.textContent = '0.000';
+        if (rmseValue) rmseValue.textContent = '0.000';
+    }
 }
 
 // 设置右键菜单
