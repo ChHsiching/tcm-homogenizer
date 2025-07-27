@@ -397,10 +397,18 @@ async function performSymbolicRegression(params) {
 
 // 显示回归结果
 function displayRegressionResults(result) {
+    console.log('displayRegressionResults called with:', result);
+    
     const container = document.getElementById('regression-results');
     const formulaDisplay = document.getElementById('formula-display');
     
-    if (!container) return;
+    console.log('container:', container);
+    console.log('formulaDisplay:', formulaDisplay);
+    
+    if (!container) {
+        console.error('regression-results container not found');
+        return;
+    }
     
     // 显示基本结果
     container.innerHTML = `
@@ -433,6 +441,7 @@ function displayRegressionResults(result) {
     
     // 显示公式显示区域
     if (formulaDisplay) {
+        console.log('Showing formula display');
         formulaDisplay.style.display = 'block';
         
         // 更新LaTeX公式
@@ -443,6 +452,14 @@ function displayRegressionResults(result) {
         
         // 生成公式树
         generateFormulaTree(result);
+    } else {
+        console.error('formula-display not found');
+    }
+    
+    // 显示结果区域
+    const resultSection = document.getElementById('regression-result');
+    if (resultSection) {
+        resultSection.style.display = 'block';
     }
 }
 
@@ -737,58 +754,6 @@ function getWeightClass(importance) {
     if (importance >= 0.2) return 'weight-3';
     if (importance >= 0.1) return 'weight-2';
     return 'weight-1';
-}
-
-// 显示回归结果
-function displayRegressionResults(result) {
-    // 更新LaTeX公式
-    renderLatexFormula(result.expression, document.getElementById('target-column').value);
-    
-    // 更新性能指标
-    updatePerformanceMetrics(result);
-    
-    // 生成公式树
-    generateFormulaTree(result);
-    
-    // 显示结果区域
-    const resultSection = document.getElementById('regression-result');
-    if (resultSection) {
-        resultSection.style.display = 'block';
-    }
-    
-    // 显示公式显示区域
-    const formulaDisplay = document.getElementById('formula-display');
-    if (formulaDisplay) {
-        formulaDisplay.style.display = 'block';
-    }
-}
-
-// 更新性能指标
-function updatePerformanceMetrics(result) {
-    const r2Value = document.getElementById('r2-value');
-    const mseValue = document.getElementById('mse-value');
-    const maeValue = document.getElementById('mae-value');
-    const rmseValue = document.getElementById('rmse-value');
-    
-    if (r2Value) r2Value.textContent = result.r2.toFixed(3);
-    if (mseValue) mseValue.textContent = result.mse.toFixed(3);
-    
-    // 计算MAE和RMSE
-    if (result.predictions && result.predictions.actual && result.predictions.predicted) {
-        const actual = result.predictions.actual;
-        const predicted = result.predictions.predicted;
-        
-        // 计算MAE
-        const mae = actual.reduce((sum, val, i) => sum + Math.abs(val - predicted[i]), 0) / actual.length;
-        if (maeValue) maeValue.textContent = mae.toFixed(3);
-        
-        // 计算RMSE
-        const rmse = Math.sqrt(result.mse);
-        if (rmseValue) rmseValue.textContent = rmse.toFixed(3);
-    } else {
-        if (maeValue) maeValue.textContent = '0.000';
-        if (rmseValue) rmseValue.textContent = '0.000';
-    }
 }
 
 // 设置右键菜单
