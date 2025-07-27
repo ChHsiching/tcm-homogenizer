@@ -108,18 +108,16 @@ body {
     color: var(--text-primary);
 }
 
-/* 主内容区域 */
+/* 主要内容区域 */
 .main-content {
     flex: 1;
     padding: var(--spacing-xl);
     overflow-y: auto;
-    background-color: var(--bg-primary);
 }
 
-/* 标签页内容 */
 .tab-content {
     display: none;
-    animation: fadeIn 0.3s ease;
+    animation: fadeIn 0.3s ease-in-out;
 }
 
 .tab-content.active {
@@ -131,7 +129,7 @@ body {
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* 首页样式 */
+/* 欢迎页面 */
 .welcome-section {
     text-align: center;
     margin-bottom: var(--spacing-xl);
@@ -154,6 +152,7 @@ body {
     margin: 0 auto;
 }
 
+/* 功能卡片网格 */
 .feature-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -170,7 +169,7 @@ body {
 }
 
 .feature-card:hover {
-    transform: translateY(-4px);
+    transform: translateY(-2px);
     box-shadow: 0 8px 24px var(--shadow-color);
     border-color: var(--accent-primary);
 }
@@ -195,7 +194,7 @@ body {
 }
 
 .page-header h2 {
-    font-size: var(--font-size-2xl);
+    font-size: var(--font-size-xl);
     margin-bottom: var(--spacing-sm);
     color: var(--text-primary);
 }
@@ -210,7 +209,7 @@ body {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: var(--spacing-xl);
-    margin-top: var(--spacing-lg);
+    max-width: 1200px;
 }
 
 .input-section, .result-section {
@@ -250,7 +249,7 @@ body {
     border-radius: var(--radius-md);
     color: var(--text-primary);
     font-size: var(--font-size-sm);
-    transition: border-color 0.2s ease;
+    transition: all 0.2s ease;
 }
 
 .form-group input:focus,
@@ -266,6 +265,7 @@ body {
     margin-right: var(--spacing-sm);
 }
 
+/* 复选框组样式 */
 .checkbox-group {
     display: flex;
     flex-direction: column;
@@ -278,11 +278,28 @@ body {
     border: 1px solid var(--border-color);
 }
 
-.checkbox-group label {
+.checkbox-item {
     display: flex;
     align-items: center;
-    margin-bottom: 0;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    transition: background-color 0.2s ease;
+}
+
+.checkbox-item:hover {
+    background-color: var(--bg-secondary);
+}
+
+.checkbox-item input[type="checkbox"] {
+    margin-right: var(--spacing-sm);
+    width: auto;
+}
+
+.checkbox-item label {
+    margin: 0;
     cursor: pointer;
+    flex: 1;
+    color: var(--text-primary);
 }
 
 /* 按钮样式 */
@@ -360,7 +377,16 @@ body {
     gap: var(--spacing-md);
 }
 
-/* 加载覆盖层 */
+/* 连接状态样式 */
+.status-connected {
+    color: var(--accent-success);
+}
+
+.status-disconnected {
+    color: var(--accent-error);
+}
+
+/* 加载指示器 */
 .loading-overlay {
     position: fixed;
     top: 0;
@@ -373,6 +399,7 @@ body {
     align-items: center;
     justify-content: center;
     z-index: 1000;
+    color: var(--text-primary);
 }
 
 .loading-overlay.hidden {
@@ -394,42 +421,60 @@ body {
     100% { transform: rotate(360deg); }
 }
 
-#loading-text {
-    color: var(--text-primary);
+.loading-text {
     font-size: var(--font-size-md);
+    color: var(--text-primary);
 }
 
-/* 通知容器 */
-.notification-container {
+/* 通知样式 */
+.notification {
     position: fixed;
-    top: var(--spacing-lg);
-    right: var(--spacing-lg);
+    top: 20px;
+    right: 20px;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
     z-index: 1001;
     display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: var(--spacing-sm);
+    animation: slideIn 0.3s ease-out;
+    max-width: 400px;
 }
 
-.notification {
-    background-color: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-md);
-    min-width: 300px;
-    box-shadow: 0 4px 12px var(--shadow-color);
-    animation: slideIn 0.3s ease;
+.notification-message {
+    flex: 1;
 }
 
-.notification.success {
-    border-left: 4px solid var(--accent-success);
+.notification-close {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.notification.error {
-    border-left: 4px solid var(--accent-error);
+.notification-info {
+    background-color: var(--accent-primary);
 }
 
-.notification.warning {
-    border-left: 4px solid var(--accent-warning);
+.notification-success {
+    background-color: var(--accent-success);
+}
+
+.notification-warning {
+    background-color: var(--accent-warning);
+}
+
+.notification-error {
+    background-color: var(--accent-error);
 }
 
 @keyframes slideIn {
@@ -454,7 +499,7 @@ body {
     }
     
     .nav {
-        width: 100%;
+        flex-wrap: wrap;
         justify-content: center;
     }
     
@@ -476,7 +521,7 @@ body {
     }
     
     .page-header h2 {
-        font-size: var(--font-size-xl);
+        font-size: var(--font-size-lg);
     }
 }
 
@@ -486,14 +531,14 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--bg-primary);
+    background: var(--bg-secondary);
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--bg-tertiary);
+    background: var(--border-color);
     border-radius: var(--radius-sm);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--border-color);
+    background: var(--text-muted);
 } 

@@ -320,13 +320,13 @@ async function performSymbolicRegression(params) {
         // 转换结果格式
         return {
             id: Date.now(),
-            model_id: result.result.get('model_id'),
-            expression: result.result.get('expression', ''),
-            r2: result.result.get('r2', 0),
-            mse: result.result.get('mse', 0),
-            featureImportance: result.result.get('feature_importance', []),
-            predictions: result.result.get('predictions', {}),
-            parameters: result.result.get('parameters', {})
+            model_id: result.result.model_id,
+            expression: result.result.expression || '',
+            r2: result.result.r2 || 0,
+            mse: result.result.mse || 0,
+            featureImportance: result.result.feature_importance || [],
+            predictions: result.result.predictions || {},
+            parameters: result.result.parameters || {}
         };
         
     } catch (error) {
@@ -460,15 +460,15 @@ async function performMonteCarloAnalysis(params) {
         // 转换结果格式
         const analysisResult = result.result;
         return {
-            analysis_id: analysisResult.get('analysis_id'),
-            iterations: analysisResult.get('iterations', 0),
-            targetEfficacy: analysisResult.get('target_efficacy', 0),
-            tolerance: analysisResult.get('tolerance', 0),
-            validSamples: analysisResult.get('valid_samples_count', 0),
-            validRate: analysisResult.get('valid_rate', 0),
-            componentStatistics: analysisResult.get('component_statistics', {}),
-            distributionData: analysisResult.get('distribution_data', {}),
-            sampleData: analysisResult.get('sample_data', {})
+            analysis_id: analysisResult.analysis_id,
+            iterations: analysisResult.iterations || 0,
+            targetEfficacy: analysisResult.target_efficacy || 0,
+            tolerance: analysisResult.tolerance || 0,
+            validSamples: analysisResult.valid_samples_count || 0,
+            validRate: analysisResult.valid_rate || 0,
+            componentStatistics: analysisResult.component_statistics || {},
+            distributionData: analysisResult.distribution_data || {},
+            sampleData: analysisResult.sample_data || {}
         };
         
     } catch (error) {
