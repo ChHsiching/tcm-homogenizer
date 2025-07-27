@@ -1,0 +1,196 @@
+{
+  "expression": "-0.037 * NCGA + + 0.014 * CGA + + 0.020 * AST + + 0.013 * GUA + + 0.014 * RUT + -0.012 * VR + -0.024 * VG + -0.012 * PB2 + -0.029 * PC1 + -0.012 * EPI + + 0.045 * OA + -0.026 * UA + -0.041 * MA + -0.061 * CRA + + 0.027 * MDA",
+  "r2": 0.963692100236334,
+  "mse": 0.001103846583749249,
+  "r2_train": 1.0,
+  "mse_train": 6.771321177375923e-31,
+  "feature_importance": [
+    {
+      "feature": "CGA",
+      "coefficient": 0.0,
+      "importance": 0.7465649954214643
+    },
+    {
+      "feature": "UA",
+      "coefficient": 0.0,
+      "importance": 0.7159231709261846
+    },
+    {
+      "feature": "MDA",
+      "coefficient": 0.0,
+      "importance": 0.5532450525829906
+    },
+    {
+      "feature": "VR",
+      "coefficient": 0.0,
+      "importance": 0.5208596062614718
+    },
+    {
+      "feature": "EPI",
+      "coefficient": 0.0,
+      "importance": 0.5047549989791273
+    },
+    {
+      "feature": "OA",
+      "coefficient": 0.0,
+      "importance": 0.49480081967269146
+    },
+    {
+      "feature": "CRA",
+      "coefficient": 0.0,
+      "importance": 0.44404268590275253
+    },
+    {
+      "feature": "PB2",
+      "coefficient": 0.0,
+      "importance": 0.43987396955508823
+    },
+    {
+      "feature": "VG",
+      "coefficient": 0.0,
+      "importance": 0.4265998503706949
+    },
+    {
+      "feature": "PC1",
+      "coefficient": 0.0,
+      "importance": 0.4257245353785858
+    },
+    {
+      "feature": "QUE",
+      "coefficient": 0.0,
+      "importance": 0.37940547393764223
+    },
+    {
+      "feature": "MA",
+      "coefficient": 0.0,
+      "importance": 0.36047390635269255
+    },
+    {
+      "feature": "PIS",
+      "coefficient": 0.0,
+      "importance": 0.34754227946215516
+    },
+    {
+      "feature": "GUA",
+      "coefficient": 0.0,
+      "importance": 0.29706612807982435
+    },
+    {
+      "feature": "AST",
+      "coefficient": 0.0,
+      "importance": 0.29582547482896326
+    },
+    {
+      "feature": "QA",
+      "coefficient": 0.0,
+      "importance": 0.2852511009329397
+    },
+    {
+      "feature": "RUT",
+      "coefficient": 0.0,
+      "importance": 0.28177989931464414
+    },
+    {
+      "feature": "CA",
+      "coefficient": 0.0,
+      "importance": 0.2710059158243671
+    },
+    {
+      "feature": "HYP",
+      "coefficient": 0.0,
+      "importance": 0.2658557505060821
+    },
+    {
+      "feature": "NCGA",
+      "coefficient": 0.0,
+      "importance": 0.24405602742448076
+    },
+    {
+      "feature": "CCGA",
+      "coefficient": 0.0,
+      "importance": 0.16286654770570555
+    }
+  ],
+  "predictions": {
+    "actual": [
+      0.611,
+      0.604,
+      1.061,
+      0.604,
+      0.874,
+      0.882,
+      0.874,
+      0.521,
+      0.515,
+      0.809,
+      0.545,
+      0.596,
+      0.575,
+      0.704,
+      0.515,
+      0.809,
+      0.521,
+      0.545,
+      0.611,
+      0.576,
+      0.704,
+      1.003,
+      0.882,
+      0.796,
+      0.604,
+      1.061,
+      0.886,
+      0.522,
+      0.507
+    ],
+    "predicted": [
+      0.6224945084493247,
+      0.507909086107557,
+      1.0399873184325454,
+      0.5018944992377643,
+      0.8808740736043672,
+      0.8641314846697407,
+      0.887748147208735,
+      0.5526768157753241,
+      0.5164758954329127,
+      0.7961719128651941,
+      0.541578727374866,
+      0.5959999999999995,
+      0.5749999999999995,
+      0.6958313960378982,
+      0.517951790865826,
+      0.8025859564325983,
+      0.5368384078876618,
+      0.5432893636874327,
+      0.6340143223465656,
+      0.5759999999999997,
+      0.6876627920757962,
+      1.0029999999999992,
+      0.8998685153302597,
+      0.796,
+      0.5139236729773499,
+      1.0820126815674527,
+      0.885999999999999,
+      0.5220000000000014,
+      0.5069999999999999
+    ]
+  },
+  "parameters": {
+    "population_size": 100000,
+    "generations": 14,
+    "test_ratio": 0.48,
+    "operators": [
+      "add",
+      "sub",
+      "mul",
+      "div",
+      "pow",
+      "sqrt"
+    ],
+    "n_features": 21,
+    "n_samples": 60,
+    "algorithm": "polynomial_regression"
+  },
+  "timestamp": 1753651366.816085,
+  "model_id": 1753651366
+}

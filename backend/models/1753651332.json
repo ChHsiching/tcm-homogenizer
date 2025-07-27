@@ -1,0 +1,170 @@
+{
+  "expression": "-0.032 * NCGA + + 0.016 * CA + + 0.018 * PIS + + 0.017 * AST + -0.012 * VR + -0.030 * VG + -0.015 * PB2 + -0.035 * PC1 + + 0.034 * OA + -0.033 * UA + -0.056 * MA + -0.077 * CRA + -0.011 * QUE + + 0.034 * MDA",
+  "r2": 0.9999647816239033,
+  "mse": 9.342718429449773e-07,
+  "r2_train": 1.0,
+  "mse_train": 6.387084033749669e-32,
+  "feature_importance": [
+    {
+      "feature": "UA",
+      "coefficient": 0.0,
+      "importance": 0.7613262880489521
+    },
+    {
+      "feature": "CGA",
+      "coefficient": 0.0,
+      "importance": 0.7339883832837643
+    },
+    {
+      "feature": "MDA",
+      "coefficient": 0.0,
+      "importance": 0.5997943869412083
+    },
+    {
+      "feature": "EPI",
+      "coefficient": 0.0,
+      "importance": 0.5605530582498301
+    },
+    {
+      "feature": "VR",
+      "coefficient": 0.0,
+      "importance": 0.5387336595870424
+    },
+    {
+      "feature": "OA",
+      "coefficient": 0.0,
+      "importance": 0.4878522243832128
+    },
+    {
+      "feature": "CRA",
+      "coefficient": 0.0,
+      "importance": 0.4642820396657271
+    },
+    {
+      "feature": "PB2",
+      "coefficient": 0.0,
+      "importance": 0.45839169776041266
+    },
+    {
+      "feature": "PC1",
+      "coefficient": 0.0,
+      "importance": 0.4544765788319358
+    },
+    {
+      "feature": "VG",
+      "coefficient": 0.0,
+      "importance": 0.4509755944469386
+    },
+    {
+      "feature": "PIS",
+      "coefficient": 0.0,
+      "importance": 0.4159496763620589
+    },
+    {
+      "feature": "MA",
+      "coefficient": 0.0,
+      "importance": 0.4156688667403838
+    },
+    {
+      "feature": "QUE",
+      "coefficient": 0.0,
+      "importance": 0.3910939542206746
+    },
+    {
+      "feature": "CA",
+      "coefficient": 0.0,
+      "importance": 0.33129951933187074
+    },
+    {
+      "feature": "GUA",
+      "coefficient": 0.0,
+      "importance": 0.31669361391589546
+    },
+    {
+      "feature": "AST",
+      "coefficient": 0.0,
+      "importance": 0.303212672023189
+    },
+    {
+      "feature": "QA",
+      "coefficient": 0.0,
+      "importance": 0.27843229989436946
+    },
+    {
+      "feature": "HYP",
+      "coefficient": 0.0,
+      "importance": 0.2663094890671252
+    },
+    {
+      "feature": "RUT",
+      "coefficient": 0.0,
+      "importance": 0.26604831553057745
+    },
+    {
+      "feature": "NCGA",
+      "coefficient": 0.0,
+      "importance": 0.24568844966799988
+    },
+    {
+      "feature": "CCGA",
+      "coefficient": 0.0,
+      "importance": 0.1627980238887056
+    }
+  ],
+  "predictions": {
+    "actual": [
+      0.611,
+      0.604,
+      1.061,
+      0.604,
+      0.874,
+      0.882,
+      0.874,
+      0.521,
+      0.515,
+      0.809,
+      0.545,
+      0.596,
+      0.575,
+      0.704,
+      0.515,
+      0.809
+    ],
+    "predicted": [
+      0.610985654657612,
+      0.6040642588418331,
+      1.0609999999999995,
+      0.6041285176836659,
+      0.8752247418949033,
+      0.8819999999999988,
+      0.8764494837898064,
+      0.5209999999999998,
+      0.5146692162638705,
+      0.8066538636427678,
+      0.5449999999999996,
+      0.5960000000000001,
+      0.5749999999999997,
+      0.7040000000000006,
+      0.5143384325277411,
+      0.807826931821384
+    ]
+  },
+  "parameters": {
+    "population_size": 1000,
+    "generations": 50,
+    "test_ratio": 0.26,
+    "operators": [
+      "add",
+      "sub",
+      "mul",
+      "div",
+      "pow",
+      "sqrt"
+    ],
+    "n_features": 21,
+    "n_samples": 60,
+    "algorithm": "polynomial_regression"
+  },
+  "timestamp": 1753651332.660346,
+  "model_id": 1753651332
+}
