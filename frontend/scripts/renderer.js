@@ -509,7 +509,7 @@ function formatFormulaToLatex(expression, targetColumn) {
     return `${targetColumn} = ${latex}`;
 }
 
-// 渲染LaTeX公式（分段渲染）
+// 渲染LaTeX公式（连续显示）
 function renderLatexFormula(expression, targetColumn) {
     const formulaContainer = document.getElementById('formula-latex');
     if (!formulaContainer) {
@@ -525,55 +525,44 @@ function renderLatexFormula(expression, targetColumn) {
     // 清空容器
     formulaContainer.innerHTML = '';
     
-    // 分段渲染：每3项为一段
-    const terms = latexFormula.split(' + ');
-    const maxTermsPerSegment = 3;
-    const segments = [];
+    // 创建单个公式容器
+    const formulaElement = document.createElement('div');
+    formulaElement.className = 'formula-content';
+    formulaElement.style.cssText = `
+        padding: 20px;
+        background: #2a2a2a;
+        border-radius: 8px;
+        margin: 10px 0;
+        text-align: center;
+        overflow-x: auto;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        max-width: 100%;
+        font-size: 16px;
+        line-height: 1.5;
+    `;
     
-    for (let i = 0; i < terms.length; i += maxTermsPerSegment) {
-        const segment = terms.slice(i, i + maxTermsPerSegment).join(' + ');
-        segments.push(segment);
+    // 使用MathJax渲染
+    formulaElement.innerHTML = `$$${latexFormula}$$`;
+    
+    // 添加到容器
+    formulaContainer.appendChild(formulaElement);
+    
+    // 触发MathJax重新渲染
+    if (window.MathJax && window.MathJax.typesetPromise) {
+        console.log('Using MathJax to render formula');
+        MathJax.typesetPromise([formulaElement]).then(() => {
+            console.log('MathJax rendering completed');
+        }).catch((err) => {
+            console.error('MathJax rendering failed:', err);
+            // 降级到普通文本显示
+            formulaElement.innerHTML = `<code style="color: #4a9eff; font-size: 16px; white-space: pre-wrap; line-height: 1.5;">${latexFormula}</code>`;
+        });
+    } else {
+        console.log('MathJax not available, using fallback');
+        // 如果MathJax不可用，使用普通文本
+        formulaElement.innerHTML = `<code style="color: #4a9eff; font-size: 16px; white-space: pre-wrap; line-height: 1.5;">${latexFormula}</code>`;
     }
-    
-    // 创建分段容器
-    segments.forEach((segment, index) => {
-        const segmentElement = document.createElement('div');
-        segmentElement.className = 'formula-segment';
-        segmentElement.style.cssText = `
-            padding: 15px;
-            background: #2a2a2a;
-            border-radius: 8px;
-            margin: 10px 0;
-            text-align: center;
-            overflow-x: auto;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            max-width: 100%;
-        `;
-        
-        // 如果是第一段，包含等号
-        const formulaText = index === 0 ? segment : segment;
-        segmentElement.innerHTML = `$$${formulaText}$$`;
-        
-        // 添加到容器
-        formulaContainer.appendChild(segmentElement);
-        
-        // 触发MathJax重新渲染
-        if (window.MathJax && window.MathJax.typesetPromise) {
-            console.log('Using MathJax to render segment:', index);
-            MathJax.typesetPromise([segmentElement]).then(() => {
-                console.log('MathJax rendering completed for segment:', index);
-            }).catch((err) => {
-                console.error('MathJax rendering failed for segment:', index, err);
-                // 降级到普通文本显示
-                segmentElement.innerHTML = `<code style="color: #4a9eff; font-size: 14px; white-space: pre-wrap;">${formulaText}</code>`;
-            });
-        } else {
-            console.log('MathJax not available, using fallback for segment:', index);
-            // 如果MathJax不可用，使用普通文本
-            segmentElement.innerHTML = `<code style="color: #4a9eff; font-size: 14px; white-space: pre-wrap;">${formulaText}</code>`;
-        }
-    });
 }
 
 // 更新性能指标
@@ -753,9 +742,9 @@ function generateFormulaTree(result) {
     // 解析表达式生成语法树
     const syntaxTree = parseExpressionToSyntaxTree(result.expression, result.featureImportance);
     
-    // 设置树形图尺寸
-    const width = treeContainer.clientWidth || 600;
-    const height = 400;
+    // 设置更大的树形图尺寸
+    const width = Math.max(treeContainer.clientWidth || 800, 800);
+    const height = Math.max(treeContainer.clientHeight || 600, 600);
     
     try {
         // 创建SVG容器
@@ -766,9 +755,10 @@ function generateFormulaTree(result) {
             .style('border', '1px solid #333')
             .style('background', '#1a1a1a');
         
-        // 创建树形布局
+        // 创建树形布局，增加间距
         const treeLayout = d3.tree()
-            .size([width - 100, height - 100]);
+            .size([width - 200, height - 200])
+            .separation((a, b) => (a.parent === b.parent ? 1.5 : 2)); // 增加节点间距
         
         // 创建层次结构
         const root = d3.hierarchy(syntaxTree);
@@ -783,11 +773,11 @@ function generateFormulaTree(result) {
             .append('path')
             .attr('class', 'link')
             .attr('d', d3.linkVertical()
-                .x(d => d.x + 50)
-                .y(d => d.y + 50))
+                .x(d => d.x + 100)
+                .y(d => d.y + 100))
             .style('fill', 'none')
             .style('stroke', '#666')
-            .style('stroke-width', '2');
+            .style('stroke-width', '3'); // 加粗连接线
         
         // 创建节点组
         const nodes = svg.selectAll('.node')
@@ -795,11 +785,11 @@ function generateFormulaTree(result) {
             .enter()
             .append('g')
             .attr('class', 'node')
-            .attr('transform', d => `translate(${d.x + 50},${d.y + 50})`);
+            .attr('transform', d => `translate(${d.x + 100},${d.y + 100})`);
         
-        // 绘制节点圆圈
+        // 绘制更大的节点圆圈
         nodes.append('circle')
-            .attr('r', d => d.data.type === 'operator' ? 25 : 20)
+            .attr('r', d => d.data.type === 'operator' ? 35 : 30) // 增大节点半径
             .style('fill', d => {
                 if (d.data.type === 'operator') {
                     return '#4a9eff';
@@ -814,7 +804,7 @@ function generateFormulaTree(result) {
                 return colors[weightClass] || '#84cc16';
             })
             .style('stroke', '#333')
-            .style('stroke-width', '2')
+            .style('stroke-width', '3') // 加粗边框
             .style('cursor', 'pointer')
             .on('click', function(event, d) {
                 showNodeInfo(event, d);
@@ -824,28 +814,42 @@ function generateFormulaTree(result) {
                 showContextMenu(event, d);
             });
         
-        // 添加节点文本
+        // 添加节点文本（主文本）
         nodes.append('text')
             .attr('dy', '.35em')
             .attr('text-anchor', 'middle')
             .style('fill', 'white')
-            .style('font-size', '12px')
+            .style('font-size', '14px') // 增大字体
             .style('font-weight', 'bold')
+            .style('text-shadow', '1px 1px 2px rgba(0,0,0,0.8)') // 添加文字阴影
             .text(d => {
                 if (d.data.type === 'operator') {
-                    return d.data.operator || d.data.name;
+                    // 运算符节点显示英文名称
+                    return d.data.name || 'Addition';
                 } else {
                     return d.data.name;
                 }
             });
         
+        // 添加运算符符号（小字）
+        nodes.filter(d => d.data.type === 'operator')
+            .append('text')
+            .attr('dy', '1.8em')
+            .attr('text-anchor', 'middle')
+            .style('fill', '#ccc')
+            .style('font-size', '12px')
+            .style('text-shadow', '1px 1px 2px rgba(0,0,0,0.8)')
+            .text(d => d.data.operator || '+');
+        
         // 添加系数标签（对于变量节点）
         nodes.filter(d => d.data.type === 'variable')
             .append('text')
-            .attr('dy', '1.5em')
+            .attr('dy', '1.8em')
             .attr('text-anchor', 'middle')
-            .style('fill', '#ccc')
-            .style('font-size', '10px')
+            .style('fill', '#fff')
+            .style('font-size', '12px')
+            .style('font-weight', 'bold')
+            .style('text-shadow', '1px 1px 2px rgba(0,0,0,0.8)')
             .text(d => d.data.coefficient.toFixed(3));
         
         console.log('Formula tree generated successfully');
