@@ -36,23 +36,11 @@ class SymbolicRegression:
     
     def analyze(self, data: Dict[str, Any], target_column: str, 
                 feature_columns: List[str], population_size: int = 100, 
-                generations: int = 50) -> Dict[str, Any]:
-        """
-        执行符号回归分析
-        
-        Args:
-            data: 输入数据
-            target_column: 目标变量列名
-            feature_columns: 特征变量列名列表
-            population_size: 种群大小
-            generations: 进化代数
-            
-        Returns:
-            分析结果字典
-        """
+                generations: int = 50, test_ratio: float = 0.3, 
+                operators: List[str] = None) -> Dict[str, Any]:
+        """执行符号回归分析"""
         try:
-            logger.info(f"开始符号回归分析，目标变量: {target_column}")
-            logger.info(f"特征变量: {feature_columns}")
+            logger.info(f"开始符号回归分析，目标变量: {target_column}, 特征变量: {feature_columns}")
             
             # 数据预处理
             X_scaled, y_scaled, X, y = self._prepare_data(data, target_column, feature_columns)
@@ -60,15 +48,17 @@ class SymbolicRegression:
             # 执行符号回归
             if GPLEARN_AVAILABLE:
                 result = self._perform_symbolic_regression_gplearn(
-                    X_scaled, y_scaled, feature_columns, population_size, generations
+                    X_scaled, y_scaled, feature_columns, population_size, generations, test_ratio, operators
                 )
             else:
                 result = self._perform_symbolic_regression_simple(
-                    X_scaled, y_scaled, feature_columns, population_size, generations
+                    X_scaled, y_scaled, feature_columns, population_size, generations, test_ratio, operators
                 )
             
             # 保存模型
-            model_id = self._save_model(result)
+            model_id = int(time.time())
+            result['model_id'] = model_id
+            self._save_model(model_id, result)
             
             logger.info(f"符号回归分析完成，模型ID: {model_id}")
             return result
@@ -144,15 +134,20 @@ class SymbolicRegression:
     
     def _perform_symbolic_regression_gplearn(self, X_scaled: np.ndarray, y_scaled: np.ndarray, 
                                            feature_names: List[str], population_size: int, 
-                                           generations: int) -> Dict[str, Any]:
+                                           generations: int, test_ratio: float = 0.3,
+                                           operators: List[str] = None) -> Dict[str, Any]:
         """使用gplearn执行符号回归算法"""
         try:
             logger.info("开始执行gplearn符号回归算法...")
             
             # 分割训练和测试数据（使用标准化数据训练）
             X_train_scaled, X_test_scaled, y_train_scaled, y_test_scaled = train_test_split(
-                X_scaled, y_scaled, test_size=0.3, random_state=42
+                X_scaled, y_scaled, test_size=test_ratio, random_state=42
             )
+            
+            # 设置运算符
+            if operators is None:
+                operators = ['add', 'sub', 'mul', 'div']
             
             # 创建符号回归器（使用更稳定的参数）
             est_gp = SymbolicRegressor(
@@ -190,15 +185,6 @@ class SymbolicRegression:
             mse_train = mean_squared_error(y_train_orig, y_pred_train)
             mse_test = mean_squared_error(y_test_orig, y_pred_test)
             
-            # 检查R²是否异常
-            if r2_test > 0.999:
-                logger.warning("R²值异常高，可能存在过拟合或数据问题")
-                r2_test = min(r2_test, 0.95)  # 限制R²最大值
-            
-            if r2_test < -10:
-                logger.warning("R²值异常低，模型可能存在问题")
-                r2_test = max(r2_test, -1.0)  # 限制R²最小值
-            
             # 获取最佳表达式
             try:
                 best_program = est_gp._program
@@ -235,6 +221,8 @@ class SymbolicRegression:
                 'parameters': {
                     'population_size': population_size,
                     'generations': generations,
+                    'test_ratio': test_ratio,
+                    'operators': operators,
                     'n_features': X_scaled.shape[1],
                     'n_samples': len(y_scaled),
                     'algorithm': 'gplearn'
@@ -250,19 +238,20 @@ class SymbolicRegression:
             # 如果gplearn失败，回退到简化实现
             logger.info("回退到简化实现...")
             return self._perform_symbolic_regression_simple(
-                X_scaled, y_scaled, feature_names, population_size, generations
+                X_scaled, y_scaled, feature_names, population_size, generations, test_ratio, operators
             )
     
     def _perform_symbolic_regression_simple(self, X_scaled: np.ndarray, y_scaled: np.ndarray, 
                                           feature_names: List[str], population_size: int, 
-                                          generations: int) -> Dict[str, Any]:
+                                          generations: int, test_ratio: float = 0.3,
+                                          operators: List[str] = None) -> Dict[str, Any]:
         """简化版符号回归算法（当gplearn不可用时使用）"""
         try:
             logger.info("开始执行简化版符号回归算法...")
             
             # 分割训练和测试数据（使用标准化数据训练）
             X_train_scaled, X_test_scaled, y_train_scaled, y_test_scaled = train_test_split(
-                X_scaled, y_scaled, test_size=0.3, random_state=42
+                X_scaled, y_scaled, test_size=test_ratio, random_state=42
             )
             
             # 使用多项式回归作为简化实现
@@ -300,15 +289,6 @@ class SymbolicRegression:
             r2_test = r2_score(y_test_orig, y_pred_test)
             mse_train = mean_squared_error(y_train_orig, y_pred_train)
             mse_test = mean_squared_error(y_test_orig, y_pred_test)
-            
-            # 检查R²是否异常
-            if r2_test > 0.999:
-                logger.warning("R²值异常高，可能存在过拟合或数据问题")
-                r2_test = min(r2_test, 0.95)  # 限制R²最大值
-            
-            if r2_test < -10:
-                logger.warning("R²值异常低，模型可能存在问题")
-                r2_test = max(r2_test, -1.0)  # 限制R²最小值
             
             # 获取特征重要性
             feature_importance = []
@@ -359,6 +339,8 @@ class SymbolicRegression:
                 'parameters': {
                     'population_size': population_size,
                     'generations': generations,
+                    'test_ratio': test_ratio,
+                    'operators': operators or ['add', 'sub', 'mul', 'div'],
                     'n_features': X_scaled.shape[1],
                     'n_samples': len(y_scaled),
                     'algorithm': 'polynomial_regression'
@@ -373,12 +355,9 @@ class SymbolicRegression:
             logger.error(f"简化版符号回归执行失败: {str(e)}")
             raise
     
-    def _save_model(self, result: Dict[str, Any]) -> str:
+    def _save_model(self, model_id: int, result: Dict[str, Any]):
         """保存模型"""
         try:
-            model_id = f"model_{int(time.time())}"
-            result['model_id'] = model_id
-            
             # 保存到内存
             self.models[model_id] = result
             
@@ -388,7 +367,6 @@ class SymbolicRegression:
                 json.dump(result, f, ensure_ascii=False, indent=2)
             
             logger.info(f"模型已保存: {model_file}")
-            return model_id
             
         except Exception as e:
             logger.error(f"模型保存失败: {str(e)}")

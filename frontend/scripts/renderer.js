@@ -56,6 +56,15 @@ function setupEventListeners() {
         regressionDataInput.addEventListener('change', handleFileUpload);
     }
     
+    // 滑块事件
+    const testRatioSlider = document.getElementById('test-ratio');
+    const testRatioValue = document.getElementById('test-ratio-value');
+    if (testRatioSlider && testRatioValue) {
+        testRatioSlider.addEventListener('input', function() {
+            testRatioValue.textContent = this.value + '%';
+        });
+    }
+    
     // 菜单事件监听
     if (window.electronAPI) {
         window.electronAPI.onMenuImportData(() => importData());
@@ -293,6 +302,21 @@ async function startRegression() {
     const featureColumns = Array.from(featureCheckboxes).map(cb => cb.value);
     const populationSize = parseInt(document.getElementById('population-size').value) || 100;
     const generations = parseInt(document.getElementById('generations').value) || 50;
+    const testRatio = parseInt(document.getElementById('test-ratio').value) || 30;
+    
+    // 获取选择的运算符
+    const operators = [];
+    if (document.getElementById('op-add').checked) operators.push('add');
+    if (document.getElementById('op-sub').checked) operators.push('sub');
+    if (document.getElementById('op-mul').checked) operators.push('mul');
+    if (document.getElementById('op-div').checked) operators.push('div');
+    if (document.getElementById('op-pow').checked) operators.push('pow');
+    if (document.getElementById('op-sqrt').checked) operators.push('sqrt');
+    
+    if (operators.length === 0) {
+        showNotification('请至少选择一个运算符号', 'warning');
+        return;
+    }
     
     showLoading('正在进行符号回归分析...');
     
@@ -302,7 +326,9 @@ async function startRegression() {
             targetColumn,
             featureColumns,
             populationSize,
-            generations
+            generations,
+            testRatio,
+            operators
         });
         
         // 保存模型
@@ -336,7 +362,9 @@ async function performSymbolicRegression(params) {
             target_column: params.targetColumn,
             feature_columns: params.featureColumns,
             population_size: params.populationSize,
-            generations: params.generations
+            generations: params.generations,
+            test_ratio: params.testRatio,
+            operators: params.operators
         };
         
         // 调用后端API
@@ -380,8 +408,11 @@ async function performSymbolicRegression(params) {
 // 显示回归结果
 function displayRegressionResults(result) {
     const container = document.getElementById('regression-results');
+    const formulaDisplay = document.getElementById('formula-display');
+    
     if (!container) return;
     
+    // 显示基本结果
     container.innerHTML = `
         <div class="result-item">
             <h4>回归表达式</h4>
@@ -409,6 +440,233 @@ function displayRegressionResults(result) {
             <button class="btn-secondary" onclick="visualizeResults(${result.id})">查看图表</button>
         </div>
     `;
+    
+    // 显示公式显示区域
+    if (formulaDisplay) {
+        formulaDisplay.style.display = 'block';
+        
+        // 更新LaTeX公式
+        const formulaLatex = document.getElementById('formula-latex');
+        if (formulaLatex) {
+            formulaLatex.innerHTML = formatFormulaToLatex(result.expression);
+        }
+        
+        // 更新性能指标
+        updatePerformanceMetrics(result);
+        
+        // 生成公式树
+        generateFormulaTree(result);
+    }
+}
+
+// 格式化公式为LaTeX
+function formatFormulaToLatex(expression) {
+    // 简单的LaTeX格式化
+    let latex = expression
+        .replace(/\*/g, ' \\cdot ')
+        .replace(/\//g, ' \\div ')
+        .replace(/\^/g, '^')
+        .replace(/sqrt/g, '\\sqrt');
+    
+    return `$$${latex}$$`;
+}
+
+// 更新性能指标
+function updatePerformanceMetrics(result) {
+    const r2Value = document.getElementById('r2-value');
+    const mseValue = document.getElementById('mse-value');
+    const maeValue = document.getElementById('mae-value');
+    const rmseValue = document.getElementById('rmse-value');
+    
+    if (r2Value) r2Value.textContent = result.r2.toFixed(3);
+    if (mseValue) mseValue.textContent = result.mse.toFixed(3);
+    
+    // 计算MAE和RMSE
+    if (result.predictions.actual && result.predictions.predicted) {
+        const actual = result.predictions.actual;
+        const predicted = result.predictions.predicted;
+        
+        const mae = actual.reduce((sum, val, i) => sum + Math.abs(val - predicted[i]), 0) / actual.length;
+        const rmse = Math.sqrt(result.mse);
+        
+        if (maeValue) maeValue.textContent = mae.toFixed(3);
+        if (rmseValue) rmseValue.textContent = rmse.toFixed(3);
+    }
+}
+
+// 生成公式树
+function generateFormulaTree(result) {
+    const treeContainer = document.getElementById('formula-tree');
+    if (!treeContainer) return;
+    
+    // 解析表达式生成树结构
+    const treeData = parseExpressionToTree(result.expression, result.featureImportance);
+    
+    treeContainer.innerHTML = '';
+    renderTreeNodes(treeContainer, treeData);
+    
+    // 添加右键菜单事件
+    setupContextMenu();
+}
+
+// 解析表达式为树结构
+function parseExpressionToTree(expression, featureImportance) {
+    // 简化的表达式解析
+    const nodes = [];
+    const terms = expression.split('+').map(term => term.trim());
+    
+    terms.forEach((term, index) => {
+        const parts = term.split('*');
+        if (parts.length === 2) {
+            const coefficient = parseFloat(parts[0]) || 1;
+            const feature = parts[1].trim();
+            
+            // 找到特征的重要性
+            const importance = featureImportance.find(f => f.feature === feature)?.importance || 0;
+            
+            nodes.push({
+                id: `node-${index}`,
+                type: 'term',
+                coefficient: coefficient,
+                feature: feature,
+                importance: importance,
+                weight: getWeightClass(importance)
+            });
+        }
+    });
+    
+    return {
+        type: 'expression',
+        children: nodes
+    };
+}
+
+// 获取权重类别
+function getWeightClass(importance) {
+    if (importance > 0.5) return 'high-weight';
+    if (importance > 0.2) return 'medium-weight';
+    return 'low-weight';
+}
+
+// 渲染树节点
+function renderTreeNodes(container, node, level = 0) {
+    if (node.type === 'expression') {
+        const expressionDiv = document.createElement('div');
+        expressionDiv.className = 'tree-expression';
+        expressionDiv.innerHTML = '<strong>药效预测公式</strong>';
+        container.appendChild(expressionDiv);
+        
+        node.children.forEach(child => {
+            renderTreeNodes(container, child, level + 1);
+        });
+    } else if (node.type === 'term') {
+        const nodeDiv = document.createElement('div');
+        nodeDiv.className = `tree-node ${node.weight}`;
+        nodeDiv.setAttribute('data-node-id', node.id);
+        nodeDiv.setAttribute('data-feature', node.feature);
+        nodeDiv.setAttribute('data-importance', node.importance);
+        
+        nodeDiv.innerHTML = `
+            <span class="node-coefficient">${node.coefficient > 0 ? '+' : ''}${node.coefficient.toFixed(3)}</span>
+            <span class="node-feature">× ${node.feature}</span>
+            <span class="node-importance">(权重: ${node.importance.toFixed(3)})</span>
+        `;
+        
+        container.appendChild(nodeDiv);
+    }
+}
+
+// 设置右键菜单
+function setupContextMenu() {
+    const treeNodes = document.querySelectorAll('.tree-node');
+    
+    treeNodes.forEach(node => {
+        node.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            showContextMenu(e, this);
+        });
+        
+        node.addEventListener('click', function() {
+            toggleNodeSelection(this);
+        });
+    });
+}
+
+// 显示右键菜单
+function showContextMenu(e, node) {
+    // 移除现有菜单
+    const existingMenu = document.querySelector('.context-menu');
+    if (existingMenu) existingMenu.remove();
+    
+    const menu = document.createElement('div');
+    menu.className = 'context-menu';
+    menu.style.left = e.pageX + 'px';
+    menu.style.top = e.pageY + 'px';
+    
+    const feature = node.getAttribute('data-feature');
+    const importance = parseFloat(node.getAttribute('data-importance'));
+    
+    menu.innerHTML = `
+        <div class="context-menu-item">特征: ${feature}</div>
+        <div class="context-menu-item">权重: ${importance.toFixed(3)}</div>
+        <div class="context-menu-item danger" onclick="deleteNode('${node.getAttribute('data-node-id')}')">删除此节点</div>
+        <div class="context-menu-item danger" onclick="deleteLowWeightNodes()">删除所有低权重节点</div>
+    `;
+    
+    document.body.appendChild(menu);
+    
+    // 点击其他地方关闭菜单
+    document.addEventListener('click', function closeMenu() {
+        menu.remove();
+        document.removeEventListener('click', closeMenu);
+    });
+}
+
+// 切换节点选择状态
+function toggleNodeSelection(node) {
+    node.classList.toggle('selected');
+}
+
+// 删除节点
+function deleteNode(nodeId) {
+    // 这里应该重新计算回归，删除指定节点
+    showNotification('节点删除功能开发中...', 'info');
+}
+
+// 删除低权重节点
+function deleteLowWeightNodes() {
+    // 删除所有低权重节点
+    const lowWeightNodes = document.querySelectorAll('.tree-node.low-weight');
+    lowWeightNodes.forEach(node => {
+        node.style.opacity = '0.3';
+        node.style.textDecoration = 'line-through';
+    });
+    showNotification('已标记低权重节点，可重新回归获得简化公式', 'info');
+}
+
+// 剪枝选中节点
+function pruneSelectedNodes() {
+    const selectedNodes = document.querySelectorAll('.tree-node.selected');
+    if (selectedNodes.length === 0) {
+        showNotification('请先选择要删除的节点', 'warning');
+        return;
+    }
+    
+    // 这里应该重新计算回归
+    showNotification(`已选择 ${selectedNodes.length} 个节点进行删除`, 'info');
+}
+
+// 重置公式
+function resetFormula() {
+    // 重置所有节点状态
+    const nodes = document.querySelectorAll('.tree-node');
+    nodes.forEach(node => {
+        node.classList.remove('selected');
+        node.style.opacity = '1';
+        node.style.textDecoration = 'none';
+    });
+    
+    showNotification('公式已重置', 'success');
 }
 
 // 更新回归模型列表

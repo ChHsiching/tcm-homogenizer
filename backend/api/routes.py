@@ -23,20 +23,17 @@ monte_carlo_engine = MonteCarloAnalysis()
 data_loader = DataLoader()
 
 # 符号回归路由
-@symbolic_regression_bp.route('/analyze', methods=['POST'])
-def analyze():
-    """符号回归分析"""
+@symbolic_regression_bp.route('/symbolic-regression', methods=['POST'])
+def symbolic_regression():
+    """符号回归分析接口"""
     try:
         data = request.get_json()
         
-        # 验证必要参数
+        # 验证必需参数
         required_fields = ['data', 'target_column', 'feature_columns']
         for field in required_fields:
             if field not in data:
-                return jsonify({
-                    'error': '参数缺失',
-                    'message': f'缺少必要参数: {field}'
-                }), 400
+                return jsonify({'error': f'缺少必需参数: {field}'}), 400
         
         # 获取参数
         input_data = data['data']
@@ -44,32 +41,37 @@ def analyze():
         feature_columns = data['feature_columns']
         population_size = data.get('population_size', 100)
         generations = data.get('generations', 50)
+        test_ratio = data.get('test_ratio', 30) / 100.0  # 转换为小数
+        operators = data.get('operators', ['add', 'sub', 'mul', 'div'])
         
-        logger.info(f"开始符号回归分析，目标变量: {target_column}")
-        logger.info(f"特征变量: {feature_columns}")
+        # 验证数据
+        if not input_data or not input_data.get('data'):
+            return jsonify({'error': '数据格式错误'}), 400
         
-        # 执行符号回归
+        if not feature_columns:
+            return jsonify({'error': '至少需要选择一个特征变量'}), 400
+        
+        # 执行符号回归分析
         result = regression_engine.analyze(
             data=input_data,
             target_column=target_column,
             feature_columns=feature_columns,
             population_size=population_size,
-            generations=generations
+            generations=generations,
+            test_ratio=test_ratio,
+            operators=operators
         )
         
-        logger.info("符号回归分析完成")
         return jsonify({
             'success': True,
             'result': result
         })
         
+    except ValueError as e:
+        return jsonify({'error': f'数据验证失败: {str(e)}'}), 400
     except Exception as e:
         logger.error(f"符号回归分析失败: {str(e)}")
-        logger.error(traceback.format_exc())
-        return jsonify({
-            'error': '分析失败',
-            'message': str(e)
-        }), 500
+        return jsonify({'error': f'符号回归分析失败: {str(e)}'}), 500
 
 @symbolic_regression_bp.route('/models', methods=['GET'])
 def get_models():
