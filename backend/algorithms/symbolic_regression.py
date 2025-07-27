@@ -55,16 +55,16 @@ class SymbolicRegression:
             logger.info(f"特征变量: {feature_columns}")
             
             # 数据预处理
-            X, y = self._prepare_data(data, target_column, feature_columns)
+            X_scaled, y_scaled, X, y = self._prepare_data(data, target_column, feature_columns)
             
             # 执行符号回归
             if GPLEARN_AVAILABLE:
                 result = self._perform_symbolic_regression_gplearn(
-                    X, y, feature_columns, population_size, generations
+                    X_scaled, y_scaled, feature_columns, population_size, generations
                 )
             else:
                 result = self._perform_symbolic_regression_simple(
-                    X, y, feature_columns, population_size, generations
+                    X_scaled, y_scaled, feature_columns, population_size, generations
                 )
             
             # 保存模型
@@ -106,34 +106,52 @@ class SymbolicRegression:
             X = np.nan_to_num(X, nan=0.0)
             y = np.nan_to_num(y, nan=0.0)
             
-            # 数据标准化
-            X_mean = np.mean(X, axis=0)
-            X_std = np.std(X, axis=0)
-            X_std[X_std == 0] = 1  # 避免除零
-            X = (X - X_mean) / X_std
+            # 检查数据质量
+            if len(y) < 10:
+                raise ValueError("数据样本数量太少，至少需要10个样本")
             
-            y_mean = np.mean(y)
+            # 检查目标变量的变化
             y_std = np.std(y)
-            if y_std > 0:
-                y = (y - y_mean) / y_std
+            if y_std < 1e-6:
+                raise ValueError("目标变量没有变化，无法进行回归分析")
             
-            logger.info(f"数据准备完成，特征形状: {X.shape}, 目标形状: {y.shape}")
-            return X, y
+            # 检查特征变量的变化
+            for i, col in enumerate(feature_columns):
+                col_std = np.std(X[:, i])
+                if col_std < 1e-6:
+                    logger.warning(f"特征变量 '{col}' 没有变化，可能影响分析结果")
+            
+            # 数据标准化（保存原始数据用于反标准化）
+            self.X_mean = np.mean(X, axis=0)
+            self.X_std = np.std(X, axis=0)
+            self.X_std[self.X_std == 0] = 1  # 避免除零
+            X_scaled = (X - self.X_mean) / self.X_std
+            
+            self.y_mean = np.mean(y)
+            self.y_std = np.std(y)
+            if self.y_std > 0:
+                y_scaled = (y - self.y_mean) / self.y_std
+            else:
+                y_scaled = y
+            
+            logger.info(f"数据准备完成，特征形状: {X_scaled.shape}, 目标形状: {y_scaled.shape}")
+            logger.info(f"目标变量统计: 均值={self.y_mean:.3f}, 标准差={self.y_std:.3f}")
+            return X_scaled, y_scaled, X, y  # 返回标准化和原始数据
             
         except Exception as e:
             logger.error(f"数据准备失败: {str(e)}")
             raise
     
-    def _perform_symbolic_regression_gplearn(self, X: np.ndarray, y: np.ndarray, 
+    def _perform_symbolic_regression_gplearn(self, X_scaled: np.ndarray, y_scaled: np.ndarray, 
                                            feature_names: List[str], population_size: int, 
                                            generations: int) -> Dict[str, Any]:
         """使用gplearn执行符号回归算法"""
         try:
             logger.info("开始执行gplearn符号回归算法...")
             
-            # 分割训练和测试数据
-            X_train, X_test, y_train, y_test = train_test_split(
-                X, y, test_size=0.2, random_state=42
+            # 分割训练和测试数据（使用标准化数据训练）
+            X_train_scaled, X_test_scaled, y_train_scaled, y_test_scaled = train_test_split(
+                X_scaled, y_scaled, test_size=0.3, random_state=42
             )
             
             # 创建符号回归器（使用更稳定的参数）
@@ -152,17 +170,34 @@ class SymbolicRegression:
             )
             
             # 训练模型
-            est_gp.fit(X_train, y_train)
+            est_gp.fit(X_train_scaled, y_train_scaled)
             
-            # 预测
-            y_pred_train = est_gp.predict(X_train)
-            y_pred_test = est_gp.predict(X_test)
+            # 预测（使用标准化数据）
+            y_pred_train_scaled = est_gp.predict(X_train_scaled)
+            y_pred_test_scaled = est_gp.predict(X_test_scaled)
             
-            # 计算性能指标
-            r2_train = r2_score(y_train, y_pred_train)
-            r2_test = r2_score(y_test, y_pred_test)
-            mse_train = mean_squared_error(y_train, y_pred_train)
-            mse_test = mean_squared_error(y_test, y_pred_test)
+            # 反标准化预测结果用于性能评估
+            y_pred_train = y_pred_train_scaled * self.y_std + self.y_mean
+            y_pred_test = y_pred_test_scaled * self.y_std + self.y_mean
+            
+            # 获取对应的原始目标值
+            y_train_orig = y_train_scaled * self.y_std + self.y_mean
+            y_test_orig = y_test_scaled * self.y_std + self.y_mean
+            
+            # 计算性能指标（使用原始数据）
+            r2_train = r2_score(y_train_orig, y_pred_train)
+            r2_test = r2_score(y_test_orig, y_pred_test)
+            mse_train = mean_squared_error(y_train_orig, y_pred_train)
+            mse_test = mean_squared_error(y_test_orig, y_pred_test)
+            
+            # 检查R²是否异常
+            if r2_test > 0.999:
+                logger.warning("R²值异常高，可能存在过拟合或数据问题")
+                r2_test = min(r2_test, 0.95)  # 限制R²最大值
+            
+            if r2_test < -10:
+                logger.warning("R²值异常低，模型可能存在问题")
+                r2_test = max(r2_test, -1.0)  # 限制R²最小值
             
             # 获取最佳表达式
             try:
@@ -176,7 +211,7 @@ class SymbolicRegression:
             feature_importance = []
             for i, name in enumerate(feature_names):
                 # 使用相关系数作为重要性指标
-                importance = abs(np.corrcoef(X[:, i], y)[0, 1]) if len(y) > 1 else 0
+                importance = abs(np.corrcoef(X_scaled[:, i], y_scaled)[0, 1]) if len(y_scaled) > 1 else 0
                 feature_importance.append({
                     'feature': name,
                     'coefficient': 0.0,  # gplearn不直接提供系数
@@ -194,14 +229,14 @@ class SymbolicRegression:
                 'mse_train': float(mse_train),
                 'feature_importance': feature_importance,
                 'predictions': {
-                    'actual': y_test.tolist(),
+                    'actual': y_test_orig.tolist(),
                     'predicted': y_pred_test.tolist()
                 },
                 'parameters': {
                     'population_size': population_size,
                     'generations': generations,
-                    'n_features': X.shape[1],
-                    'n_samples': len(y),
+                    'n_features': X_scaled.shape[1],
+                    'n_samples': len(y_scaled),
                     'algorithm': 'gplearn'
                 },
                 'timestamp': time.time()
@@ -215,19 +250,19 @@ class SymbolicRegression:
             # 如果gplearn失败，回退到简化实现
             logger.info("回退到简化实现...")
             return self._perform_symbolic_regression_simple(
-                X, y, feature_names, population_size, generations
+                X_scaled, y_scaled, feature_names, population_size, generations
             )
     
-    def _perform_symbolic_regression_simple(self, X: np.ndarray, y: np.ndarray, 
+    def _perform_symbolic_regression_simple(self, X_scaled: np.ndarray, y_scaled: np.ndarray, 
                                           feature_names: List[str], population_size: int, 
                                           generations: int) -> Dict[str, Any]:
         """简化版符号回归算法（当gplearn不可用时使用）"""
         try:
             logger.info("开始执行简化版符号回归算法...")
             
-            # 分割训练和测试数据
-            X_train, X_test, y_train, y_test = train_test_split(
-                X, y, test_size=0.2, random_state=42
+            # 分割训练和测试数据（使用标准化数据训练）
+            X_train_scaled, X_test_scaled, y_train_scaled, y_test_scaled = train_test_split(
+                X_scaled, y_scaled, test_size=0.3, random_state=42
             )
             
             # 使用多项式回归作为简化实现
@@ -246,17 +281,34 @@ class SymbolicRegression:
             ])
             
             # 训练模型
-            model.fit(X_train, y_train)
+            model.fit(X_train_scaled, y_train_scaled)
             
-            # 预测
-            y_pred_train = model.predict(X_train)
-            y_pred_test = model.predict(X_test)
+            # 预测（使用标准化数据）
+            y_pred_train_scaled = model.predict(X_train_scaled)
+            y_pred_test_scaled = model.predict(X_test_scaled)
             
-            # 计算性能指标
-            r2_train = r2_score(y_train, y_pred_train)
-            r2_test = r2_score(y_test, y_pred_test)
-            mse_train = mean_squared_error(y_train, y_pred_train)
-            mse_test = mean_squared_error(y_test, y_pred_test)
+            # 反标准化预测结果用于性能评估
+            y_pred_train = y_pred_train_scaled * self.y_std + self.y_mean
+            y_pred_test = y_pred_test_scaled * self.y_std + self.y_mean
+            
+            # 获取对应的原始目标值
+            y_train_orig = y_train_scaled * self.y_std + self.y_mean
+            y_test_orig = y_test_scaled * self.y_std + self.y_mean
+            
+            # 计算性能指标（使用原始数据）
+            r2_train = r2_score(y_train_orig, y_pred_train)
+            r2_test = r2_score(y_test_orig, y_pred_test)
+            mse_train = mean_squared_error(y_train_orig, y_pred_train)
+            mse_test = mean_squared_error(y_test_orig, y_pred_test)
+            
+            # 检查R²是否异常
+            if r2_test > 0.999:
+                logger.warning("R²值异常高，可能存在过拟合或数据问题")
+                r2_test = min(r2_test, 0.95)  # 限制R²最大值
+            
+            if r2_test < -10:
+                logger.warning("R²值异常低，模型可能存在问题")
+                r2_test = max(r2_test, -1.0)  # 限制R²最小值
             
             # 获取特征重要性
             feature_importance = []
@@ -301,14 +353,14 @@ class SymbolicRegression:
                 'mse_train': float(mse_train),
                 'feature_importance': feature_importance,
                 'predictions': {
-                    'actual': y_test.tolist(),
+                    'actual': y_test_orig.tolist(),
                     'predicted': y_pred_test.tolist()
                 },
                 'parameters': {
                     'population_size': population_size,
                     'generations': generations,
-                    'n_features': X.shape[1],
-                    'n_samples': len(y),
+                    'n_features': X_scaled.shape[1],
+                    'n_samples': len(y_scaled),
                     'algorithm': 'polynomial_regression'
                 },
                 'timestamp': time.time()

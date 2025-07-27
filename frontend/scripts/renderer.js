@@ -217,14 +217,56 @@ function updateFeatureColumnsCheckboxes(columns) {
     if (!container) return;
     
     container.innerHTML = '';
+    
+    // 添加全选按钮
+    const selectAllDiv = document.createElement('div');
+    selectAllDiv.className = 'checkbox-item select-all-item';
+    selectAllDiv.innerHTML = `
+        <input type="checkbox" id="select-all-features">
+        <label for="select-all-features"><strong>全选所有特征变量</strong></label>
+    `;
+    container.appendChild(selectAllDiv);
+    
+    // 添加分隔线
+    const separator = document.createElement('div');
+    separator.className = 'checkbox-separator';
+    container.appendChild(separator);
+    
+    // 添加各个特征变量
     columns.forEach(column => {
         const div = document.createElement('div');
         div.className = 'checkbox-item';
         div.innerHTML = `
-            <input type="checkbox" id="feature-${column}" value="${column}">
+            <input type="checkbox" id="feature-${column}" value="${column}" class="feature-checkbox">
             <label for="feature-${column}">${column}</label>
         `;
         container.appendChild(div);
+    });
+    
+    // 添加全选功能
+    const selectAllCheckbox = document.getElementById('select-all-features');
+    const featureCheckboxes = document.querySelectorAll('.feature-checkbox');
+    
+    selectAllCheckbox.addEventListener('change', function() {
+        featureCheckboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
+        });
+    });
+    
+    // 当单个复选框改变时，更新全选状态
+    featureCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const allChecked = Array.from(featureCheckboxes).every(cb => cb.checked);
+            const anyChecked = Array.from(featureCheckboxes).some(cb => cb.checked);
+            selectAllCheckbox.checked = allChecked;
+            selectAllCheckbox.indeterminate = anyChecked && !allChecked;
+        });
+    });
+    
+    // 默认全选
+    selectAllCheckbox.checked = true;
+    featureCheckboxes.forEach(checkbox => {
+        checkbox.checked = true;
     });
 }
 
