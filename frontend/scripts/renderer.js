@@ -348,78 +348,50 @@ async function startRegression() {
 }
 
 // 执行符号回归分析
-async function performSymbolicRegression() {
+async function performSymbolicRegression(params) {
     try {
-        console.log('开始符号回归分析...');
-        
-        // 获取参数
-        const populationSize = parseInt(document.getElementById('population-size').value) || 100;
-        const generations = parseInt(document.getElementById('generations').value) || 50;
-        const testRatio = parseFloat(document.getElementById('test-ratio').value) / 100 || 0.3;
-        
-        // 获取运算符选择
-        const operatorCheckboxes = document.querySelectorAll('input[name="operator"]:checked');
-        const operators = Array.from(operatorCheckboxes).map(cb => {
-            const value = cb.value;
-            switch(value) {
-                case 'add': return 'add';
-                case 'sub': return 'sub';
-                case 'mul': return 'mul';
-                case 'div': return 'div';
-                default: return value;
-            }
-        });
-        
-        console.log('参数:', { populationSize, generations, testRatio, operators });
-        
-        // 准备请求数据
-        const requestData = {
-            data: currentData,
-            target_column: targetColumn,
-            feature_columns: selectedFeatures,
-            population_size: populationSize,
-            generations: generations,
-            test_ratio: testRatio,
-            operators: operators
-        };
-        
-        console.log('请求数据:', requestData);
-        
-        // 显示加载状态
-        showNotification('正在执行符号回归分析，请稍候...', 'info');
-        
-        // 发送请求
-        const response = await fetch(`${backendUrl}/api/symbolic-regression`, {
+        const response = await fetch('http://localhost:5000/api/regression/symbolic-regression', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
             },
-            body: JSON.stringify(requestData)
+            body: JSON.stringify({
+                data: params.data,
+                target_column: params.targetColumn,
+                feature_columns: params.featureColumns,
+                population_size: params.populationSize,
+                generations: params.generations,
+                test_ratio: params.testRatio,
+                operators: params.operators
+            })
         });
         
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP ${response.status}`);
         }
         
         const result = await response.json();
         
         if (!result.success) {
-            throw new Error(result.error || '符号回归分析失败');
+            throw new Error(result.error || '分析失败');
         }
         
-        console.log('符号回归结果:', result);
-        
-        // 显示结果
-        displayRegressionResults(result);
-        
-        // 更新模型选择器
-        updateModelSelector(result);
-        
-        showNotification('符号回归分析完成！', 'success');
+        // 转换结果格式
+        return {
+            id: Date.now(),
+            model_id: result.result.id || Date.now(),
+            expression: result.result.expression || '',
+            r2: result.result.r2 || 0,
+            mse: result.result.mse || 0,
+            featureImportance: result.result.feature_importance || [],
+            predictions: result.result.predictions || {},
+            parameters: result.result.parameters || {}
+        };
         
     } catch (error) {
         console.error('符号回归分析失败:', error);
-        showNotification(`符号回归分析失败: ${error.message}`, 'error');
+        throw error;
     }
 }
 
@@ -673,7 +645,7 @@ function updatePerformanceMetrics(result) {
     }
 }
 
-// 解析表达式为真正的语法树（支持多种运算符）
+// 解析表达式为真正的语法树（参考HeuristicLab实现）
 function parseExpressionToSyntaxTree(expression, featureImportance) {
     console.log('Parsing expression:', expression);
     
@@ -683,120 +655,158 @@ function parseExpressionToSyntaxTree(expression, featureImportance) {
     }
     
     try {
-        // 移除等号和目标变量
-        let cleanExpression = expression;
-        if (cleanExpression.includes('=')) {
-            cleanExpression = cleanExpression.split('=')[1].trim();
-        }
+        // 解析表达式为语法树
+        const tree = parseExpression(expression);
         
-        // 解析表达式，支持加减乘除
-        const terms = cleanExpression.split(/(?=[+-])/).filter(term => term.trim());
-        console.log('Parsed terms:', terms);
+        // 添加特征重要性信息
+        addFeatureImportance(tree, featureImportance);
         
-        if (terms.length === 0) {
-            console.error('No terms found in expression');
-            return null;
-        }
-        
-        // 创建根节点（加法）
-        const rootNode = {
-            name: 'Addition',
-            type: 'operator',
-            operator: '+',
-            children: []
-        };
-        
-        // 处理每个项
-        terms.forEach(term => {
-            const trimmedTerm = term.trim();
-            if (!trimmedTerm) return;
-            
-            // 检查是否包含乘法或除法
-            if (trimmedTerm.includes('*') || trimmedTerm.includes('⋅') || trimmedTerm.includes('×')) {
-                // 乘法项
-                const parts = trimmedTerm.split(/(\*|⋅|×)/);
-                if (parts.length >= 3) {
-                    const coefficient = parseFloat(parts[0]) || 1;
-                    const variable = parts[2];
-                    
-                    // 创建乘法节点
-                    const multiplyNode = {
-                        name: 'Multiplication',
-                        type: 'operator',
-                        operator: '×',
-                        children: [
-                            {
-                                name: coefficient.toString(),
-                                type: 'constant',
-                                value: coefficient
-                            },
-                            {
-                                name: variable,
-                                type: 'variable',
-                                coefficient: coefficient,
-                                importance: featureImportance[variable] || 0.5,
-                                weight: getWeightClass(featureImportance[variable] || 0.5)
-                            }
-                        ]
-                    };
-                    rootNode.children.push(multiplyNode);
-                }
-            } else if (trimmedTerm.includes('/') || trimmedTerm.includes('÷')) {
-                // 除法项
-                const parts = trimmedTerm.split(/(\/|÷)/);
-                if (parts.length >= 3) {
-                    const numerator = parts[0];
-                    const denominator = parts[2];
-                    
-                    // 创建除法节点
-                    const divideNode = {
-                        name: 'Division',
-                        type: 'operator',
-                        operator: '÷',
-                        children: [
-                            {
-                                name: numerator,
-                                type: 'variable',
-                                coefficient: 1,
-                                importance: featureImportance[numerator] || 0.5,
-                                weight: getWeightClass(featureImportance[numerator] || 0.5)
-                            },
-                            {
-                                name: denominator,
-                                type: 'variable',
-                                coefficient: 1,
-                                importance: featureImportance[denominator] || 0.5,
-                                weight: getWeightClass(featureImportance[denominator] || 0.5)
-                            }
-                        ]
-                    };
-                    rootNode.children.push(divideNode);
-                }
-            } else {
-                // 简单变量项
-                const match = trimmedTerm.match(/^([+-]?\d*\.?\d*)\s*([A-Za-z_][A-Za-z0-9_]*)/);
-                if (match) {
-                    const coefficient = parseFloat(match[1]) || (match[1] === '-' ? -1 : 1);
-                    const variable = match[2];
-                    
-                    const variableNode = {
-                        name: variable,
-                        type: 'variable',
-                        coefficient: coefficient,
-                        importance: featureImportance[variable] || 0.5,
-                        weight: getWeightClass(featureImportance[variable] || 0.5)
-                    };
-                    rootNode.children.push(variableNode);
-                }
-            }
-        });
-        
-        console.log('Generated syntax tree:', rootNode);
-        return rootNode;
+        console.log('Parsed tree:', tree);
+        return tree;
         
     } catch (error) {
         console.error('Error parsing expression to syntax tree:', error);
         return null;
+    }
+}
+
+// 解析表达式为语法树
+function parseExpression(expression) {
+    // 移除等号和目标变量
+    let cleanExpression = expression;
+    if (cleanExpression.includes('=')) {
+        cleanExpression = cleanExpression.split('=')[1].trim();
+    }
+    
+    // 解析括号表达式
+    return parseBrackets(cleanExpression);
+}
+
+// 解析括号表达式
+function parseBrackets(expr) {
+    expr = expr.trim();
+    
+    // 如果表达式被括号包围，去掉外层括号
+    if (expr.startsWith('(') && expr.endsWith(')')) {
+        let count = 0;
+        for (let i = 0; i < expr.length; i++) {
+            if (expr[i] === '(') count++;
+            if (expr[i] === ')') count--;
+            if (count === 0 && i < expr.length - 1) {
+                // 不是最外层括号
+                break;
+            }
+        }
+        if (count === 0) {
+            expr = expr.slice(1, -1);
+        }
+    }
+    
+    // 查找最外层的运算符
+    const operator = findOuterOperator(expr);
+    if (operator) {
+        const parts = expr.split(operator.symbol);
+        if (parts.length === 2) {
+            return {
+                type: 'operator',
+                name: operator.name,
+                operator: operator.symbol,
+                left: parseBrackets(parts[0]),
+                right: parseBrackets(parts[1])
+            };
+        }
+    }
+    
+    // 如果没有找到运算符，可能是变量或常数
+    return parseTerm(expr);
+}
+
+// 查找最外层运算符
+function findOuterOperator(expr) {
+    const operators = [
+        { symbol: ' + ', name: 'Addition' },
+        { symbol: ' - ', name: 'Subtraction' },
+        { symbol: ' * ', name: 'Multiplication' },
+        { symbol: ' / ', name: 'Division' }
+    ];
+    
+    for (const op of operators) {
+        let count = 0;
+        for (let i = 0; i < expr.length; i++) {
+            if (expr[i] === '(') count++;
+            if (expr[i] === ')') count--;
+            if (count === 0 && expr.substring(i, i + op.symbol.length) === op.symbol) {
+                return op;
+            }
+        }
+    }
+    
+    return null;
+}
+
+// 解析项（变量或常数）
+function parseTerm(term) {
+    term = term.trim();
+    
+    // 检查是否是数字
+    if (!isNaN(term)) {
+        return {
+            type: 'constant',
+            name: term,
+            value: parseFloat(term)
+        };
+    }
+    
+    // 检查是否是变量
+    if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(term)) {
+        return {
+            type: 'variable',
+            name: term,
+            coefficient: 1.0
+        };
+    }
+    
+    // 检查是否是系数 * 变量的形式
+    const match = term.match(/^([+-]?\d*\.?\d*)\s*\*\s*([A-Za-z_][A-Za-z0-9_]*)$/);
+    if (match) {
+        const coefficient = parseFloat(match[1]) || 1;
+        const variable = match[2];
+        return {
+            type: 'variable',
+            name: variable,
+            coefficient: coefficient
+        };
+    }
+    
+    // 默认作为变量处理
+    return {
+        type: 'variable',
+        name: term,
+        coefficient: 1.0
+    };
+}
+
+// 添加特征重要性信息
+function addFeatureImportance(node, featureImportance) {
+    if (node.type === 'variable') {
+        const importance = featureImportance.find(f => f.feature === node.name);
+        if (importance) {
+            node.importance = importance.importance;
+            node.weight = getWeightClass(importance.importance);
+        } else {
+            node.importance = 0.5;
+            node.weight = 'weight-5';
+        }
+    } else if (node.type === 'operator') {
+        node.importance = 1.0;
+        node.weight = 'weight-9';
+        
+        // 递归处理子节点
+        if (node.left) addFeatureImportance(node.left, featureImportance);
+        if (node.right) addFeatureImportance(node.right, featureImportance);
+    } else if (node.type === 'constant') {
+        node.importance = 1.0;
+        node.weight = 'weight-9';
     }
 }
 
