@@ -7,6 +7,7 @@ API路由定义
 from flask import Blueprint, request, jsonify
 from loguru import logger
 import traceback
+import pandas as pd
 
 from algorithms.symbolic_regression import SymbolicRegression
 from algorithms.monte_carlo import MonteCarloAnalysis
@@ -25,15 +26,15 @@ data_loader = DataLoader()
 # 符号回归路由
 @symbolic_regression_bp.route('/symbolic-regression', methods=['POST'])
 def symbolic_regression():
-    """符号回归分析接口"""
+    """符号回归分析"""
     try:
         data = request.get_json()
         
-        # 验证必需参数
+        # 验证必要参数
         required_fields = ['data', 'target_column', 'feature_columns']
         for field in required_fields:
             if field not in data:
-                return jsonify({'error': f'缺少必需参数: {field}'}), 400
+                return jsonify({'success': False, 'error': f'缺少必要参数: {field}'})
         
         # 获取参数
         input_data = data['data']
@@ -41,37 +42,54 @@ def symbolic_regression():
         feature_columns = data['feature_columns']
         population_size = data.get('population_size', 100)
         generations = data.get('generations', 50)
-        test_ratio = data.get('test_ratio', 30) / 100.0  # 转换为小数
-        operators = data.get('operators', ['add', 'sub', 'mul', 'div'])
+        test_ratio = data.get('test_ratio', 0.3)
+        operators = data.get('operators', ['+', '-', '*', '/'])
         
-        # 验证数据
-        if not input_data or not input_data.get('data'):
-            return jsonify({'error': '数据格式错误'}), 400
+        logger.info(f"开始符号回归分析，目标变量: {target_column}, 特征数量: {len(feature_columns)}")
         
-        if not feature_columns:
-            return jsonify({'error': '至少需要选择一个特征变量'}), 400
+        # 数据预处理
+        df = pd.DataFrame(input_data)
         
-        # 执行符号回归分析
-        result = symbolic_regression_engine.analyze(
-            data=input_data,
+        # 检查列是否存在
+        if target_column not in df.columns:
+            return jsonify({'success': False, 'error': f'目标变量列 "{target_column}" 不存在'})
+        
+        for col in feature_columns:
+            if col not in df.columns:
+                return jsonify({'success': False, 'error': f'特征变量列 "{col}" 不存在'})
+        
+        # 提取数据
+        X = df[feature_columns]
+        y = df[target_column]
+        
+        # 数据质量检查
+        if len(y) < 10:
+            return jsonify({'success': False, 'error': '数据样本数量太少，至少需要10个样本'})
+        
+        if y.std() < 1e-6:
+            return jsonify({'success': False, 'error': '目标变量没有变化，无法进行回归分析'})
+        
+        # 执行符号回归（使用新的HeuristicLab算法）
+        from algorithms.symbolic_regression import perform_symbolic_regression_gplearn
+        
+        result = perform_symbolic_regression_gplearn(
+            data=df,
             target_column=target_column,
-            feature_columns=feature_columns,
             population_size=population_size,
             generations=generations,
-            test_ratio=test_ratio,
-            operators=operators
+            operators=operators,
+            test_ratio=test_ratio
         )
         
-        return jsonify({
-            'success': True,
-            'result': result
-        })
-        
-    except ValueError as e:
-        return jsonify({'error': f'数据验证失败: {str(e)}'}), 400
+        if result['success']:
+            logger.info(f"符号回归分析完成，R² = {result['metrics']['r2_test']:.3f}")
+            return jsonify(result)
+        else:
+            return jsonify({'success': False, 'error': result['error']})
+            
     except Exception as e:
         logger.error(f"符号回归分析失败: {str(e)}")
-        return jsonify({'error': f'符号回归分析失败: {str(e)}'}), 500
+        return jsonify({'success': False, 'error': str(e)})
 
 @symbolic_regression_bp.route('/models', methods=['GET'])
 def get_models():

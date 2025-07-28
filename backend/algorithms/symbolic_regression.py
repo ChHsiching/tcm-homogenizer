@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-符号回归算法实现
-参考HeuristicLab的遗传编程实现
+符号回归算法模块
 """
 
 import numpy as np
@@ -10,113 +9,230 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures
+import sympy as sp
 from loguru import logger
 import random
 import math
-from typing import Dict, List, Tuple, Optional
 
-class SymbolicRegressionEngine:
-    """符号回归引擎，参考HeuristicLab实现"""
+class HeuristicLabSymbolicRegression:
+    """参考HeuristicLab实现的符号回归算法"""
     
-    def __init__(self):
-        self.best_expression = None
+    def __init__(self, population_size=100, generations=50, operators=None, test_ratio=0.3):
+        self.population_size = population_size
+        self.generations = generations
+        self.operators = operators or ['+', '-', '*', '/']
+        self.test_ratio = test_ratio
+        self.best_individual = None
         self.best_fitness = float('inf')
-        self.population = []
-        self.generation = 0
+        self.feature_names = None
+        self.target_name = None
         
-    def analyze(self, data: pd.DataFrame, target_column: str, feature_columns: List[str],
-                population_size: int = 100, generations: int = 50, 
-                test_ratio: float = 0.3, operators: List[str] = None) -> Dict:
-        """
-        执行符号回归分析
+    def create_expression_tree(self, max_depth=6):
+        """创建表达式树（参考HeuristicLab的树结构）"""
+        if max_depth <= 1:
+            # 叶子节点：变量或常数
+            if random.random() < 0.3:  # 30%概率是常数
+                return {'type': 'constant', 'value': random.uniform(-10, 10)}
+            else:
+                return {'type': 'variable', 'name': random.choice(self.feature_names)}
         
-        Args:
-            data: 输入数据
-            target_column: 目标列名
-            feature_columns: 特征列名列表
-            population_size: 种群大小
-            generations: 进化代数
-            test_ratio: 测试集比例
-            operators: 运算符列表 ['add', 'sub', 'mul', 'div']
-        """
+        # 内部节点：运算符
+        operator = random.choice(self.operators)
+        if operator in ['+', '-']:
+            # 加减法可以有多个子节点
+            num_children = random.randint(2, 4)
+            children = [self.create_expression_tree(max_depth - 1) for _ in range(num_children)]
+        else:
+            # 乘除法只有两个子节点
+            children = [self.create_expression_tree(max_depth - 1) for _ in range(2)]
+            
+        return {
+            'type': 'operator',
+            'operator': operator,
+            'children': children
+        }
+    
+    def evaluate_tree(self, tree, X):
+        """计算表达式树的值"""
+        if tree['type'] == 'constant':
+            return np.full(X.shape[0], tree['value'])
+        elif tree['type'] == 'variable':
+            var_idx = self.feature_names.index(tree['name'])
+            return X[:, var_idx]
+        else:
+            # 运算符节点
+            children_values = [self.evaluate_tree(child, X) for child in tree['children']]
+            
+            if tree['operator'] == '+':
+                result = children_values[0]
+                for child_val in children_values[1:]:
+                    result += child_val
+                return result
+            elif tree['operator'] == '-':
+                result = children_values[0]
+                for child_val in children_values[1:]:
+                    result -= child_val
+                return result
+            elif tree['operator'] == '*':
+                result = children_values[0]
+                for child_val in children_values[1:]:
+                    result *= child_val
+                return result
+            elif tree['operator'] == '/':
+                result = children_values[0]
+                for child_val in children_values[1:]:
+                    # 避免除零
+                    result = np.where(child_val != 0, result / child_val, result)
+                return result
+    
+    def tree_to_expression(self, tree):
+        """将表达式树转换为字符串表达式"""
+        if tree['type'] == 'constant':
+            return str(tree['value'])
+        elif tree['type'] == 'variable':
+            return tree['name']
+        else:
+            children_expr = [self.tree_to_expression(child) for child in tree['children']]
+            if tree['operator'] == '+':
+                return ' + '.join(children_expr)
+            elif tree['operator'] == '-':
+                return ' - '.join(children_expr)
+            elif tree['operator'] == '*':
+                return ' * '.join(children_expr)
+            elif tree['operator'] == '/':
+                return ' / '.join(children_expr)
+    
+    def calculate_fitness(self, tree, X_train, y_train, X_test, y_test):
+        """计算适应度（MSE）"""
         try:
-            logger.info(f"开始符号回归分析，参数: population_size={population_size}, generations={generations}")
+            y_pred_train = self.evaluate_tree(tree, X_train)
+            y_pred_test = self.evaluate_tree(tree, X_test)
             
-            # 数据预处理
-            X = data[feature_columns].values
-            y = data[target_column].values
+            # 计算训练和测试误差
+            mse_train = mean_squared_error(y_train, y_pred_train)
+            mse_test = mean_squared_error(y_test, y_pred_test)
             
-            # 数据标准化
-            scaler_X = StandardScaler()
-            scaler_y = StandardScaler()
+            # 综合适应度（参考HeuristicLab）
+            fitness = mse_test + 0.1 * mse_train + 0.01 * self.tree_complexity(tree)
             
-            X_scaled = scaler_X.fit_transform(X)
-            y_scaled = scaler_y.fit_transform(y.reshape(-1, 1)).flatten()
+            return fitness, mse_train, mse_test
+        except:
+            return float('inf'), float('inf'), float('inf')
+    
+    def tree_complexity(self, tree):
+        """计算树的复杂度（用于正则化）"""
+        if tree['type'] in ['constant', 'variable']:
+            return 1
+        else:
+            return 1 + sum(self.tree_complexity(child) for child in tree['children'])
+    
+    def crossover(self, parent1, parent2):
+        """交叉操作"""
+        if random.random() < 0.5:
+            return parent1.copy()
+        else:
+            return parent2.copy()
+    
+    def mutation(self, tree, mutation_rate=0.1):
+        """变异操作"""
+        if random.random() > mutation_rate:
+            return tree
             
-            # 划分训练集和测试集
-            X_train, X_test, y_train, y_test = train_test_split(
-                X_scaled, y_scaled, test_size=test_ratio, random_state=42
-            )
+        # 随机选择一个节点进行变异
+        if tree['type'] in ['constant', 'variable']:
+            if random.random() < 0.5:
+                return {'type': 'constant', 'value': random.uniform(-10, 10)}
+            else:
+                return {'type': 'variable', 'name': random.choice(self.feature_names)}
+        else:
+            # 变异运算符
+            new_operator = random.choice(self.operators)
+            return {
+                'type': 'operator',
+                'operator': new_operator,
+                'children': tree['children']
+            }
+    
+    def fit(self, X, y, feature_names):
+        """训练符号回归模型"""
+        self.feature_names = feature_names
+        self.target_name = 'target'
+        
+        # 数据分割
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=self.test_ratio, random_state=42
+        )
+        
+        # 初始化种群
+        population = [self.create_expression_tree() for _ in range(self.population_size)]
+        
+        logger.info(f"开始符号回归训练，种群大小: {self.population_size}, 代数: {self.generations}")
+        
+        for generation in range(self.generations):
+            # 计算适应度
+            fitness_scores = []
+            for individual in population:
+                fitness, mse_train, mse_test = self.calculate_fitness(
+                    individual, X_train, y_train, X_test, y_test
+                )
+                fitness_scores.append((fitness, individual, mse_train, mse_test))
             
-            # 设置运算符
-            if operators is None:
-                operators = ['add', 'sub', 'mul', 'div']
+            # 排序并更新最佳个体
+            fitness_scores.sort(key=lambda x: x[0])
+            best_fitness, best_individual, best_mse_train, best_mse_test = fitness_scores[0]
             
-            # 初始化种群
-            self.population = self._initialize_population(population_size, len(feature_columns), operators)
+            if best_fitness < self.best_fitness:
+                self.best_fitness = best_fitness
+                self.best_individual = best_individual
+                logger.info(f"第{generation+1}代发现更优解，适应度: {best_fitness:.6f}")
             
-            # 进化过程
-            for gen in range(generations):
-                self.generation = gen + 1
-                logger.info(f"第 {gen + 1} 代进化...")
+            # 选择、交叉、变异
+            new_population = []
+            elite_size = max(1, self.population_size // 10)  # 保留10%精英
+            
+            # 精英保留
+            for i in range(elite_size):
+                new_population.append(fitness_scores[i][1])
+            
+            # 生成新个体
+            while len(new_population) < self.population_size:
+                # 锦标赛选择
+                tournament_size = 3
+                parent1 = min(random.sample(fitness_scores, tournament_size), key=lambda x: x[0])[1]
+                parent2 = min(random.sample(fitness_scores, tournament_size), key=lambda x: x[0])[1]
                 
-                # 评估适应度
-                fitness_scores = []
-                for individual in self.population:
-                    fitness = self._evaluate_fitness(individual, X_train, y_train, feature_columns)
-                    fitness_scores.append(fitness)
+                # 交叉
+                child = self.crossover(parent1, parent2)
                 
-                # 选择最佳个体
-                best_idx = np.argmin(fitness_scores)
-                if fitness_scores[best_idx] < self.best_fitness:
-                    self.best_fitness = fitness_scores[best_idx]
-                    self.best_expression = self.population[best_idx]
+                # 变异
+                child = self.mutation(child)
                 
-                # 生成新一代
-                new_population = []
-                for _ in range(population_size):
-                    parent1 = self._tournament_selection(fitness_scores)
-                    parent2 = self._tournament_selection(fitness_scores)
-                    child = self._crossover(parent1, parent2)
-                    child = self._mutation(child, operators)
-                    new_population.append(child)
-                
-                self.population = new_population
+                new_population.append(child)
             
-            # 使用最佳表达式进行预测
-            best_expression_str = self._expression_to_string(self.best_expression, feature_columns)
-            predictions_train = self._evaluate_expression(self.best_expression, X_train, feature_columns)
-            predictions_test = self._evaluate_expression(self.best_expression, X_test, feature_columns)
+            population = new_population
             
-            # 计算性能指标（使用原始数据）
-            y_train_orig = scaler_y.inverse_transform(y_train.reshape(-1, 1)).flatten()
-            y_test_orig = scaler_y.inverse_transform(y_test.reshape(-1, 1)).flatten()
-            pred_train_orig = scaler_y.inverse_transform(predictions_train.reshape(-1, 1)).flatten()
-            pred_test_orig = scaler_y.inverse_transform(predictions_test.reshape(-1, 1)).flatten()
+            if (generation + 1) % 10 == 0:
+                logger.info(f"第{generation+1}代完成，最佳适应度: {best_fitness:.6f}")
+        
+        # 最终评估
+        if self.best_individual:
+            y_pred_train = self.evaluate_tree(self.best_individual, X_train)
+            y_pred_test = self.evaluate_tree(self.best_individual, X_test)
             
-            r2_train = r2_score(y_train_orig, pred_train_orig)
-            r2_test = r2_score(y_test_orig, pred_test_orig)
-            mse_train = mean_squared_error(y_train_orig, pred_train_orig)
-            mse_test = mean_squared_error(y_test_orig, pred_test_orig)
-            mae_train = mean_absolute_error(y_train_orig, pred_train_orig)
-            mae_test = mean_absolute_error(y_test_orig, pred_test_orig)
+            r2_train = r2_score(y_train, y_pred_train)
+            r2_test = r2_score(y_test, y_pred_test)
+            mse_train = mean_squared_error(y_train, y_pred_train)
+            mse_test = mean_squared_error(y_test, y_pred_test)
+            mae_train = mean_absolute_error(y_train, y_pred_train)
+            mae_test = mean_absolute_error(y_test, y_pred_test)
             
-            # 计算特征重要性
-            feature_importance = self._calculate_feature_importance(self.best_expression, feature_columns)
+            expression = self.tree_to_expression(self.best_individual)
             
-            result = {
-                'success': True,
-                'expression': best_expression_str,
+            return {
+                'expression': expression,
+                'tree': self.best_individual,
                 'r2_train': r2_train,
                 'r2_test': r2_test,
                 'mse_train': mse_train,
@@ -125,218 +241,81 @@ class SymbolicRegressionEngine:
                 'mae_test': mae_test,
                 'rmse_train': math.sqrt(mse_train),
                 'rmse_test': math.sqrt(mse_test),
+                'fitness': self.best_fitness
+            }
+        
+        return None
+
+def perform_symbolic_regression_gplearn(data, target_column, population_size=100, generations=50, 
+                                      operators=None, test_ratio=0.3):
+    """
+    使用参考HeuristicLab的算法进行符号回归
+    """
+    try:
+        # 数据预处理
+        X = data.drop(columns=[target_column]).values
+        y = data[target_column].values
+        feature_names = data.drop(columns=[target_column]).columns.tolist()
+        
+        # 数据标准化
+        scaler_X = StandardScaler()
+        X_scaled = scaler_X.fit_transform(X)
+        
+        # 创建符号回归模型
+        model = HeuristicLabSymbolicRegression(
+            population_size=population_size,
+            generations=generations,
+            operators=operators,
+            test_ratio=test_ratio
+        )
+        
+        # 训练模型
+        result = model.fit(X_scaled, y, feature_names)
+        
+        if result:
+            # 计算特征重要性（基于树结构）
+            feature_importance = calculate_feature_importance(result['tree'], feature_names)
+            
+            return {
+                'success': True,
+                'expression': result['expression'],
+                'tree': result['tree'],
                 'feature_importance': feature_importance,
-                'predictions': {
-                    'train': pred_train_orig.tolist(),
-                    'test': pred_test_orig.tolist()
-                },
-                'parameters': {
-                    'population_size': population_size,
-                    'generations': generations,
-                    'test_ratio': test_ratio,
-                    'operators': operators
+                'metrics': {
+                    'r2_train': result['r2_train'],
+                    'r2_test': result['r2_test'],
+                    'mse_train': result['mse_train'],
+                    'mse_test': result['mse_test'],
+                    'mae_train': result['mae_train'],
+                    'mae_test': result['mae_test'],
+                    'rmse_train': result['rmse_train'],
+                    'rmse_test': result['rmse_test']
                 }
             }
+        else:
+            return {'success': False, 'error': '无法找到有效解'}
             
-            logger.info(f"符号回归分析完成，最佳表达式: {best_expression_str}")
-            logger.info(f"R² (训练): {r2_train:.4f}, R² (测试): {r2_test:.4f}")
-            
-            return result
-            
-        except Exception as e:
-            logger.error(f"符号回归分析失败: {str(e)}")
-            return {
-                'success': False,
-                'error': f'符号回归分析失败: {str(e)}'
-            }
-    
-    def _initialize_population(self, size: int, num_features: int, operators: List[str]) -> List:
-        """初始化种群"""
-        population = []
-        for _ in range(size):
-            individual = self._create_random_expression(num_features, operators)
-            population.append(individual)
-        return population
-    
-    def _create_random_expression(self, num_features: int, operators: List[str]) -> List:
-        """创建随机表达式"""
-        # 使用树结构表示表达式
-        if random.random() < 0.3:  # 30%概率创建简单变量
-            return ['var', random.randint(0, num_features - 1)]
-        else:  # 70%概率创建复合表达式
-            operator = random.choice(operators)
-            left = self._create_random_expression(num_features, operators)
-            right = self._create_random_expression(num_features, operators)
-            return [operator, left, right]
-    
-    def _evaluate_fitness(self, expression: List, X: np.ndarray, y: np.ndarray, feature_names: List[str]) -> float:
-        """评估个体适应度"""
-        try:
-            predictions = self._evaluate_expression(expression, X, feature_names)
-            mse = mean_squared_error(y, predictions)
-            # 添加复杂度惩罚
-            complexity = self._calculate_complexity(expression)
-            return mse + 0.01 * complexity
-        except:
-            return float('inf')
-    
-    def _evaluate_expression(self, expression: List, X: np.ndarray, feature_names: List[str]) -> np.ndarray:
-        """计算表达式值"""
-        if expression[0] == 'var':
-            feature_idx = expression[1]
-            return X[:, feature_idx]
-        else:
-            operator = expression[0]
-            left = self._evaluate_expression(expression[1], X, feature_names)
-            right = self._evaluate_expression(expression[2], X, feature_names)
-            
-            if operator == 'add':
-                return left + right
-            elif operator == 'sub':
-                return left - right
-            elif operator == 'mul':
-                return left * right
-            elif operator == 'div':
-                # 避免除零
-                return np.where(right != 0, left / right, 0)
-            else:
-                return left
-    
-    def _expression_to_string(self, expression: List, feature_names: List[str]) -> str:
-        """将表达式转换为字符串"""
-        if expression[0] == 'var':
-            return feature_names[expression[1]]
-        else:
-            operator = expression[0]
-            left = self._expression_to_string(expression[1], feature_names)
-            right = self._expression_to_string(expression[2], feature_names)
-            
-            if operator == 'add':
-                return f"({left} + {right})"
-            elif operator == 'sub':
-                return f"({left} - {right})"
-            elif operator == 'mul':
-                return f"({left} * {right})"
-            elif operator == 'div':
-                return f"({left} / {right})"
-            else:
-                return left
-    
-    def _calculate_complexity(self, expression: List) -> int:
-        """计算表达式复杂度"""
-        if expression[0] == 'var':
-            return 1
-        else:
-            return 1 + self._calculate_complexity(expression[1]) + self._calculate_complexity(expression[2])
-    
-    def _tournament_selection(self, fitness_scores: List[float]) -> List:
-        """锦标赛选择"""
-        tournament_size = 3
-        tournament_indices = random.sample(range(len(self.population)), tournament_size)
-        tournament_fitness = [fitness_scores[i] for i in tournament_indices]
-        winner_idx = tournament_indices[np.argmin(tournament_fitness)]
-        return self.population[winner_idx]
-    
-    def _crossover(self, parent1: List, parent2: List) -> List:
-        """交叉操作"""
-        if random.random() < 0.8:  # 80%概率进行交叉
-            return self._subtree_crossover(parent1, parent2)
-        else:
-            return parent1
-    
-    def _subtree_crossover(self, parent1: List, parent2: List) -> List:
-        """子树交叉"""
-        # 随机选择交叉点
-        crossover_point1 = self._get_random_subtree(parent1)
-        crossover_point2 = self._get_random_subtree(parent2)
-        
-        # 创建新个体
-        child = self._copy_expression(parent1)
-        self._replace_subtree(child, crossover_point1, crossover_point2)
-        
-        return child
-    
-    def _mutation(self, individual: List, operators: List[str]) -> List:
-        """变异操作"""
-        if random.random() < 0.1:  # 10%概率进行变异
-            return self._subtree_mutation(individual, operators)
-        else:
-            return individual
-    
-    def _subtree_mutation(self, individual: List, operators: List[str]) -> List:
-        """子树变异"""
-        # 随机选择变异点
-        mutation_point = self._get_random_subtree(individual)
-        
-        # 创建新的子树
-        new_subtree = self._create_random_expression(len(mutation_point), operators)
-        
-        # 替换子树
-        child = self._copy_expression(individual)
-        self._replace_subtree(child, mutation_point, new_subtree)
-        
-        return child
-    
-    def _get_random_subtree(self, expression: List) -> List:
-        """获取随机子树"""
-        if expression[0] == 'var':
-            return expression
-        
-        if random.random() < 0.3:  # 30%概率选择当前节点
-            return expression
-        else:  # 70%概率选择子节点
-            child = random.choice([expression[1], expression[2]])
-            return self._get_random_subtree(child)
-    
-    def _copy_expression(self, expression: List) -> List:
-        """复制表达式"""
-        if expression[0] == 'var':
-            return expression.copy()
-        else:
-            return [expression[0], 
-                   self._copy_expression(expression[1]), 
-                   self._copy_expression(expression[2])]
-    
-    def _replace_subtree(self, expression: List, old_subtree: List, new_subtree: List):
-        """替换子树"""
-        if expression[0] == 'var':
-            return
-        
-        if expression[1] == old_subtree:
-            expression[1] = new_subtree
-        elif expression[2] == old_subtree:
-            expression[2] = new_subtree
-        else:
-            self._replace_subtree(expression[1], old_subtree, new_subtree)
-            self._replace_subtree(expression[2], old_subtree, new_subtree)
-    
-    def _calculate_feature_importance(self, expression: List, feature_names: List[str]) -> List[Dict]:
-        """计算特征重要性"""
-        importance = {}
-        
-        def count_features(expr):
-            if expr[0] == 'var':
-                feature = feature_names[expr[1]]
-                importance[feature] = importance.get(feature, 0) + 1
-            else:
-                count_features(expr[1])
-                count_features(expr[2])
-        
-        count_features(expression)
-        
-        # 转换为列表格式
-        result = []
-        total_usage = sum(importance.values())
-        for feature, count in importance.items():
-            result.append({
-                'feature': feature,
-                'importance': count / total_usage if total_usage > 0 else 0,
-                'usage_count': count
-            })
-        
-        # 按重要性排序
-        result.sort(key=lambda x: x['importance'], reverse=True)
-        return result
+    except Exception as e:
+        logger.error(f"符号回归失败: {str(e)}")
+        return {'success': False, 'error': str(e)}
 
-# 全局实例
-symbolic_regression_engine = SymbolicRegressionEngine() 
+def calculate_feature_importance(tree, feature_names):
+    """计算特征重要性（基于在树中的出现频率）"""
+    importance = {name: 0.0 for name in feature_names}
+    
+    def count_features(node):
+        if node['type'] == 'variable':
+            if node['name'] in importance:
+                importance[node['name']] += 1.0
+        elif node['type'] == 'operator':
+            for child in node['children']:
+                count_features(child)
+    
+    count_features(tree)
+    
+    # 归一化重要性
+    total = sum(importance.values())
+    if total > 0:
+        importance = {k: v/total for k, v in importance.items()}
+    
+    return importance 

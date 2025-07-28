@@ -509,7 +509,7 @@ function formatFormulaToLatex(expression, targetColumn) {
     return `${targetColumn} = ${latex}`;
 }
 
-// 渲染LaTeX公式（固定宽度卡片内部滚动）
+// 渲染LaTeX公式（固定宽度卡片内滚动）
 function renderLatexFormula(expression, targetColumn) {
     const formulaContainer = document.getElementById('formula-latex');
     if (!formulaContainer) {
@@ -538,12 +538,11 @@ function renderLatexFormula(expression, targetColumn) {
         max-width: 100%;
         overflow-x: auto;
         overflow-y: hidden;
-        word-wrap: normal;
-        overflow-wrap: normal;
-        white-space: nowrap;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
     `;
     
-    // 分段渲染：每5项为一段，减少换行次数
+    // 分段渲染：每5项为一段（增加每段项数）
     const terms = latexFormula.split(' + ');
     const maxTermsPerSegment = 5; // 增加每段项数
     const segments = [];
@@ -558,14 +557,14 @@ function renderLatexFormula(expression, targetColumn) {
         const segmentElement = document.createElement('div');
         segmentElement.className = 'formula-segment';
         segmentElement.style.cssText = `
-            margin: 8px 0;
-            font-size: 16px;
-            line-height: 1.5;
+            margin: 12px 0;
+            font-size: 18px;
+            line-height: 1.6;
             color: #4a9eff;
             white-space: nowrap;
             overflow-x: auto;
             overflow-y: hidden;
-            min-width: 100%;
+            padding: 8px 0;
         `;
         
         // 如果是第一段，包含等号
@@ -585,12 +584,12 @@ function renderLatexFormula(expression, targetColumn) {
             }).catch((err) => {
                 console.error('MathJax rendering failed for segment:', index, err);
                 // 降级到普通文本显示
-                segmentElement.innerHTML = `<code style="color: #4a9eff; font-size: 16px; white-space: nowrap;">${formulaText}</code>`;
+                segmentElement.innerHTML = `<code style="color: #4a9eff; font-size: 18px; white-space: nowrap;">${formulaText}</code>`;
             });
         } else {
             console.log('MathJax not available, using fallback for segment:', index);
             // 如果MathJax不可用，使用普通文本
-            segmentElement.innerHTML = `<code style="color: #4a9eff; font-size: 16px; white-space: nowrap;">${formulaText}</code>`;
+            segmentElement.innerHTML = `<code style="color: #4a9eff; font-size: 18px; white-space: nowrap;">${formulaText}</code>`;
         }
     });
     
@@ -598,51 +597,82 @@ function renderLatexFormula(expression, targetColumn) {
     formulaContainer.appendChild(backgroundContainer);
 }
 
-// 更新性能指标
-function updatePerformanceMetrics(result) {
-    console.log('Updating performance metrics:', result);
+// 更新性能指标（实时更新，参考HeuristicLab）
+function updatePerformanceMetrics(metrics) {
+    console.log('Updating performance metrics:', metrics);
     
-    const r2Value = document.getElementById('r2-value');
-    const mseValue = document.getElementById('mse-value');
-    const maeValue = document.getElementById('mae-value');
-    const rmseValue = document.getElementById('rmse-value');
-    
-    if (r2Value) {
-        r2Value.textContent = (result.r2 || 0).toFixed(3);
-        console.log('Updated R²:', (result.r2 || 0).toFixed(3));
-    }
-    if (mseValue) {
-        mseValue.textContent = (result.mse || 0).toFixed(3);
-        console.log('Updated MSE:', (result.mse || 0).toFixed(3));
+    // 更新R²值
+    const r2Element = document.getElementById('r2-value');
+    if (r2Element) {
+        r2Element.textContent = metrics.r2_test ? metrics.r2_test.toFixed(3) : '0.000';
+        r2Element.style.color = metrics.r2_test > 0.8 ? '#22c55e' : metrics.r2_test > 0.6 ? '#eab308' : '#ef4444';
     }
     
-    // 计算MAE和RMSE
-    if (result.predictions && result.predictions.actual && result.predictions.predicted) {
-        const actual = result.predictions.actual;
-        const predicted = result.predictions.predicted;
+    // 更新MSE值
+    const mseElement = document.getElementById('mse-value');
+    if (mseElement) {
+        mseElement.textContent = metrics.mse_test ? metrics.mse_test.toFixed(3) : '0.000';
+        mseElement.style.color = metrics.mse_test < 0.1 ? '#22c55e' : metrics.mse_test < 0.5 ? '#eab308' : '#ef4444';
+    }
+    
+    // 更新MAE值
+    const maeElement = document.getElementById('mae-value');
+    if (maeElement) {
+        maeElement.textContent = metrics.mae_test ? metrics.mae_test.toFixed(3) : '0.000';
+        maeElement.style.color = metrics.mae_test < 0.1 ? '#22c55e' : metrics.mae_test < 0.5 ? '#eab308' : '#ef4444';
+    }
+    
+    // 更新RMSE值
+    const rmseElement = document.getElementById('rmse-value');
+    if (rmseElement) {
+        rmseElement.textContent = metrics.rmse_test ? metrics.rmse_test.toFixed(3) : '0.000';
+        rmseElement.style.color = metrics.rmse_test < 0.1 ? '#22c55e' : metrics.rmse_test < 0.5 ? '#eab308' : '#ef4444';
+    }
+    
+    // 更新训练集指标（参考HeuristicLab的test/training对比）
+    updateTrainingMetrics(metrics);
+}
+
+// 更新训练集指标
+function updateTrainingMetrics(metrics) {
+    // 创建或更新训练集指标显示
+    let trainingMetricsContainer = document.getElementById('training-metrics');
+    if (!trainingMetricsContainer) {
+        trainingMetricsContainer = document.createElement('div');
+        trainingMetricsContainer.id = 'training-metrics';
+        trainingMetricsContainer.className = 'training-metrics';
+        trainingMetricsContainer.style.cssText = `
+            margin-top: 10px;
+            padding: 10px;
+            background: #1a1a1a;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #ccc;
+        `;
         
-        if (actual.length > 0 && predicted.length > 0) {
-            // 计算MAE
-            const mae = actual.reduce((sum, val, i) => sum + Math.abs(val - predicted[i]), 0) / actual.length;
-            if (maeValue) {
-                maeValue.textContent = mae.toFixed(3);
-                console.log('Updated MAE:', mae.toFixed(3));
-            }
-            
-            // 计算RMSE
-            const rmse = Math.sqrt(result.mse || 0);
-            if (rmseValue) {
-                rmseValue.textContent = rmse.toFixed(3);
-                console.log('Updated RMSE:', rmse.toFixed(3));
-            }
-        } else {
-            if (maeValue) maeValue.textContent = '0.000';
-            if (rmseValue) rmseValue.textContent = '0.000';
+        const metricsContainer = document.querySelector('.performance-metrics');
+        if (metricsContainer) {
+            metricsContainer.parentNode.insertBefore(trainingMetricsContainer, metricsContainer.nextSibling);
         }
-    } else {
-        if (maeValue) maeValue.textContent = '0.000';
-        if (rmseValue) rmseValue.textContent = '0.000';
     }
+    
+    // 显示训练集和测试集对比
+    trainingMetricsContainer.innerHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div>
+                <strong>训练集:</strong><br>
+                R²: ${metrics.r2_train ? metrics.r2_train.toFixed(3) : '0.000'}<br>
+                MSE: ${metrics.mse_train ? metrics.mse_train.toFixed(3) : '0.000'}<br>
+                MAE: ${metrics.mae_train ? metrics.mae_train.toFixed(3) : '0.000'}
+            </div>
+            <div>
+                <strong>测试集:</strong><br>
+                R²: ${metrics.r2_test ? metrics.r2_test.toFixed(3) : '0.000'}<br>
+                MSE: ${metrics.mse_test ? metrics.mse_test.toFixed(3) : '0.000'}<br>
+                MAE: ${metrics.mae_test ? metrics.mae_test.toFixed(3) : '0.000'}
+            </div>
+        </div>
+    `;
 }
 
 // 解析表达式为真正的语法树（参考HeuristicLab实现）
@@ -655,158 +685,120 @@ function parseExpressionToSyntaxTree(expression, featureImportance) {
     }
     
     try {
-        // 解析表达式为语法树
-        const tree = parseExpression(expression);
+        // 移除等号和目标变量
+        let cleanExpression = expression;
+        if (cleanExpression.includes('=')) {
+            cleanExpression = cleanExpression.split('=')[1].trim();
+        }
         
-        // 添加特征重要性信息
-        addFeatureImportance(tree, featureImportance);
+        // 解析表达式，支持加减乘除
+        const terms = cleanExpression.split(/(?=[+-])/).filter(term => term.trim());
+        console.log('Parsed terms:', terms);
         
-        console.log('Parsed tree:', tree);
-        return tree;
+        if (terms.length === 0) {
+            console.error('No terms found in expression');
+            return null;
+        }
+        
+        // 创建根节点（加法）
+        const rootNode = {
+            name: 'Addition',
+            type: 'operator',
+            operator: '+',
+            children: []
+        };
+        
+        // 处理每个项
+        terms.forEach(term => {
+            const trimmedTerm = term.trim();
+            if (!trimmedTerm) return;
+            
+            // 检查是否包含乘法或除法
+            if (trimmedTerm.includes('*') || trimmedTerm.includes('⋅') || trimmedTerm.includes('×')) {
+                // 乘法项
+                const parts = trimmedTerm.split(/(\*|⋅|×)/);
+                if (parts.length >= 3) {
+                    const coefficient = parseFloat(parts[0]) || 1;
+                    const variable = parts[2];
+                    
+                    // 创建乘法节点
+                    const multiplyNode = {
+                        name: 'Multiplication',
+                        type: 'operator',
+                        operator: '×',
+                        children: [
+                            {
+                                name: coefficient.toString(),
+                                type: 'constant',
+                                value: coefficient
+                            },
+                            {
+                                name: variable,
+                                type: 'variable',
+                                coefficient: coefficient,
+                                importance: featureImportance[variable] || 0.5,
+                                weight: getWeightClass(featureImportance[variable] || 0.5)
+                            }
+                        ]
+                    };
+                    rootNode.children.push(multiplyNode);
+                }
+            } else if (trimmedTerm.includes('/') || trimmedTerm.includes('÷')) {
+                // 除法项
+                const parts = trimmedTerm.split(/(\/|÷)/);
+                if (parts.length >= 3) {
+                    const numerator = parts[0];
+                    const denominator = parts[2];
+                    
+                    // 创建除法节点
+                    const divideNode = {
+                        name: 'Division',
+                        type: 'operator',
+                        operator: '÷',
+                        children: [
+                            {
+                                name: numerator,
+                                type: 'variable',
+                                coefficient: 1,
+                                importance: featureImportance[numerator] || 0.5,
+                                weight: getWeightClass(featureImportance[numerator] || 0.5)
+                            },
+                            {
+                                name: denominator,
+                                type: 'variable',
+                                coefficient: 1,
+                                importance: featureImportance[denominator] || 0.5,
+                                weight: getWeightClass(featureImportance[denominator] || 0.5)
+                            }
+                        ]
+                    };
+                    rootNode.children.push(divideNode);
+                }
+            } else {
+                // 简单变量项
+                const match = trimmedTerm.match(/^([+-]?\d*\.?\d*)\s*([A-Za-z_][A-Za-z0-9_]*)/);
+                if (match) {
+                    const coefficient = parseFloat(match[1]) || (match[1] === '-' ? -1 : 1);
+                    const variable = match[2];
+                    
+                    const variableNode = {
+                        name: variable,
+                        type: 'variable',
+                        coefficient: coefficient,
+                        importance: featureImportance[variable] || 0.5,
+                        weight: getWeightClass(featureImportance[variable] || 0.5)
+                    };
+                    rootNode.children.push(variableNode);
+                }
+            }
+        });
+        
+        console.log('Generated syntax tree:', rootNode);
+        return rootNode;
         
     } catch (error) {
         console.error('Error parsing expression to syntax tree:', error);
         return null;
-    }
-}
-
-// 解析表达式为语法树
-function parseExpression(expression) {
-    // 移除等号和目标变量
-    let cleanExpression = expression;
-    if (cleanExpression.includes('=')) {
-        cleanExpression = cleanExpression.split('=')[1].trim();
-    }
-    
-    // 解析括号表达式
-    return parseBrackets(cleanExpression);
-}
-
-// 解析括号表达式
-function parseBrackets(expr) {
-    expr = expr.trim();
-    
-    // 如果表达式被括号包围，去掉外层括号
-    if (expr.startsWith('(') && expr.endsWith(')')) {
-        let count = 0;
-        for (let i = 0; i < expr.length; i++) {
-            if (expr[i] === '(') count++;
-            if (expr[i] === ')') count--;
-            if (count === 0 && i < expr.length - 1) {
-                // 不是最外层括号
-                break;
-            }
-        }
-        if (count === 0) {
-            expr = expr.slice(1, -1);
-        }
-    }
-    
-    // 查找最外层的运算符
-    const operator = findOuterOperator(expr);
-    if (operator) {
-        const parts = expr.split(operator.symbol);
-        if (parts.length === 2) {
-            return {
-                type: 'operator',
-                name: operator.name,
-                operator: operator.symbol,
-                left: parseBrackets(parts[0]),
-                right: parseBrackets(parts[1])
-            };
-        }
-    }
-    
-    // 如果没有找到运算符，可能是变量或常数
-    return parseTerm(expr);
-}
-
-// 查找最外层运算符
-function findOuterOperator(expr) {
-    const operators = [
-        { symbol: ' + ', name: 'Addition' },
-        { symbol: ' - ', name: 'Subtraction' },
-        { symbol: ' * ', name: 'Multiplication' },
-        { symbol: ' / ', name: 'Division' }
-    ];
-    
-    for (const op of operators) {
-        let count = 0;
-        for (let i = 0; i < expr.length; i++) {
-            if (expr[i] === '(') count++;
-            if (expr[i] === ')') count--;
-            if (count === 0 && expr.substring(i, i + op.symbol.length) === op.symbol) {
-                return op;
-            }
-        }
-    }
-    
-    return null;
-}
-
-// 解析项（变量或常数）
-function parseTerm(term) {
-    term = term.trim();
-    
-    // 检查是否是数字
-    if (!isNaN(term)) {
-        return {
-            type: 'constant',
-            name: term,
-            value: parseFloat(term)
-        };
-    }
-    
-    // 检查是否是变量
-    if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(term)) {
-        return {
-            type: 'variable',
-            name: term,
-            coefficient: 1.0
-        };
-    }
-    
-    // 检查是否是系数 * 变量的形式
-    const match = term.match(/^([+-]?\d*\.?\d*)\s*\*\s*([A-Za-z_][A-Za-z0-9_]*)$/);
-    if (match) {
-        const coefficient = parseFloat(match[1]) || 1;
-        const variable = match[2];
-        return {
-            type: 'variable',
-            name: variable,
-            coefficient: coefficient
-        };
-    }
-    
-    // 默认作为变量处理
-    return {
-        type: 'variable',
-        name: term,
-        coefficient: 1.0
-    };
-}
-
-// 添加特征重要性信息
-function addFeatureImportance(node, featureImportance) {
-    if (node.type === 'variable') {
-        const importance = featureImportance.find(f => f.feature === node.name);
-        if (importance) {
-            node.importance = importance.importance;
-            node.weight = getWeightClass(importance.importance);
-        } else {
-            node.importance = 0.5;
-            node.weight = 'weight-5';
-        }
-    } else if (node.type === 'operator') {
-        node.importance = 1.0;
-        node.weight = 'weight-9';
-        
-        // 递归处理子节点
-        if (node.left) addFeatureImportance(node.left, featureImportance);
-        if (node.right) addFeatureImportance(node.right, featureImportance);
-    } else if (node.type === 'constant') {
-        node.importance = 1.0;
-        node.weight = 'weight-9';
     }
 }
 
@@ -1105,72 +1097,68 @@ function pruneSelectedNodes() {
     showNotification(`已标记删除 ${deletedFeatures.length} 个选中特征`, 'info');
 }
 
-// 重新计算回归（排除删除的特征）
-async function recalculateRegression() {
-    if (!window.deletedFeatures || window.deletedFeatures.length === 0) {
-        showNotification('没有需要排除的特征', 'warning');
+// 删除节点后重新计算（参考HeuristicLab的实时更新）
+function recalculateRegression() {
+    console.log('Recalculating regression after node deletion...');
+    
+    // 获取当前删除的特征
+    const deletedFeatures = window.deletedFeatures || [];
+    console.log('Deleted features:', deletedFeatures);
+    
+    if (deletedFeatures.length === 0) {
+        showNotification('没有删除任何节点，无需重新计算', 'info');
         return;
     }
     
-    if (!currentData) {
-        showNotification('没有可用的数据', 'warning');
+    // 显示加载状态
+    showNotification('正在重新计算回归模型...', 'info');
+    
+    // 获取原始数据
+    const data = window.currentData;
+    const targetColumn = window.currentTargetColumn;
+    const featureColumns = window.currentFeatureColumns.filter(f => !deletedFeatures.includes(f));
+    
+    if (!data || !targetColumn || featureColumns.length === 0) {
+        showNotification('数据不完整，无法重新计算', 'error');
         return;
     }
     
-    const targetColumn = document.getElementById('target-column').value;
-    const featureCheckboxes = document.querySelectorAll('#feature-columns input[type="checkbox"]:checked');
+    // 准备参数
+    const params = {
+        data: data,
+        target_column: targetColumn,
+        feature_columns: featureColumns,
+        population_size: parseInt(document.getElementById('population-size').value) || 100,
+        generations: parseInt(document.getElementById('generations').value) || 50,
+        test_ratio: parseFloat(document.getElementById('test-ratio').value) / 100 || 0.3,
+        operators: getSelectedOperators()
+    };
     
-    if (!targetColumn) {
-        showNotification('请选择目标变量', 'warning');
-        return;
-    }
-    
-    let featureColumns = Array.from(featureCheckboxes).map(cb => cb.value);
-    
-    // 排除已删除的特征
-    featureColumns = featureColumns.filter(feature => !window.deletedFeatures.includes(feature));
-    
-    if (featureColumns.length === 0) {
-        showNotification('没有可用的特征变量', 'warning');
-        return;
-    }
-    
-    const populationSize = parseInt(document.getElementById('population-size').value) || 100;
-    const generations = parseInt(document.getElementById('generations').value) || 50;
-    const testRatio = parseInt(document.getElementById('test-ratio').value) || 30;
-    
-    // 获取选择的运算符
-    const operators = [];
-    if (document.getElementById('op-add').checked) operators.push('add');
-    if (document.getElementById('op-sub').checked) operators.push('sub');
-    if (document.getElementById('op-mul').checked) operators.push('mul');
-    if (document.getElementById('op-div').checked) operators.push('div');
-    if (document.getElementById('op-pow').checked) operators.push('pow');
-    if (document.getElementById('op-sqrt').checked) operators.push('sqrt');
-    
-    showLoading('正在重新计算回归分析...');
-    
-    try {
-        const result = await performSymbolicRegression({
-            data: currentData,
-            targetColumn,
-            featureColumns,
-            populationSize,
-            generations,
-            testRatio,
-            operators
-        });
-        
-        // 更新结果
-        displayRegressionResults(result);
-        
-        showNotification('重新计算完成', 'success');
-        
-    } catch (error) {
-        showNotification('重新计算失败: ' + error.message, 'error');
-    } finally {
-        hideLoading();
-    }
+    // 调用后端API
+    fetch('/api/regression/symbolic-regression', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            // 更新结果
+            displayRegressionResults(result);
+            showNotification('重新计算完成，模型已更新', 'success');
+            
+            // 清空删除的特征列表
+            window.deletedFeatures = [];
+        } else {
+            showNotification(`重新计算失败: ${result.error}`, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('重新计算失败:', error);
+        showNotification('重新计算失败，请检查网络连接', 'error');
+    });
 }
 
 // 重置公式
