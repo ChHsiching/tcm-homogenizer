@@ -348,50 +348,78 @@ async function startRegression() {
 }
 
 // 执行符号回归分析
-async function performSymbolicRegression(params) {
+async function performSymbolicRegression() {
     try {
-        const response = await fetch('http://localhost:5000/api/regression/symbolic-regression', {
+        console.log('开始符号回归分析...');
+        
+        // 获取参数
+        const populationSize = parseInt(document.getElementById('population-size').value) || 100;
+        const generations = parseInt(document.getElementById('generations').value) || 50;
+        const testRatio = parseFloat(document.getElementById('test-ratio').value) / 100 || 0.3;
+        
+        // 获取运算符选择
+        const operatorCheckboxes = document.querySelectorAll('input[name="operator"]:checked');
+        const operators = Array.from(operatorCheckboxes).map(cb => {
+            const value = cb.value;
+            switch(value) {
+                case 'add': return 'add';
+                case 'sub': return 'sub';
+                case 'mul': return 'mul';
+                case 'div': return 'div';
+                default: return value;
+            }
+        });
+        
+        console.log('参数:', { populationSize, generations, testRatio, operators });
+        
+        // 准备请求数据
+        const requestData = {
+            data: currentData,
+            target_column: targetColumn,
+            feature_columns: selectedFeatures,
+            population_size: populationSize,
+            generations: generations,
+            test_ratio: testRatio,
+            operators: operators
+        };
+        
+        console.log('请求数据:', requestData);
+        
+        // 显示加载状态
+        showNotification('正在执行符号回归分析，请稍候...', 'info');
+        
+        // 发送请求
+        const response = await fetch(`${backendUrl}/api/symbolic-regression`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                data: params.data,
-                target_column: params.targetColumn,
-                feature_columns: params.featureColumns,
-                population_size: params.populationSize,
-                generations: params.generations,
-                test_ratio: params.testRatio,
-                operators: params.operators
-            })
+            body: JSON.stringify(requestData)
         });
         
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `HTTP ${response.status}`);
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
         const result = await response.json();
         
         if (!result.success) {
-            throw new Error(result.error || '分析失败');
+            throw new Error(result.error || '符号回归分析失败');
         }
         
-        // 转换结果格式
-        return {
-            id: Date.now(),
-            model_id: result.result.id || Date.now(),
-            expression: result.result.expression || '',
-            r2: result.result.r2 || 0,
-            mse: result.result.mse || 0,
-            featureImportance: result.result.feature_importance || [],
-            predictions: result.result.predictions || {},
-            parameters: result.result.parameters || {}
-        };
+        console.log('符号回归结果:', result);
+        
+        // 显示结果
+        displayRegressionResults(result);
+        
+        // 更新模型选择器
+        updateModelSelector(result);
+        
+        showNotification('符号回归分析完成！', 'success');
         
     } catch (error) {
         console.error('符号回归分析失败:', error);
-        throw error;
+        showNotification(`符号回归分析失败: ${error.message}`, 'error');
     }
 }
 
@@ -598,176 +626,54 @@ function renderLatexFormula(expression, targetColumn) {
     formulaContainer.appendChild(backgroundContainer);
 }
 
-// 实时更新性能指标
+// 更新性能指标
 function updatePerformanceMetrics(result) {
     console.log('Updating performance metrics:', result);
     
-    // 更新R²值
-    const r2Element = document.getElementById('r2-value');
-    if (r2Element && result.test_r2 !== undefined) {
-        r2Element.textContent = result.test_r2.toFixed(3);
+    const r2Value = document.getElementById('r2-value');
+    const mseValue = document.getElementById('mse-value');
+    const maeValue = document.getElementById('mae-value');
+    const rmseValue = document.getElementById('rmse-value');
+    
+    if (r2Value) {
+        r2Value.textContent = (result.r2 || 0).toFixed(3);
+        console.log('Updated R²:', (result.r2 || 0).toFixed(3));
+    }
+    if (mseValue) {
+        mseValue.textContent = (result.mse || 0).toFixed(3);
+        console.log('Updated MSE:', (result.mse || 0).toFixed(3));
     }
     
-    // 更新MSE值
-    const mseElement = document.getElementById('mse-value');
-    if (mseElement && result.test_mse !== undefined) {
-        mseElement.textContent = result.test_mse.toFixed(3);
-    }
-    
-    // 更新MAE值
-    const maeElement = document.getElementById('mae-value');
-    if (maeElement && result.test_mae !== undefined) {
-        maeElement.textContent = result.test_mae.toFixed(3);
-    }
-    
-    // 更新RMSE值
-    const rmseElement = document.getElementById('rmse-value');
-    if (rmseElement && result.test_rmse !== undefined) {
-        rmseElement.textContent = Math.sqrt(result.test_mse).toFixed(3);
-    }
-    
-    // 更新训练集指标
-    updateTrainingMetrics(result);
-}
-
-// 更新训练集指标
-function updateTrainingMetrics(result) {
-    const trainingMetricsContainer = document.getElementById('training-metrics');
-    if (!trainingMetricsContainer) return;
-    
-    trainingMetricsContainer.innerHTML = `
-        <div class="metric-card">
-            <div class="metric-value">${result.train_r2?.toFixed(3) || '0.000'}</div>
-            <div class="metric-label">训练集 R²</div>
-        </div>
-        <div class="metric-card">
-            <div class="metric-value">${result.train_mse?.toFixed(3) || '0.000'}</div>
-            <div class="metric-label">训练集 MSE</div>
-        </div>
-    `;
-}
-
-// 检查树的有效状态
-function checkTreeValidity(tree) {
-    if (!tree) return false;
-    
-    // 检查树结构是否有效
-    if (tree.type === 'operator') {
-        if (tree.children && tree.children.length >= 2) {
-            return tree.children.every(child => checkTreeValidity(child));
-        }
-        return false;
-    } else if (tree.type === 'variable' || tree.type === 'constant') {
-        return true;
-    }
-    return false;
-}
-
-// 更新树状态显示
-function updateTreeStatus(isValid) {
-    const statusElement = document.getElementById('tree-status');
-    if (statusElement) {
-        statusElement.textContent = isValid ? '有效' : '无效';
-        statusElement.className = isValid ? 'status-valid' : 'status-invalid';
-    }
-}
-
-// 删除节点后重新计算
-function recalculateAfterNodeDeletion(deletedFeatures) {
-    console.log('Recalculating after node deletion:', deletedFeatures);
-    
-    // 获取当前数据
-    const currentData = window.currentAnalysisData;
-    if (!currentData) {
-        showNotification('没有可用的分析数据', 'error');
-        return;
-    }
-    
-    // 移除被删除的特征
-    const remainingFeatures = currentData.feature_columns.filter(
-        feature => !deletedFeatures.includes(feature)
-    );
-    
-    if (remainingFeatures.length === 0) {
-        showNotification('没有剩余的特征变量', 'error');
-        return;
-    }
-    
-    // 重新执行分析
-    performSymbolicRegressionWithFeatures(remainingFeatures);
-}
-
-// 带特征参数执行符号回归
-function performSymbolicRegressionWithFeatures(featureColumns) {
-    const data = window.currentData;
-    const targetColumn = window.currentTargetColumn;
-    
-    if (!data || !targetColumn) {
-        showNotification('缺少必要的数据参数', 'error');
-        return;
-    }
-    
-    // 获取参数
-    const populationSize = parseInt(document.getElementById('population-size').value) || 100;
-    const generations = parseInt(document.getElementById('generations').value) || 50;
-    const testRatio = parseFloat(document.getElementById('test-ratio').value) / 100 || 0.3;
-    
-    // 获取运算符选择
-    const operators = [];
-    const operatorCheckboxes = document.querySelectorAll('input[name="operator"]:checked');
-    operatorCheckboxes.forEach(checkbox => {
-        switch(checkbox.value) {
-            case 'add': operators.push('+'); break;
-            case 'sub': operators.push('-'); break;
-            case 'mul': operators.push('*'); break;
-            case 'div': operators.push('/'); break;
-            case 'pow': operators.push('^'); break;
-            case 'sqrt': operators.push('sqrt'); break;
-        }
-    });
-    
-    // 显示加载状态
-    showNotification('正在重新计算符号回归...', 'info');
-    
-    // 调用后端API
-    fetch('/api/regression/symbolic-regression', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            data: data,
-            target_column: targetColumn,
-            feature_columns: featureColumns,
-            population_size: populationSize,
-            generations: generations,
-            test_ratio: testRatio,
-            operators: operators
-        })
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success) {
-            // 更新当前分析数据
-            window.currentAnalysisData = {
-                ...window.currentAnalysisData,
-                feature_columns: featureColumns
-            };
+    // 计算MAE和RMSE
+    if (result.predictions && result.predictions.actual && result.predictions.predicted) {
+        const actual = result.predictions.actual;
+        const predicted = result.predictions.predicted;
+        
+        if (actual.length > 0 && predicted.length > 0) {
+            // 计算MAE
+            const mae = actual.reduce((sum, val, i) => sum + Math.abs(val - predicted[i]), 0) / actual.length;
+            if (maeValue) {
+                maeValue.textContent = mae.toFixed(3);
+                console.log('Updated MAE:', mae.toFixed(3));
+            }
             
-            // 显示结果
-            displayRegressionResults(result.data);
-            showNotification('重新计算完成', 'success');
+            // 计算RMSE
+            const rmse = Math.sqrt(result.mse || 0);
+            if (rmseValue) {
+                rmseValue.textContent = rmse.toFixed(3);
+                console.log('Updated RMSE:', rmse.toFixed(3));
+            }
         } else {
-            showNotification(`重新计算失败: ${result.error}`, 'error');
+            if (maeValue) maeValue.textContent = '0.000';
+            if (rmseValue) rmseValue.textContent = '0.000';
         }
-    })
-    .catch(error => {
-        console.error('重新计算失败:', error);
-        showNotification('重新计算失败: 网络错误', 'error');
-    });
+    } else {
+        if (maeValue) maeValue.textContent = '0.000';
+        if (rmseValue) rmseValue.textContent = '0.000';
+    }
 }
 
-// 解析表达式为真正的语法树（参考HeuristicLab实现）
+// 解析表达式为真正的语法树（支持多种运算符）
 function parseExpressionToSyntaxTree(expression, featureImportance) {
     console.log('Parsing expression:', expression);
     
