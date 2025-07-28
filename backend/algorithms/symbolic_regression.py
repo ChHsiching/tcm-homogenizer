@@ -253,24 +253,35 @@ def perform_symbolic_regression_gplearn(data, target_column, population_size=100
     """
     try:
         # 数据预处理
-        X = data.drop(columns=[target_column]).values
-        y = data[target_column].values
-        feature_names = data.drop(columns=[target_column]).columns.tolist()
+        if target_column not in data.columns:
+            return {'success': False, 'error': f'目标变量列 "{target_column}" 不存在'}
         
-        # 检查数据一致性
-        if len(X) != len(y):
-            raise ValueError(f"特征数据长度({len(X)})与目标数据长度({len(y)})不匹配")
+        X = data.drop(columns=[target_column])
+        y = data[target_column]
+        feature_names = X.columns.tolist()
         
+        # 检查数据完整性
         if len(X) == 0:
-            raise ValueError("数据为空，无法进行分析")
+            return {'success': False, 'error': '没有可用的数据，请先上传数据文件'}
         
-        # 检查特征数量
         if len(feature_names) == 0:
-            raise ValueError("没有可用的特征变量")
+            return {'success': False, 'error': '没有可用的特征变量'}
+        
+        # 检查数据类型
+        try:
+            X_values = X.astype(float).values
+            y_values = y.astype(float).values
+        except Exception as e:
+            logger.error(f"数据类型转换失败: {str(e)}")
+            return {'success': False, 'error': '数据包含非数值类型，请确保所有特征和目标变量都是数值'}
+        
+        # 检查数据长度一致性
+        if len(X_values) != len(y_values):
+            return {'success': False, 'error': '特征数据与目标数据长度不匹配，请检查数据文件'}
         
         # 数据标准化
         scaler_X = StandardScaler()
-        X_scaled = scaler_X.fit_transform(X)
+        X_scaled = scaler_X.fit_transform(X_values)
         
         # 创建符号回归模型
         model = HeuristicLabSymbolicRegression(
@@ -281,7 +292,7 @@ def perform_symbolic_regression_gplearn(data, target_column, population_size=100
         )
         
         # 训练模型
-        result = model.fit(X_scaled, y, feature_names)
+        result = model.fit(X_scaled, y_values, feature_names)
         
         if result:
             # 计算特征重要性（基于树结构）
@@ -304,11 +315,11 @@ def perform_symbolic_regression_gplearn(data, target_column, population_size=100
                 }
             }
         else:
-            return {'success': False, 'error': '无法找到有效解'}
+            return {'success': False, 'error': '无法找到有效解，请尝试调整参数'}
             
     except Exception as e:
         logger.error(f"符号回归失败: {str(e)}")
-        return {'success': False, 'error': str(e)}
+        return {'success': False, 'error': f'符号回归分析失败: {str(e)}'}
 
 def calculate_feature_importance(tree, feature_names):
     """计算特征重要性（基于在树中的出现频率）"""
