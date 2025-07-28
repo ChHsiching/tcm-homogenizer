@@ -9,7 +9,7 @@ from loguru import logger
 import traceback
 import pandas as pd
 
-from algorithms.symbolic_regression import SymbolicRegression
+from algorithms.symbolic_regression import perform_symbolic_regression_gplearn
 from algorithms.monte_carlo import MonteCarloAnalysis
 from utils.data_loader import DataLoader
 
@@ -19,9 +19,67 @@ monte_carlo_bp = Blueprint('monte_carlo', __name__)
 data_bp = Blueprint('data', __name__)
 
 # 全局实例
-symbolic_regression_engine = SymbolicRegression()
 monte_carlo_engine = MonteCarloAnalysis()
 data_loader = DataLoader()
+
+# 兼容性类
+class SymbolicRegression:
+    """兼容性符号回归类"""
+    
+    def __init__(self):
+        self.models = {}
+    
+    def analyze(self, data, target_column, feature_columns, population_size=100, 
+                generations=50, test_ratio=0.3, operators=None):
+        """执行符号回归分析"""
+        try:
+            # 使用新的HeuristicLab算法
+            result = perform_symbolic_regression_gplearn(
+                data=data,
+                target_column=target_column,
+                population_size=population_size,
+                generations=generations,
+                operators=operators or ['+', '-', '*', '/'],
+                test_ratio=test_ratio
+            )
+            
+            if result['success']:
+                return {
+                    'expression': result['expression'],
+                    'r2': result['metrics']['r2_test'],
+                    'mse': result['metrics']['mse_test'],
+                    'r2_train': result['metrics']['r2_train'],
+                    'mse_train': result['metrics']['mse_train'],
+                    'feature_importance': result['feature_importance'],
+                    'predictions': {
+                        'actual': [],
+                        'predicted': []
+                    },
+                    'parameters': {
+                        'population_size': population_size,
+                        'generations': generations,
+                        'test_ratio': test_ratio,
+                        'operators': operators,
+                        'algorithm': 'heuristiclab'
+                    }
+                }
+            else:
+                raise Exception(result['error'])
+                
+        except Exception as e:
+            logger.error(f"符号回归分析失败: {str(e)}")
+            raise
+    
+    def get_saved_models(self):
+        """获取已保存的模型列表"""
+        return []
+    
+    def get_model(self, model_id):
+        """获取模型"""
+        return self.models.get(model_id)
+
+# 全局实例
+symbolic_regression_engine = SymbolicRegression()
 
 # 符号回归路由
 @symbolic_regression_bp.route('/symbolic-regression', methods=['POST'])
@@ -52,11 +110,11 @@ def symbolic_regression():
         
         # 检查列是否存在
         if target_column not in df.columns:
-            return jsonify({'success': False, 'error': f'目标变量列 "{target_column}" 不存在，请检查数据文件'})
+            return jsonify({'success': False, 'error': f'目标变量列 "{target_column}" 不存在'})
         
         for col in feature_columns:
             if col not in df.columns:
-                return jsonify({'success': False, 'error': f'特征变量列 "{col}" 不存在，请检查数据文件'})
+                return jsonify({'success': False, 'error': f'特征变量列 "{col}" 不存在'})
         
         # 提取数据
         X = df[feature_columns]
@@ -64,18 +122,12 @@ def symbolic_regression():
         
         # 数据质量检查
         if len(y) < 10:
-            return jsonify({'success': False, 'error': '数据样本数量太少，至少需要10个样本才能进行分析'})
+            return jsonify({'success': False, 'error': '数据样本数量太少，至少需要10个样本'})
         
         if y.std() < 1e-6:
-            return jsonify({'success': False, 'error': '目标变量没有变化，无法进行回归分析，请检查数据'})
-        
-        # 检查数据长度一致性
-        if len(X) != len(y):
-            return jsonify({'success': False, 'error': '特征变量和目标变量的数据长度不一致，请检查数据文件'})
+            return jsonify({'success': False, 'error': '目标变量没有变化，无法进行回归分析'})
         
         # 执行符号回归（使用新的HeuristicLab算法）
-        from algorithms.symbolic_regression import perform_symbolic_regression_gplearn
-        
         result = perform_symbolic_regression_gplearn(
             data=df,
             target_column=target_column,
@@ -93,20 +145,7 @@ def symbolic_regression():
             
     except Exception as e:
         logger.error(f"符号回归分析失败: {str(e)}")
-        # 返回用户友好的错误消息
-        error_msg = str(e)
-        if "All arrays must be of the same length" in error_msg:
-            error_msg = "数据长度不一致，请检查特征变量和目标变量的数据行数是否相同"
-        elif "division by zero" in error_msg.lower():
-            error_msg = "计算过程中出现除零错误，请检查数据中是否包含零值"
-        elif "invalid value" in error_msg.lower():
-            error_msg = "数据包含无效值，请检查数据中是否包含NaN或无穷大值"
-        elif "memory" in error_msg.lower():
-            error_msg = "内存不足，请减少数据量或降低算法参数"
-        else:
-            error_msg = f"符号回归分析失败: {error_msg}"
-        
-        return jsonify({'success': False, 'error': error_msg})
+        return jsonify({'success': False, 'error': str(e)})
 
 @symbolic_regression_bp.route('/models', methods=['GET'])
 def get_models():
@@ -190,21 +229,9 @@ def monte_carlo_analyze():
     except Exception as e:
         logger.error(f"蒙特卡罗分析失败: {str(e)}")
         logger.error(traceback.format_exc())
-        
-        # 返回用户友好的错误消息
-        error_msg = str(e)
-        if "model not found" in error_msg.lower():
-            error_msg = "模型不存在，请先进行符号回归分析"
-        elif "invalid target" in error_msg.lower():
-            error_msg = "目标药效值无效，请输入合理的数值"
-        elif "iterations" in error_msg.lower():
-            error_msg = "迭代次数无效，请输入正整数"
-        else:
-            error_msg = f"蒙特卡罗分析失败: {error_msg}"
-        
         return jsonify({
             'error': '分析失败',
-            'message': error_msg
+            'message': str(e)
         }), 500
 
 @monte_carlo_bp.route('/results/<analysis_id>', methods=['GET'])

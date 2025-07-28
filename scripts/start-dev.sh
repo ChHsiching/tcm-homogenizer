@@ -18,32 +18,30 @@ if [ ! -d "$BACKEND_VENV" ]; then
 fi
 
 # 检查前端node_modules
-FRONTEND_NODE_MODULES="$PROJECT_ROOT/frontend/node_modules"
-if [ ! -d "$FRONTEND_NODE_MODULES" ]; then
+if [ ! -d "$PROJECT_ROOT/frontend/node_modules" ]; then
     echo "❌ 前端依赖不存在，请先运行 setup-dev.sh"
     exit 1
 fi
 
-# 清理旧的PID文件
-rm -f .backend.pid .frontend.pid
+# 停止可能存在的旧进程
+echo "🛑 停止可能存在的旧进程..."
+pkill -f "python.*main.py" 2>/dev/null || true
+pkill -f "npm.*start" 2>/dev/null || true
 
 # 启动后端服务
 echo "📡 启动后端服务..."
 cd backend
 
 # 激活虚拟环境
-echo "🔧 激活Python虚拟环境..."
 source venv/bin/activate
 
 # 检查Python依赖
-echo "📦 检查Python依赖..."
-python -c "import flask, pandas, numpy, sklearn" 2>/dev/null || {
-    echo "❌ Python依赖不完整，请运行: pip install -r requirements.txt"
+if ! python -c "import flask, pandas, numpy, sklearn" 2>/dev/null; then
+    echo "❌ 后端依赖不完整，请先运行 setup-dev.sh"
     exit 1
-}
+fi
 
 # 启动后端服务
-echo "🚀 启动Flask后端服务..."
 nohup python main.py > backend.log 2>&1 &
 BACKEND_PID=$!
 echo "✅ 后端服务已启动 (PID: $BACKEND_PID)"
@@ -53,46 +51,41 @@ echo "⏳ 等待后端服务启动..."
 sleep 5
 
 # 检查后端服务是否正常
-echo "🔍 检查后端服务状态..."
-if curl -s http://127.0.0.1:5000/api/health > /dev/null 2>&1; then
-    echo "✅ 后端服务运行正常"
-else
-    echo "❌ 后端服务启动失败"
-    echo "📋 检查后端日志:"
-    tail -n 10 backend.log
-    echo ""
-    echo "🔧 可能的解决方案:"
-    echo "   1. 检查端口5000是否被占用: lsof -i :5000"
-    echo "   2. 检查Python依赖: pip install -r requirements.txt"
-    echo "   3. 检查虚拟环境: source venv/bin/activate"
-    exit 1
-fi
+for i in {1..10}; do
+    if curl -s http://127.0.0.1:5000/api/health > /dev/null 2>&1; then
+        echo "✅ 后端服务运行正常"
+        break
+    else
+        if [ $i -eq 10 ]; then
+            echo "❌ 后端服务启动失败，请检查 backend.log"
+            echo "📋 后端日志内容:"
+            tail -20 backend.log
+            exit 1
+        fi
+        echo "⏳ 等待后端服务启动... ($i/10)"
+        sleep 2
+    fi
+done
 
 # 启动前端服务
 echo "🖥️  启动前端服务..."
 cd ../frontend
 
 # 检查Node.js版本
-echo "🔧 检查Node.js环境..."
-NODE_VERSION=$(node --version 2>/dev/null || echo "not found")
-echo "📦 Node.js版本: $NODE_VERSION"
-
-# 检查npm依赖
-echo "📦 检查npm依赖..."
-if [ ! -f "package-lock.json" ]; then
-    echo "❌ 前端依赖未安装，请运行: npm install"
+NODE_VERSION=$(node --version 2>/dev/null | cut -d'v' -f2 | cut -d'.' -f1)
+if [ "$NODE_VERSION" -lt 16 ]; then
+    echo "❌ Node.js版本过低，需要16或更高版本"
     exit 1
 fi
 
 # 启动前端服务
-echo "🚀 启动Electron前端应用..."
 npm start &
 FRONTEND_PID=$!
 echo "✅ 前端服务已启动 (PID: $FRONTEND_PID)"
 
 # 保存进程ID
-echo $BACKEND_PID > ../.backend.pid
-echo $FRONTEND_PID > ../.frontend.pid
+echo $BACKEND_PID > .backend.pid
+echo $FRONTEND_PID > .frontend.pid
 
 echo ""
 echo "🎉 开发环境启动完成！"
@@ -106,6 +99,6 @@ echo "   - 停止服务: ./scripts/stop-dev.sh"
 echo ""
 
 # 等待用户中断
-trap 'echo ""; echo "🛑 正在停止服务..."; kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; rm -f ../.backend.pid ../.frontend.pid; echo "✅ 服务已停止"; exit 0' INT
+trap 'echo ""; echo "🛑 正在停止服务..."; kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; rm -f .backend.pid .frontend.pid; echo "✅ 服务已停止"; exit 0' INT
 
 wait 

@@ -349,11 +349,11 @@ async function startRegression() {
 
 // 执行符号回归分析
 async function performSymbolicRegression(params) {
-    console.log('开始符号回归分析，参数:', params);
-    
     try {
-        // 验证数据
-        if (!params.data || !params.data.length) {
+        console.log('开始符号回归分析，参数:', params);
+        
+        // 检查数据
+        if (!params.data || !params.data.data || params.data.data.length === 0) {
             throw new Error('没有可用的数据，请先上传数据文件');
         }
         
@@ -362,27 +362,12 @@ async function performSymbolicRegression(params) {
         }
         
         if (!params.featureColumns || params.featureColumns.length === 0) {
-            throw new Error('请至少选择一个特征变量');
-        }
-        
-        // 检查数据长度一致性
-        const dataLength = params.data.length;
-        const targetData = params.data.map(row => row[params.targetColumn]);
-        const featureData = params.featureColumns.map(col => params.data.map(row => row[col]));
-        
-        if (targetData.length !== dataLength) {
-            throw new Error('目标变量数据长度不一致，请检查数据文件');
-        }
-        
-        for (let i = 0; i < featureData.length; i++) {
-            if (featureData[i].length !== dataLength) {
-                throw new Error(`特征变量 "${params.featureColumns[i]}" 数据长度不一致，请检查数据文件`);
-            }
+            throw new Error('请选择至少一个特征变量');
         }
         
         // 准备请求数据
         const requestData = {
-            data: params.data,
+            data: params.data.data,
             target_column: params.targetColumn,
             feature_columns: params.featureColumns,
             population_size: params.populationSize || 100,
@@ -404,86 +389,59 @@ async function performSymbolicRegression(params) {
         
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('HTTP错误:', response.status, errorText);
+            console.error('API响应错误:', response.status, errorText);
             throw new Error(`服务器响应错误 (${response.status}): ${errorText}`);
         }
         
         const result = await response.json();
-        console.log('收到响应:', result);
+        console.log('API响应:', result);
         
         if (!result.success) {
             throw new Error(result.error || '符号回归分析失败');
         }
         
-        // 转换结果格式
-        return {
-            id: Date.now(),
-            model_id: result.result?.id || Date.now(),
-            expression: result.expression || '',
-            r2: result.metrics?.r2_test || 0,
-            mse: result.metrics?.mse_test || 0,
-            r2_train: result.metrics?.r2_train || 0,
-            mse_train: result.metrics?.mse_train || 0,
-            mae_test: result.metrics?.mae_test || 0,
-            mae_train: result.metrics?.mae_train || 0,
-            rmse_test: result.metrics?.rmse_test || 0,
-            rmse_train: result.metrics?.rmse_train || 0,
-            featureImportance: result.feature_importance || {},
-            tree: result.tree || null,
-            predictions: result.predictions || {},
-            parameters: result.parameters || {}
-        };
+        return result;
         
     } catch (error) {
         console.error('符号回归分析失败:', error);
-        
-        // 转换错误消息为用户友好的格式
-        let userMessage = error.message;
-        if (error.message.includes('fetch')) {
-            userMessage = '无法连接到后端服务，请检查后端是否正常启动';
-        } else if (error.message.includes('JSON')) {
-            userMessage = '数据格式错误，请检查上传的数据文件';
-        } else if (error.message.includes('HTTP')) {
-            userMessage = '服务器响应错误，请检查后端服务状态';
-        } else if (error.message.includes('All arrays must be of the same length')) {
-            userMessage = '数据长度不一致，请检查特征变量和目标变量的数据行数是否相同';
-        }
-        
-        throw new Error(userMessage);
+        throw error;
     }
 }
 
-// 显示回归结果
+// 显示符号回归结果
 function displayRegressionResults(result) {
-    console.log('显示回归结果:', result);
+    console.log('显示符号回归结果:', result);
     
-    // 显示公式
-    if (result.expression) {
-        renderLatexFormula(result.expression, window.currentTargetColumn);
+    try {
+        // 更新公式显示
+        if (result.expression) {
+            renderLatexFormula(result.expression, window.currentTargetColumn);
+        }
+        
+        // 更新性能指标
+        if (result.metrics) {
+            updatePerformanceMetrics(result.metrics);
+        }
+        
+        // 更新特征重要性
+        if (result.feature_importance) {
+            updateFeatureImportance(result.feature_importance);
+        }
+        
+        // 生成公式树
+        if (result.tree) {
+            generateFormulaTree(result);
+        }
+        
+        // 保存当前结果
+        window.currentRegressionResult = result;
+        
+        showNotification('符号回归分析完成', 'success');
+        
+    } catch (error) {
+        console.error('显示结果失败:', error);
+        showNotification('显示结果失败: ' + error.message, 'error');
     }
-    
-    // 更新性能指标
-    updatePerformanceMetrics({
-        r2_test: result.r2 || 0,
-        mse_test: result.mse || 0,
-        mae_test: result.mae_test || 0,
-        rmse_test: result.rmse_test || Math.sqrt(result.mse || 0),
-        r2_train: result.r2_train || 0,
-        mse_train: result.mse_train || 0,
-        mae_train: result.mae_train || 0,
-        rmse_train: result.rmse_train || Math.sqrt(result.mse_train || 0)
-    });
-    
-    // 生成公式树
-    if (result.expression && result.featureImportance) {
-        generateFormulaTree(result);
-    }
-    
-    // 更新模型列表
-    updateRegressionModelList();
-    
-    // 显示成功通知
-    showNotification('符号回归分析完成', 'success');
 }
 
 // 格式化公式为LaTeX（支持分段渲染）
@@ -1254,46 +1212,55 @@ async function startMonteCarlo() {
 // 执行蒙特卡罗分析
 async function performMonteCarloAnalysis(params) {
     try {
+        console.log('开始蒙特卡罗分析，参数:', params);
+        
+        // 检查数据
+        if (!params.data || !params.data.data || params.data.data.length === 0) {
+            throw new Error('没有可用的数据，请先上传数据文件');
+        }
+        
+        if (!params.targetColumn) {
+            throw new Error('请选择目标变量');
+        }
+        
+        if (!params.featureColumns || params.featureColumns.length === 0) {
+            throw new Error('请选择至少一个特征变量');
+        }
+        
+        // 准备请求数据
+        const requestData = {
+            data: params.data.data,
+            target_column: params.targetColumn,
+            feature_columns: params.featureColumns,
+            iterations: params.iterations || 1000,
+            confidence_level: params.confidenceLevel || 0.95
+        };
+        
+        console.log('发送蒙特卡罗分析请求:', requestData);
+        
+        // 发送请求
         const response = await fetch('http://localhost:5000/api/monte-carlo/analyze', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                data: params.data,
-                target_column: params.targetColumn,
-                feature_columns: params.featureColumns,
-                model_id: params.modelId,
-                iterations: params.iterations,
-                target_efficacy: params.targetEfficacy,
-                tolerance: params.tolerance
-            })
+            body: JSON.stringify(requestData)
         });
         
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `HTTP ${response.status}`);
+            const errorText = await response.text();
+            console.error('蒙特卡罗API响应错误:', response.status, errorText);
+            throw new Error(`服务器响应错误 (${response.status}): ${errorText}`);
         }
         
         const result = await response.json();
+        console.log('蒙特卡罗API响应:', result);
         
         if (!result.success) {
-            throw new Error(result.error || '分析失败');
+            throw new Error(result.error || '蒙特卡罗分析失败');
         }
         
-        // 转换结果格式
-        const analysisResult = result.result;
-        return {
-            analysis_id: analysisResult.analysis_id,
-            iterations: analysisResult.iterations || 0,
-            targetEfficacy: analysisResult.target_efficacy || 0,
-            tolerance: analysisResult.tolerance || 0,
-            validSamples: analysisResult.valid_samples_count || 0,
-            validRate: analysisResult.valid_rate || 0,
-            componentStatistics: analysisResult.component_statistics || {},
-            distributionData: analysisResult.distribution_data || {},
-            sampleData: analysisResult.sample_data || {}
-        };
+        return result;
         
     } catch (error) {
         console.error('蒙特卡罗分析失败:', error);
@@ -1303,62 +1270,30 @@ async function performMonteCarloAnalysis(params) {
 
 // 显示蒙特卡罗结果
 function displayMonteCarloResults(result) {
-    const container = document.getElementById('monte-carlo-results');
-    if (!container) return;
+    console.log('显示蒙特卡罗分析结果:', result);
     
-    // 转换成分统计信息为表格格式
-    const optimalRanges = Object.entries(result.componentStatistics).map(([component, stats]) => ({
-        component,
-        min: stats.min,
-        max: stats.max,
-        mean: stats.mean,
-        std: stats.std
-    }));
-    
-    container.innerHTML = `
-        <div class="result-item">
-            <h4>分析参数</h4>
-            <p>模拟次数: ${result.iterations.toLocaleString()}</p>
-            <p>目标药效: ${result.targetEfficacy}</p>
-            <p>容差范围: ±${result.tolerance}</p>
-        </div>
+    try {
+        // 更新统计信息
+        if (result.statistics) {
+            updateMonteCarloStatistics(result.statistics);
+        }
         
-        <div class="result-item">
-            <h4>有效样本</h4>
-            <p>符合条件样本数: ${result.validSamples.toLocaleString()}</p>
-            <p>有效率: ${(result.validRate * 100).toFixed(2)}%</p>
-        </div>
+        // 更新分布图
+        if (result.distribution_data) {
+            updateMonteCarloDistribution(result.distribution_data);
+        }
         
-        <div class="result-item">
-            <h4>推荐配比区间</h4>
-            <table class="result-table">
-                <thead>
-                    <tr>
-                        <th>成分</th>
-                        <th>最小值</th>
-                        <th>最大值</th>
-                        <th>平均值</th>
-                        <th>标准差</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${optimalRanges.map(range => `
-                        <tr>
-                            <td>${range.component}</td>
-                            <td>${range.min.toFixed(3)}</td>
-                            <td>${range.max.toFixed(3)}</td>
-                            <td>${range.mean.toFixed(3)}</td>
-                            <td>${range.std.toFixed(3)}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        </div>
+        // 更新样本数据
+        if (result.sample_data) {
+            updateMonteCarloSamples(result.sample_data);
+        }
         
-        <div class="result-item">
-            <button class="btn-secondary" onclick="exportMonteCarloResults('${result.analysis_id}')">导出结果</button>
-        </div>
-    `;
+        showNotification('蒙特卡罗分析完成', 'success');
+        
+    } catch (error) {
+        console.error('显示蒙特卡罗结果失败:', error);
+        showNotification('显示蒙特卡罗结果失败: ' + error.message, 'error');
+    }
 }
 
 // 导入数据
@@ -1514,15 +1449,9 @@ function hideLoading() {
     }
 }
 
-// 显示通知（用户友好的消息）
+// 显示通知消息
 function showNotification(message, type = 'info') {
-    console.log(`[${type.toUpperCase()}] ${message}`);
-    
-    // 移除现有通知
-    const existingNotifications = document.querySelectorAll('.notification');
-    existingNotifications.forEach(notification => {
-        notification.remove();
-    });
+    console.log(`显示通知: [${type}] ${message}`);
     
     // 创建通知元素
     const notification = document.createElement('div');
@@ -1531,67 +1460,69 @@ function showNotification(message, type = 'info') {
         position: fixed;
         top: 20px;
         right: 20px;
-        padding: 12px 20px;
-        border-radius: 6px;
+        padding: 15px 20px;
+        border-radius: 8px;
         color: white;
         font-weight: 500;
         z-index: 10000;
         max-width: 400px;
         word-wrap: break-word;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         animation: slideIn 0.3s ease-out;
     `;
     
-    // 根据类型设置颜色和用户友好的消息
+    // 根据类型设置样式
     switch (type) {
         case 'success':
-            notification.style.backgroundColor = '#22c55e';
-            notification.style.borderLeft = '4px solid #16a34a';
+            notification.style.background = 'linear-gradient(135deg, #22c55e, #16a34a)';
+            notification.style.borderLeft = '4px solid #15803d';
             break;
         case 'error':
-            notification.style.backgroundColor = '#ef4444';
-            notification.style.borderLeft = '4px solid #dc2626';
+            notification.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+            notification.style.borderLeft = '4px solid #b91c1c';
             break;
         case 'warning':
-            notification.style.backgroundColor = '#f59e0b';
-            notification.style.borderLeft = '4px solid #d97706';
+            notification.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+            notification.style.borderLeft = '4px solid #b45309';
             break;
         default:
-            notification.style.backgroundColor = '#3b82f6';
-            notification.style.borderLeft = '4px solid #2563eb';
+            notification.style.background = 'linear-gradient(135deg, #3b82f6, #2563eb)';
+            notification.style.borderLeft = '4px solid #1d4ed8';
     }
     
-    // 转换技术消息为用户友好消息
-    let userMessage = message;
-    if (message.includes('HTTP')) {
-        userMessage = '网络连接失败，请检查后端服务是否启动';
-    } else if (message.includes('fetch')) {
-        userMessage = '无法连接到后端服务，请检查网络连接';
-    } else if (message.includes('JSON')) {
-        userMessage = '数据格式错误，请检查输入数据';
-    } else if (message.includes('symbolic_regression')) {
-        userMessage = '符号回归分析失败，请检查数据格式';
-    } else if (message.includes('monte_carlo')) {
-        userMessage = '蒙特卡罗分析失败，请检查参数设置';
-    }
-    
-    notification.innerHTML = `
-        <div class="notification-message">${userMessage}</div>
-        <button class="notification-close" onclick="this.parentElement.remove()">×</button>
-    `;
+    notification.textContent = message;
     
     // 添加到页面
     document.body.appendChild(notification);
     
-    // 自动移除通知
+    // 自动移除
     setTimeout(() => {
-        notification.style.animation = 'slideOut 0.3s ease-in';
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        }, 300);
+        if (notification.parentNode) {
+            notification.style.animation = 'slideOut 0.3s ease-in';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }
     }, 5000);
+    
+    // 添加动画样式
+    if (!document.getElementById('notification-styles')) {
+        const style = document.createElement('style');
+        style.id = 'notification-styles';
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
 }
 
 // 显示关于对话框
@@ -1607,4 +1538,38 @@ function visualizeResults(modelId) {
 // 导出蒙特卡罗结果
 function exportMonteCarloResults(analysisId) {
     showNotification('导出功能开发中...', 'info');
+} 
+
+// 上传数据文件
+async function uploadDataFile(file) {
+    try {
+        console.log('开始上传数据文件:', file.name);
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await fetch('http://localhost:5000/api/data/upload', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('数据上传API响应错误:', response.status, errorText);
+            throw new Error(`服务器响应错误 (${response.status}): ${errorText}`);
+        }
+        
+        const result = await response.json();
+        console.log('数据上传API响应:', result);
+        
+        if (!result.success) {
+            throw new Error(result.error || '数据上传失败');
+        }
+        
+        return result;
+        
+    } catch (error) {
+        console.error('数据上传失败:', error);
+        throw error;
+    }
 } 

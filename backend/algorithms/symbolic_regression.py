@@ -257,6 +257,17 @@ def perform_symbolic_regression_gplearn(data, target_column, population_size=100
         y = data[target_column].values
         feature_names = data.drop(columns=[target_column]).columns.tolist()
         
+        # 检查数据一致性
+        if len(X) != len(y):
+            raise ValueError(f"特征数据长度({len(X)})与目标数据长度({len(y)})不匹配")
+        
+        if len(X) == 0:
+            raise ValueError("数据为空，无法进行分析")
+        
+        # 检查特征数量
+        if len(feature_names) == 0:
+            raise ValueError("没有可用的特征变量")
+        
         # 数据标准化
         scaler_X = StandardScaler()
         X_scaled = scaler_X.fit_transform(X)
@@ -318,60 +329,4 @@ def calculate_feature_importance(tree, feature_names):
     if total > 0:
         importance = {k: v/total for k, v in importance.items()}
     
-    return importance
-
-# 兼容性类
-class SymbolicRegression:
-    """兼容性符号回归类"""
-    
-    def __init__(self):
-        self.models = {}
-    
-    def analyze(self, data, target_column, feature_columns, population_size=100, 
-                generations=50, test_ratio=0.3, operators=None):
-        """执行符号回归分析"""
-        try:
-            # 使用新的HeuristicLab算法
-            result = perform_symbolic_regression_gplearn(
-                data=data,
-                target_column=target_column,
-                population_size=population_size,
-                generations=generations,
-                operators=operators or ['+', '-', '*', '/'],
-                test_ratio=test_ratio
-            )
-            
-            if result['success']:
-                return {
-                    'expression': result['expression'],
-                    'r2': result['metrics']['r2_test'],
-                    'mse': result['metrics']['mse_test'],
-                    'r2_train': result['metrics']['r2_train'],
-                    'mse_train': result['metrics']['mse_train'],
-                    'feature_importance': result['feature_importance'],
-                    'predictions': {
-                        'actual': [],
-                        'predicted': []
-                    },
-                    'parameters': {
-                        'population_size': population_size,
-                        'generations': generations,
-                        'test_ratio': test_ratio,
-                        'operators': operators,
-                        'algorithm': 'heuristiclab'
-                    }
-                }
-            else:
-                raise Exception(result['error'])
-                
-        except Exception as e:
-            logger.error(f"符号回归分析失败: {str(e)}")
-            raise
-    
-    def get_saved_models(self):
-        """获取已保存的模型列表"""
-        return []
-    
-    def get_model(self, model_id):
-        """获取模型"""
-        return self.models.get(model_id) 
+    return importance 
