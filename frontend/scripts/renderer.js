@@ -10,29 +10,9 @@ let currentSettings = {
     autoSave: false
 };
 
-// API基础URL
-const API_BASE_URL = 'http://127.0.0.1:5000';
-
 // DOM 加载完成后初始化
-document.addEventListener('DOMContentLoaded', async function() {
-    console.log('DOM加载完成，开始初始化...');
-    
-    // 初始化设置
-    await initializeSettings();
-    
-    // 启动后端服务
-    if (currentSettings.autoStartBackend) {
-        await startBackendService();
-    }
-    
-    // 测试后端连接
-    await testBackendConnection();
-    
-    // 显示欢迎通知
-    showNotification('欢迎使用中药多组分均化分析客户端', 'success');
-    
-    // 初始化事件监听器
-    initializeEventListeners();
+document.addEventListener('DOMContentLoaded', function() {
+    initializeApp();
 });
 
 // 应用初始化
@@ -370,38 +350,55 @@ async function startRegression() {
 // 执行符号回归分析
 async function performSymbolicRegression(params) {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/regression/symbolic-regression`, {
+        const response = await fetch('http://localhost:5000/api/regression/symbolic-regression', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(params)
+            body: JSON.stringify({
+                data: params.data,
+                target_column: params.targetColumn,
+                feature_columns: params.featureColumns,
+                population_size: params.populationSize,
+                generations: params.generations,
+                test_ratio: params.testRatio,
+                operators: params.operators
+            })
         });
         
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP ${response.status}`);
         }
         
         const result = await response.json();
         
         if (!result.success) {
-            throw new Error(result.error || '符号回归分析失败');
+            throw new Error(result.error || '分析失败');
         }
         
+        // 转换结果格式以兼容前端显示
         return {
             id: Date.now(),
             model_id: result.result?.id || Date.now(),
             expression: result.expression || '',
             r2: result.metrics?.r2_test || 0,
             mse: result.metrics?.mse_test || 0,
+            r2_train: result.metrics?.r2_train || 0,
+            mse_train: result.metrics?.mse_train || 0,
+            mae_test: result.metrics?.mae_test || 0,
+            mae_train: result.metrics?.mae_train || 0,
+            rmse_test: result.metrics?.rmse_test || 0,
+            rmse_train: result.metrics?.rmse_train || 0,
             featureImportance: result.feature_importance || {},
+            tree: result.tree || null,
             predictions: result.predictions || {},
             parameters: result.parameters || {}
         };
         
     } catch (error) {
         console.error('符号回归分析失败:', error);
-        throw new Error(`符号回归分析失败: ${error.message}`);
+        throw error;
     }
 }
 
@@ -415,21 +412,16 @@ function displayRegressionResults(result) {
     }
     
     // 更新性能指标
-    if (result.metrics) {
-        updatePerformanceMetrics(result.metrics);
-    } else {
-        // 兼容旧格式
-        updatePerformanceMetrics({
-            r2_test: result.r2 || 0,
-            mse_test: result.mse || 0,
-            mae_test: 0,
-            rmse_test: Math.sqrt(result.mse || 0),
-            r2_train: result.r2_train || 0,
-            mse_train: result.mse_train || 0,
-            mae_train: 0,
-            rmse_train: Math.sqrt(result.mse_train || 0)
-        });
-    }
+    updatePerformanceMetrics({
+        r2_test: result.r2 || 0,
+        mse_test: result.mse || 0,
+        mae_test: result.mae_test || 0,
+        rmse_test: result.rmse_test || Math.sqrt(result.mse || 0),
+        r2_train: result.r2_train || 0,
+        mse_train: result.mse_train || 0,
+        mae_train: result.mae_train || 0,
+        rmse_train: result.rmse_train || Math.sqrt(result.mse_train || 0)
+    });
     
     // 生成公式树
     if (result.expression && result.featureImportance) {
@@ -1115,7 +1107,7 @@ function recalculateRegression() {
     };
     
     // 调用后端API
-    fetch(`${API_BASE_URL}/api/regression/symbolic-regression`, {
+    fetch('/api/regression/symbolic-regression', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -1192,10 +1184,13 @@ async function startMonteCarlo() {
     
     try {
         const result = await performMonteCarloAnalysis({
-            modelId,
-            iterations,
-            targetEfficacy,
-            tolerance
+            data: currentData, // Pass currentData
+            targetColumn: document.getElementById('target-column').value, // Get target column from UI
+            featureColumns: Array.from(document.querySelectorAll('#feature-columns input[type="checkbox"]:checked')).map(cb => cb.value), // Get feature columns from UI
+            modelId: modelId,
+            iterations: iterations,
+            targetEfficacy: targetEfficacy,
+            tolerance: tolerance
         });
         
         displayMonteCarloResults(result);
@@ -1211,29 +1206,50 @@ async function startMonteCarlo() {
 // 执行蒙特卡罗分析
 async function performMonteCarloAnalysis(params) {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/monte-carlo/analyze`, {
+        const response = await fetch('http://localhost:5000/api/monte-carlo/analyze', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(params)
+            body: JSON.stringify({
+                data: params.data,
+                target_column: params.targetColumn,
+                feature_columns: params.featureColumns,
+                model_id: params.modelId,
+                iterations: params.iterations,
+                target_efficacy: params.targetEfficacy,
+                tolerance: params.tolerance
+            })
         });
         
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP ${response.status}`);
         }
         
         const result = await response.json();
         
         if (!result.success) {
-            throw new Error(result.error || '蒙特卡罗分析失败');
+            throw new Error(result.error || '分析失败');
         }
         
-        return result;
+        // 转换结果格式
+        const analysisResult = result.result;
+        return {
+            analysis_id: analysisResult.analysis_id,
+            iterations: analysisResult.iterations || 0,
+            targetEfficacy: analysisResult.target_efficacy || 0,
+            tolerance: analysisResult.tolerance || 0,
+            validSamples: analysisResult.valid_samples_count || 0,
+            validRate: analysisResult.valid_rate || 0,
+            componentStatistics: analysisResult.component_statistics || {},
+            distributionData: analysisResult.distribution_data || {},
+            sampleData: analysisResult.sample_data || {}
+        };
         
     } catch (error) {
         console.error('蒙特卡罗分析失败:', error);
-        throw new Error(`蒙特卡罗分析失败: ${error.message}`);
+        throw error;
     }
 }
 
@@ -1341,22 +1357,21 @@ async function startBackendService() {
 // 测试后端连接
 async function testBackendConnection() {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/health`, {
+        const response = await fetch(`http://127.0.0.1:${currentSettings.backendPort}/api/health`, {
             method: 'GET',
             timeout: 5000
         });
         
         if (response.ok) {
-            const health = await response.json();
-            showNotification(`后端服务连接正常 (${health.status})`, 'success');
-            updateBackendStatus('已连接', 'success');
+            updateConnectionStatus(true);
+            return true;
         } else {
-            throw new Error(`HTTP ${response.status}`);
+            updateConnectionStatus(false);
+            return false;
         }
     } catch (error) {
-        console.error('后端连接失败:', error);
-        showNotification('后端服务连接失败，请检查服务是否启动', 'error');
-        updateBackendStatus('连接失败', 'error');
+        updateConnectionStatus(false);
+        return false;
     }
 }
 
@@ -1407,11 +1422,11 @@ function updateConnectionStatus(isConnected) {
     const statusElement = document.getElementById('connection-status');
     if (statusElement) {
         if (isConnected) {
-            statusElement.textContent = `后端服务：已连接 (localhost:${currentSettings.backendPort})`;
-            statusElement.className = 'status-connected';
+            statusElement.textContent = '后端服务已连接';
+            statusElement.className = 'status-success';
         } else {
-            statusElement.textContent = `后端服务：未连接 (localhost:${currentSettings.backendPort})`;
-            statusElement.className = 'status-disconnected';
+            statusElement.textContent = '后端服务未连接';
+            statusElement.className = 'status-error';
         }
     }
 }
@@ -1431,7 +1446,27 @@ function updateStatusBar() {
     }
 }
 
-// 显示通知消息（用户友好）
+// 显示加载状态
+function showLoading(text = '正在处理...') {
+    const loading = document.getElementById('loading');
+    if (loading) {
+        const textElement = loading.querySelector('.loading-text');
+        if (textElement) {
+            textElement.textContent = text;
+        }
+        loading.style.display = 'flex';
+    }
+}
+
+// 隐藏加载状态
+function hideLoading() {
+    const loading = document.getElementById('loading');
+    if (loading) {
+        loading.style.display = 'none';
+    }
+}
+
+// 显示通知（用户友好的消息）
 function showNotification(message, type = 'info') {
     console.log(`[${type.toUpperCase()}] ${message}`);
     
@@ -1453,7 +1488,7 @@ function showNotification(message, type = 'info') {
         animation: slideIn 0.3s ease-out;
     `;
     
-    // 根据类型设置颜色
+    // 根据类型设置颜色和用户友好的消息
     switch (type) {
         case 'success':
             notification.style.backgroundColor = '#22c55e';
@@ -1472,7 +1507,21 @@ function showNotification(message, type = 'info') {
             notification.style.borderLeft = '4px solid #2563eb';
     }
     
-    notification.textContent = message;
+    // 转换技术消息为用户友好消息
+    let userMessage = message;
+    if (message.includes('HTTP')) {
+        userMessage = '网络连接失败，请检查后端服务是否启动';
+    } else if (message.includes('fetch')) {
+        userMessage = '无法连接到后端服务，请检查网络连接';
+    } else if (message.includes('JSON')) {
+        userMessage = '数据格式错误，请检查输入数据';
+    } else if (message.includes('symbolic_regression')) {
+        userMessage = '符号回归分析失败，请检查数据格式';
+    } else if (message.includes('monte_carlo')) {
+        userMessage = '蒙特卡罗分析失败，请检查参数设置';
+    }
+    
+    notification.textContent = userMessage;
     
     // 添加到页面
     document.body.appendChild(notification);
@@ -1487,112 +1536,6 @@ function showNotification(message, type = 'info') {
         }, 300);
     }, 5000);
 }
-
-// 更新后端状态显示
-function updateBackendStatus(status, type = 'info') {
-    const statusElement = document.getElementById('backend-status');
-    if (statusElement) {
-        statusElement.textContent = status;
-        statusElement.className = `status-${type}`;
-    }
-}
-
-// 显示加载状态
-function showLoading(message = '正在处理...') {
-    const loading = document.createElement('div');
-    loading.id = 'loading-overlay';
-    loading.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.7);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-    `;
-    
-    loading.innerHTML = `
-        <div style="
-            background: #2a2a2a;
-            padding: 30px;
-            border-radius: 8px;
-            text-align: center;
-            color: white;
-        ">
-            <div style="
-                width: 40px;
-                height: 40px;
-                border: 4px solid #3b82f6;
-                border-top: 4px solid transparent;
-                border-radius: 50%;
-                animation: spin 1s linear infinite;
-                margin: 0 auto 20px;
-            "></div>
-            <div>${message}</div>
-        </div>
-    `;
-    
-    document.body.appendChild(loading);
-}
-
-// 隐藏加载状态
-function hideLoading() {
-    const loading = document.getElementById('loading-overlay');
-    if (loading) {
-        loading.remove();
-    }
-}
-
-// 添加CSS动画
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideIn {
-        from {
-            transform: translateX(100%);
-            opacity: 0;
-        }
-        to {
-            transform: translateX(0);
-            opacity: 1;
-        }
-    }
-    
-    @keyframes slideOut {
-        from {
-            transform: translateX(0);
-            opacity: 1;
-        }
-        to {
-            transform: translateX(100%);
-            opacity: 0;
-        }
-    }
-    
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-    
-    .status-success {
-        color: #22c55e;
-    }
-    
-    .status-error {
-        color: #ef4444;
-    }
-    
-    .status-warning {
-        color: #f59e0b;
-    }
-    
-    .status-info {
-        color: #3b82f6;
-    }
-`;
-document.head.appendChild(style);
 
 // 显示关于对话框
 function showAboutDialog() {
