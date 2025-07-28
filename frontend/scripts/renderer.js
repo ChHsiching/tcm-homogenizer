@@ -81,9 +81,6 @@ function setupEventListeners() {
             updateSetting(this.id, this.value || this.checked);
         });
     });
-
-    // 绑定剪枝控制按钮事件
-    bindPruningControls();
 }
 
 // 切换标签页
@@ -512,7 +509,7 @@ function formatFormulaToLatex(expression, targetColumn) {
     return `${targetColumn} = ${latex}`;
 }
 
-// 渲染LaTeX公式（分段渲染但统一背景）
+// 渲染LaTeX公式（统一背景，分段渲染）
 function renderLatexFormula(expression, targetColumn) {
     const formulaContainer = document.getElementById('formula-latex');
     if (!formulaContainer) {
@@ -528,7 +525,7 @@ function renderLatexFormula(expression, targetColumn) {
     // 清空容器
     formulaContainer.innerHTML = '';
     
-    // 创建统一背景容器
+    // 创建统一的背景容器
     const backgroundContainer = document.createElement('div');
     backgroundContainer.className = 'formula-background';
     backgroundContainer.style.cssText = `
@@ -543,48 +540,48 @@ function renderLatexFormula(expression, targetColumn) {
         max-width: 100%;
     `;
     
-    // 分段处理公式（每3项为一段）
+    // 分段渲染：每3项为一段
     const terms = latexFormula.split(' + ');
-    const maxTermsPerLine = 3;
-    const lines = [];
+    const maxTermsPerSegment = 3;
+    const segments = [];
     
-    for (let i = 0; i < terms.length; i += maxTermsPerLine) {
-        const line = terms.slice(i, i + maxTermsPerLine).join(' + ');
-        lines.push(line);
+    for (let i = 0; i < terms.length; i += maxTermsPerSegment) {
+        const segment = terms.slice(i, i + maxTermsPerSegment).join(' + ');
+        segments.push(segment);
     }
     
     // 在统一背景内创建分段
-    lines.forEach((line, index) => {
-        const lineElement = document.createElement('div');
-        lineElement.className = 'formula-line';
-        lineElement.style.cssText = `
-            margin: ${index === 0 ? '0' : '8px'} 0 8px 0;
+    segments.forEach((segment, index) => {
+        const segmentElement = document.createElement('div');
+        segmentElement.className = 'formula-segment';
+        segmentElement.style.cssText = `
+            margin: 8px 0;
             font-size: 16px;
             line-height: 1.5;
             color: #4a9eff;
         `;
         
-        // 第一行包含等号
-        const formulaText = index === 0 ? line : line;
-        lineElement.innerHTML = `$$${formulaText}$$`;
+        // 如果是第一段，包含等号
+        const formulaText = index === 0 ? segment : segment;
+        segmentElement.innerHTML = `$$${formulaText}$$`;
         
         // 添加到背景容器
-        backgroundContainer.appendChild(lineElement);
+        backgroundContainer.appendChild(segmentElement);
         
         // 触发MathJax重新渲染
         if (window.MathJax && window.MathJax.typesetPromise) {
-            console.log('Using MathJax to render line:', index);
-            MathJax.typesetPromise([lineElement]).then(() => {
-                console.log('MathJax rendering completed for line:', index);
+            console.log('Using MathJax to render segment:', index);
+            MathJax.typesetPromise([segmentElement]).then(() => {
+                console.log('MathJax rendering completed for segment:', index);
             }).catch((err) => {
-                console.error('MathJax rendering failed for line:', index, err);
+                console.error('MathJax rendering failed for segment:', index, err);
                 // 降级到普通文本显示
-                lineElement.innerHTML = `<code style="color: #4a9eff; font-size: 16px; white-space: pre-wrap; line-height: 1.5;">${formulaText}</code>`;
+                segmentElement.innerHTML = `<code style="color: #4a9eff; font-size: 16px; white-space: pre-wrap;">${formulaText}</code>`;
             });
         } else {
-            console.log('MathJax not available, using fallback for line:', index);
+            console.log('MathJax not available, using fallback for segment:', index);
             // 如果MathJax不可用，使用普通文本
-            lineElement.innerHTML = `<code style="color: #4a9eff; font-size: 16px; white-space: pre-wrap; line-height: 1.5;">${formulaText}</code>`;
+            segmentElement.innerHTML = `<code style="color: #4a9eff; font-size: 16px; white-space: pre-wrap;">${formulaText}</code>`;
         }
     });
     
@@ -784,7 +781,7 @@ function generateFormulaTree(result) {
         
         // 创建树形布局，增加间距
         const treeLayout = d3.tree()
-            .size([width - 300, height - 200])
+            .size([width - 200, height - 200])
             .separation((a, b) => (a.parent === b.parent ? 2 : 3)); // 进一步增加节点间距
         
         // 创建层次结构
@@ -800,11 +797,11 @@ function generateFormulaTree(result) {
             .append('path')
             .attr('class', 'link')
             .attr('d', d3.linkVertical()
-                .x(d => d.x + 150)
+                .x(d => d.x + 100)
                 .y(d => d.y + 100))
             .style('fill', 'none')
             .style('stroke', '#666')
-            .style('stroke-width', '3'); // 加粗连接线
+            .style('stroke-width', '3');
         
         // 创建节点组
         const nodes = svg.selectAll('.node')
@@ -812,16 +809,18 @@ function generateFormulaTree(result) {
             .enter()
             .append('g')
             .attr('class', 'node')
-            .attr('transform', d => `translate(${d.x + 150},${d.y + 100})`);
+            .attr('transform', d => `translate(${d.x + 100},${d.y + 100})`);
         
-        // 绘制椭圆形节点
-        nodes.append('ellipse')
-            .attr('rx', d => d.data.type === 'operator' ? 45 : 40) // 椭圆形半径
-            .attr('ry', d => d.data.type === 'operator' ? 35 : 30)
+        // 绘制圆角矩形节点
+        nodes.append('rect')
+            .attr('width', d => d.data.type === 'operator' ? 80 : 70)
+            .attr('height', d => d.data.type === 'operator' ? 50 : 45)
+            .attr('rx', 12) // 圆角半径
+            .attr('ry', 12)
             .style('fill', d => {
                 if (d.data.type === 'operator') {
                     // 运算符节点使用灰阶色调
-                    return '#666666';
+                    return '#6b7280';
                 }
                 // 根据权重返回颜色
                 const weightClass = d.data.weight || 'weight-5';
@@ -833,7 +832,7 @@ function generateFormulaTree(result) {
                 return colors[weightClass] || '#84cc16';
             })
             .style('stroke', '#333')
-            .style('stroke-width', '3') // 加粗边框
+            .style('stroke-width', '3')
             .style('cursor', 'pointer')
             .on('click', function(event, d) {
                 showNodeInfo(event, d);
@@ -845,12 +844,13 @@ function generateFormulaTree(result) {
         
         // 添加节点文本（主文本）
         nodes.append('text')
-            .attr('dy', '.35em')
+            .attr('x', d => d.data.type === 'operator' ? 40 : 35)
+            .attr('y', '18')
             .attr('text-anchor', 'middle')
             .style('fill', 'white')
-            .style('font-size', '14px') // 增大字体
+            .style('font-size', '14px')
             .style('font-weight', 'bold')
-            .style('text-shadow', '1px 1px 2px rgba(0,0,0,0.8)') // 添加文字阴影
+            .style('text-shadow', '1px 1px 2px rgba(0,0,0,0.8)')
             .text(d => {
                 if (d.data.type === 'operator') {
                     // 运算符节点显示英文名称
@@ -863,7 +863,8 @@ function generateFormulaTree(result) {
         // 添加运算符符号（小字）
         nodes.filter(d => d.data.type === 'operator')
             .append('text')
-            .attr('dy', '1.8em')
+            .attr('x', 40)
+            .attr('y', '35')
             .attr('text-anchor', 'middle')
             .style('fill', '#ccc')
             .style('font-size', '12px')
@@ -873,7 +874,8 @@ function generateFormulaTree(result) {
         // 添加系数标签（对于变量节点）
         nodes.filter(d => d.data.type === 'variable')
             .append('text')
-            .attr('dy', '1.8em')
+            .attr('x', 35)
+            .attr('y', '35')
             .attr('text-anchor', 'middle')
             .style('fill', '#fff')
             .style('font-size', '12px')
@@ -1469,23 +1471,4 @@ function visualizeResults(modelId) {
 // 导出蒙特卡罗结果
 function exportMonteCarloResults(analysisId) {
     showNotification('导出功能开发中...', 'info');
-} 
-
-// 绑定剪枝控制按钮事件
-function bindPruningControls() {
-    const deleteSelectedBtn = document.getElementById('delete-selected');
-    const resetFormulaBtn = document.getElementById('reset-formula');
-    const recalculateBtn = document.getElementById('recalculate');
-    
-    if (deleteSelectedBtn) {
-        deleteSelectedBtn.addEventListener('click', deleteSelectedNodes);
-    }
-    
-    if (resetFormulaBtn) {
-        resetFormulaBtn.addEventListener('click', resetFormula);
-    }
-    
-    if (recalculateBtn) {
-        recalculateBtn.addEventListener('click', recalculateRegression);
-    }
 } 

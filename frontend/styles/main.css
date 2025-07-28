@@ -685,7 +685,7 @@ body {
     overflow-x: auto;
 }
 
-.formula-background {
+.formula-content {
     padding: 20px;
     background: #2a2a2a;
     border-radius: 8px;
@@ -695,13 +695,8 @@ body {
     word-wrap: break-word;
     overflow-wrap: break-word;
     max-width: 100%;
-}
-
-.formula-line {
-    margin: 8px 0;
     font-size: 16px;
     line-height: 1.5;
-    color: #4a9eff;
 }
 
 /* 公式树容器 - 独占一行 */
@@ -724,7 +719,6 @@ body {
     min-height: 700px; /* 增加最小高度 */
     position: relative;
     overflow-y: auto;
-    width: 100%;
 }
 
 /* 剪枝控制区域 - 单独一行 */
@@ -737,75 +731,19 @@ body {
     padding: var(--spacing-lg);
 }
 
-.pruning-controls {
-    display: flex;
-    gap: var(--spacing-md);
-    margin-bottom: var(--spacing-lg);
-}
-
-.pruning-controls .btn {
-    padding: 10px 20px;
-    border: none;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    font-weight: bold;
-    transition: all 0.3s ease;
-}
-
-.btn-danger {
-    background-color: #ef4444;
-    color: white;
-}
-
-.btn-secondary {
-    background-color: #6b7280;
-    color: white;
-}
-
-.btn-primary {
-    background-color: #3b82f6;
-    color: white;
-}
-
-.pruning-instructions {
-    background-color: var(--bg-secondary);
-    padding: var(--spacing-md);
-    border-radius: var(--radius-sm);
-}
-
-.pruning-instructions h4 {
-    margin-bottom: var(--spacing-sm);
-    color: var(--text-primary);
-}
-
-.pruning-instructions ul {
-    list-style: none;
-    padding: 0;
-}
-
-.pruning-instructions li {
-    margin-bottom: var(--spacing-xs);
-    color: var(--text-secondary);
-}
-
-.color-red { color: #ef4444; font-weight: bold; }
-.color-orange { color: #f97316; font-weight: bold; }
-.color-yellow { color: #eab308; font-weight: bold; }
-.color-green { color: #22c55e; font-weight: bold; }
-
 /* 树形结构样式 */
 .tree-svg-container {
     position: relative;
     width: 100%;
     height: 100%;
-    min-height: 600px; /* 增加最小高度 */
+    min-height: 500px; /* 增加最小高度 */
 }
 
 .tree-nodes-container {
     position: relative;
     width: 100%;
     height: 100%;
-    min-height: 600px; /* 增加最小高度 */
+    min-height: 500px; /* 增加最小高度 */
 }
 
 .tree-node {
@@ -979,6 +917,53 @@ body {
 .context-menu-item.danger:hover {
     background-color: rgba(248, 113, 113, 0.2);
 }
+
+/* 剪枝控制 */
+.pruning-controls {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-lg);
+    padding: var(--spacing-md);
+    background-color: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+}
+
+.pruning-controls button {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.pruning-controls .btn-prune {
+    background-color: var(--accent-error);
+    color: var(--text-primary);
+}
+
+.pruning-controls .btn-prune:hover {
+    background-color: #ef4444;
+}
+
+.pruning-controls .btn-reset {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.pruning-controls .btn-reset:hover {
+    background-color: var(--bg-tertiary);
+}
+
+.pruning-controls .btn-recalculate {
+    background-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.pruning-controls .btn-recalculate:hover {
+    background-color: #3b82f6;
+} 
 
 /* 运算符节点样式 */
 .tree-operator-node {
