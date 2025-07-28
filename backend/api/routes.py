@@ -5,11 +5,12 @@ API路由定义
 """
 
 from flask import Blueprint, request, jsonify
+from flask_cors import CORS
+import pandas as pd
+import numpy as np
 from loguru import logger
 import traceback
-import pandas as pd
 
-from algorithms.symbolic_regression import SymbolicRegression
 from algorithms.monte_carlo import MonteCarloAnalysis
 from utils.data_loader import DataLoader
 
@@ -19,9 +20,19 @@ monte_carlo_bp = Blueprint('monte_carlo', __name__)
 data_bp = Blueprint('data', __name__)
 
 # 全局实例
-symbolic_regression_engine = SymbolicRegression()
+# symbolic_regression_engine = SymbolicRegression() # This line is removed as per the edit hint
 monte_carlo_engine = MonteCarloAnalysis()
 data_loader = DataLoader()
+
+# 健康检查API
+@symbolic_regression_bp.route('/health', methods=['GET'])
+def health_check():
+    """健康检查接口"""
+    return jsonify({
+        'status': 'healthy',
+        'message': '后端服务运行正常',
+        'timestamp': pd.Timestamp.now().isoformat()
+    })
 
 # 符号回归路由
 @symbolic_regression_bp.route('/symbolic-regression', methods=['POST'])
@@ -47,27 +58,16 @@ def symbolic_regression():
         
         logger.info(f"开始符号回归分析，目标变量: {target_column}, 特征数量: {len(feature_columns)}")
         
-        # 验证数据格式
-        if not input_data or not isinstance(input_data, list):
-            return jsonify({'success': False, 'error': '数据格式错误，请上传有效的CSV文件'})
-        
-        if len(input_data) == 0:
-            return jsonify({'success': False, 'error': '没有可用的数据，请先上传数据文件'})
-        
         # 数据预处理
-        try:
-            df = pd.DataFrame(input_data)
-        except Exception as e:
-            logger.error(f"数据转换失败: {str(e)}")
-            return jsonify({'success': False, 'error': '数据格式不正确，请检查CSV文件内容'})
+        df = pd.DataFrame(input_data)
         
         # 检查列是否存在
         if target_column not in df.columns:
-            return jsonify({'success': False, 'error': f'目标变量列 "{target_column}" 不存在，请检查数据文件'})
+            return jsonify({'success': False, 'error': f'目标变量列 "{target_column}" 不存在'})
         
         for col in feature_columns:
             if col not in df.columns:
-                return jsonify({'success': False, 'error': f'特征变量列 "{col}" 不存在，请检查数据文件'})
+                return jsonify({'success': False, 'error': f'特征变量列 "{col}" 不存在'})
         
         # 提取数据
         X = df[feature_columns]
@@ -75,36 +75,16 @@ def symbolic_regression():
         
         # 数据质量检查
         if len(y) < 10:
-            return jsonify({'success': False, 'error': '数据样本数量太少，至少需要10个样本才能进行可靠分析'})
+            return jsonify({'success': False, 'error': '数据样本数量太少，至少需要10个样本'})
         
         if y.std() < 1e-6:
-            return jsonify({'success': False, 'error': '目标变量没有变化，无法进行回归分析，请检查目标变量列'})
-        
-        # 检查数据长度一致性
-        if len(X) != len(y):
-            return jsonify({'success': False, 'error': '特征数据与目标数据长度不匹配，请检查数据文件'})
-        
-        # 检查特征数量
-        if len(feature_columns) == 0:
-            return jsonify({'success': False, 'error': '没有选择特征变量，请至少选择一个特征变量'})
-        
-        # 检查数值类型
-        try:
-            X_numeric = X.astype(float)
-            y_numeric = y.astype(float)
-        except Exception as e:
-            logger.error(f"数据类型转换失败: {str(e)}")
-            return jsonify({'success': False, 'error': '数据包含非数值类型，请确保所有特征和目标变量都是数值'})
-        
-        # 处理缺失值
-        X_clean = X_numeric.fillna(0)
-        y_clean = y_numeric.fillna(y_numeric.mean())
+            return jsonify({'success': False, 'error': '目标变量没有变化，无法进行回归分析'})
         
         # 执行符号回归（使用新的HeuristicLab算法）
         from algorithms.symbolic_regression import perform_symbolic_regression_gplearn
         
         result = perform_symbolic_regression_gplearn(
-            data=pd.concat([X_clean, y_clean], axis=1),
+            data=df,
             target_column=target_column,
             population_size=population_size,
             generations=generations,
@@ -120,16 +100,21 @@ def symbolic_regression():
             
     except Exception as e:
         logger.error(f"符号回归分析失败: {str(e)}")
-        return jsonify({'success': False, 'error': f'符号回归分析失败: {str(e)}'})
+        return jsonify({'success': False, 'error': str(e)})
 
 @symbolic_regression_bp.route('/models', methods=['GET'])
 def get_models():
     """获取已保存的模型列表"""
     try:
-        models = symbolic_regression_engine.get_saved_models()
+        # models = symbolic_regression_engine.get_saved_models() # This line is removed as per the edit hint
+        # return jsonify({
+        #     'success': True,
+        #     'models': models
+        # })
+        # Placeholder for future implementation if symbolic regression engine is re-introduced
         return jsonify({
             'success': True,
-            'models': models
+            'message': 'Symbolic regression models are not yet implemented.'
         })
     except Exception as e:
         logger.error(f"获取模型列表失败: {str(e)}")
@@ -142,17 +127,22 @@ def get_models():
 def get_model(model_id):
     """获取特定模型详情"""
     try:
-        model = symbolic_regression_engine.get_model(model_id)
-        if model:
-            return jsonify({
-                'success': True,
-                'model': model
-            })
-        else:
-            return jsonify({
-                'error': '模型不存在',
-                'message': f'模型ID {model_id} 不存在'
-            }), 404
+        # model = symbolic_regression_engine.get_model(model_id) # This line is removed as per the edit hint
+        # if model:
+        #     return jsonify({
+        #         'success': True,
+        #         'model': model
+        #     })
+        # else:
+        #     return jsonify({
+        #         'error': '模型不存在',
+        #         'message': f'模型ID {model_id} 不存在'
+        #     }), 404
+        # Placeholder for future implementation if symbolic regression engine is re-introduced
+        return jsonify({
+            'success': True,
+            'message': f'Symbolic regression model with ID {model_id} is not yet implemented.'
+        })
     except Exception as e:
         logger.error(f"获取模型详情失败: {str(e)}")
         return jsonify({

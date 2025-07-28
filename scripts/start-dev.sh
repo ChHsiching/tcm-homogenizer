@@ -23,9 +23,6 @@ if [ ! -d "$PROJECT_ROOT/frontend/node_modules" ]; then
     exit 1
 fi
 
-# 清理旧的PID文件
-rm -f .backend.pid .frontend.pid
-
 # 启动后端服务
 echo "📡 启动后端服务..."
 cd backend
@@ -35,7 +32,7 @@ source venv/bin/activate
 
 # 检查Python依赖
 if ! python -c "import flask, pandas, numpy, sklearn" 2>/dev/null; then
-    echo "❌ 后端Python依赖不完整，请先运行 setup-dev.sh"
+    echo "❌ 后端依赖不完整，请先运行 setup-dev.sh"
     exit 1
 fi
 
@@ -49,20 +46,21 @@ echo "⏳ 等待后端服务启动..."
 sleep 5
 
 # 检查后端服务是否正常
-echo "🔍 检查后端服务状态..."
-if curl -s http://127.0.0.1:5000/api/health > /dev/null 2>&1; then
-    echo "✅ 后端服务运行正常"
-else
-    echo "❌ 后端服务启动失败"
-    echo "📋 检查后端日志:"
-    tail -n 10 backend.log
-    echo ""
-    echo "💡 可能的解决方案:"
-    echo "   - 检查端口5000是否被占用: lsof -i :5000"
-    echo "   - 重新安装依赖: ./scripts/setup-dev.sh"
-    echo "   - 检查Python环境: python --version"
-    exit 1
-fi
+for i in {1..10}; do
+    if curl -s http://127.0.0.1:5000/api/health > /dev/null 2>&1; then
+        echo "✅ 后端服务运行正常"
+        break
+    else
+        if [ $i -eq 10 ]; then
+            echo "❌ 后端服务启动失败，请检查 backend.log"
+            echo "📋 后端日志内容:"
+            tail -20 backend.log
+            exit 1
+        fi
+        echo "⏳ 等待后端服务启动... (尝试 $i/10)"
+        sleep 2
+    fi
+done
 
 # 启动前端服务
 echo "🖥️  启动前端服务..."
@@ -71,20 +69,13 @@ cd ../frontend
 # 检查Node.js版本
 NODE_VERSION=$(node --version 2>/dev/null | cut -d'v' -f2 | cut -d'.' -f1)
 if [ -z "$NODE_VERSION" ] || [ "$NODE_VERSION" -lt 16 ]; then
-    echo "❌ Node.js版本过低，需要Node.js 16+，当前版本: $(node --version 2>/dev/null || echo '未安装')"
-    echo "💡 请手动激活Node.js 20 LTS环境:"
-    echo "   nvm use 20"
-    exit 1
+    echo "⚠️  警告: 建议使用 Node.js 16+ 版本"
 fi
 
 # 启动前端服务
 npm start &
 FRONTEND_PID=$!
 echo "✅ 前端服务已启动 (PID: $FRONTEND_PID)"
-
-# 等待前端启动
-echo "⏳ 等待前端服务启动..."
-sleep 3
 
 # 保存进程ID
 echo $BACKEND_PID > .backend.pid

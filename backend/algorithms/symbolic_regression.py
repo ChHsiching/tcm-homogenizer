@@ -253,35 +253,39 @@ def perform_symbolic_regression_gplearn(data, target_column, population_size=100
     """
     try:
         # 数据预处理
-        if target_column not in data.columns:
-            return {'success': False, 'error': f'目标变量列 "{target_column}" 不存在'}
+        X = data.drop(columns=[target_column]).values
+        y = data[target_column].values
+        feature_names = data.drop(columns=[target_column]).columns.tolist()
         
-        X = data.drop(columns=[target_column])
-        y = data[target_column]
-        feature_names = X.columns.tolist()
-        
-        # 检查数据完整性
-        if len(X) == 0:
-            return {'success': False, 'error': '没有可用的数据，请先上传数据文件'}
+        # 数据验证
+        if len(data) < 10:
+            return {'success': False, 'error': '数据样本数量太少，至少需要10个样本才能进行可靠分析'}
         
         if len(feature_names) == 0:
-            return {'success': False, 'error': '没有可用的特征变量'}
+            return {'success': False, 'error': '没有可用的特征变量，请检查数据文件'}
         
         # 检查数据类型
         try:
-            X_values = X.astype(float).values
-            y_values = y.astype(float).values
+            X = X.astype(float)
+            y = y.astype(float)
         except Exception as e:
-            logger.error(f"数据类型转换失败: {str(e)}")
             return {'success': False, 'error': '数据包含非数值类型，请确保所有特征和目标变量都是数值'}
         
         # 检查数据长度一致性
-        if len(X_values) != len(y_values):
+        if len(X) != len(y):
             return {'success': False, 'error': '特征数据与目标数据长度不匹配，请检查数据文件'}
+        
+        # 检查目标变量变化
+        if np.std(y) < 1e-6:
+            return {'success': False, 'error': '目标变量没有变化，无法进行回归分析'}
+        
+        # 处理缺失值
+        X = np.nan_to_num(X, nan=0.0)
+        y = np.nan_to_num(y, nan=np.nanmean(y))
         
         # 数据标准化
         scaler_X = StandardScaler()
-        X_scaled = scaler_X.fit_transform(X_values)
+        X_scaled = scaler_X.fit_transform(X)
         
         # 创建符号回归模型
         model = HeuristicLabSymbolicRegression(
@@ -292,7 +296,7 @@ def perform_symbolic_regression_gplearn(data, target_column, population_size=100
         )
         
         # 训练模型
-        result = model.fit(X_scaled, y_values, feature_names)
+        result = model.fit(X_scaled, y, feature_names)
         
         if result:
             # 计算特征重要性（基于树结构）
@@ -315,7 +319,7 @@ def perform_symbolic_regression_gplearn(data, target_column, population_size=100
                 }
             }
         else:
-            return {'success': False, 'error': '无法找到有效解，请尝试调整参数'}
+            return {'success': False, 'error': '无法找到有效的回归模型，请尝试调整参数'}
             
     except Exception as e:
         logger.error(f"符号回归失败: {str(e)}")
