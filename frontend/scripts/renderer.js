@@ -540,9 +540,9 @@ function renderLatexFormula(expression, targetColumn) {
         max-width: 100%;
     `;
     
-    // 分段渲染：每3项为一段
+    // 分段渲染：每6项为一段（增加每段项数，减少换行）
     const terms = latexFormula.split(' + ');
-    const maxTermsPerSegment = 3;
+    const maxTermsPerSegment = 6; // 从3增加到6
     const segments = [];
     
     for (let i = 0; i < terms.length; i += maxTermsPerSegment) {
@@ -559,6 +559,8 @@ function renderLatexFormula(expression, targetColumn) {
             font-size: 16px;
             line-height: 1.5;
             color: #4a9eff;
+            white-space: nowrap; /* 防止内部换行 */
+            overflow-x: auto; /* 允许水平滚动 */
         `;
         
         // 如果是第一段，包含等号
@@ -591,54 +593,36 @@ function renderLatexFormula(expression, targetColumn) {
     formulaContainer.appendChild(backgroundContainer);
 }
 
-// 更新性能指标
-function updatePerformanceMetrics(result) {
-    console.log('Updating performance metrics:', result);
+// 检测树的有效状态
+function checkTreeValidity(tree) {
+    if (!tree) return false;
     
-    const r2Value = document.getElementById('r2-value');
-    const mseValue = document.getElementById('mse-value');
-    const maeValue = document.getElementById('mae-value');
-    const rmseValue = document.getElementById('rmse-value');
-    
-    if (r2Value) {
-        r2Value.textContent = (result.r2 || 0).toFixed(3);
-        console.log('Updated R²:', (result.r2 || 0).toFixed(3));
-    }
-    if (mseValue) {
-        mseValue.textContent = (result.mse || 0).toFixed(3);
-        console.log('Updated MSE:', (result.mse || 0).toFixed(3));
+    // 检查节点是否有效
+    if (tree.type === 'variable') {
+        return tree.name && tree.coefficient !== undefined;
+    } else if (tree.type === 'operator') {
+        return tree.children && tree.children.length === 2;
     }
     
-    // 计算MAE和RMSE
-    if (result.predictions && result.predictions.actual && result.predictions.predicted) {
-        const actual = result.predictions.actual;
-        const predicted = result.predictions.predicted;
-        
-        if (actual.length > 0 && predicted.length > 0) {
-            // 计算MAE
-            const mae = actual.reduce((sum, val, i) => sum + Math.abs(val - predicted[i]), 0) / actual.length;
-            if (maeValue) {
-                maeValue.textContent = mae.toFixed(3);
-                console.log('Updated MAE:', mae.toFixed(3));
-            }
-            
-            // 计算RMSE
-            const rmse = Math.sqrt(result.mse || 0);
-            if (rmseValue) {
-                rmseValue.textContent = rmse.toFixed(3);
-                console.log('Updated RMSE:', rmse.toFixed(3));
-            }
-        } else {
-            if (maeValue) maeValue.textContent = '0.000';
-            if (rmseValue) rmseValue.textContent = '0.000';
-        }
-    } else {
-        if (maeValue) maeValue.textContent = '0.000';
-        if (rmseValue) rmseValue.textContent = '0.000';
-    }
+    return false;
 }
 
-// 解析表达式为真正的语法树（支持多种运算符）
+// 更新性能指标（实时）
+function updatePerformanceMetrics(result) {
+    const r2Element = document.getElementById('r2-value');
+    const mseElement = document.getElementById('mse-value');
+    const maeElement = document.getElementById('mae-value');
+    const rmseElement = document.getElementById('rmse-value');
+    
+    if (r2Element) r2Element.textContent = (result.r2 || 0).toFixed(3);
+    if (mseElement) mseElement.textContent = (result.mse || 0).toFixed(3);
+    if (maeElement) maeElement.textContent = (result.mae || 0).toFixed(3);
+    if (rmseElement) rmseElement.textContent = (result.rmse || 0).toFixed(3);
+    
+    console.log('Updated performance metrics:', result);
+}
+
+// 解析表达式为真正的语法树（参考HeuristicLab实现）
 function parseExpressionToSyntaxTree(expression, featureImportance) {
     console.log('Parsing expression:', expression);
     
@@ -663,100 +647,74 @@ function parseExpressionToSyntaxTree(expression, featureImportance) {
             return null;
         }
         
-        // 创建根节点（加法）
-        const rootNode = {
-            name: 'Addition',
-            type: 'operator',
-            operator: '+',
-            children: []
-        };
-        
-        // 处理每个项
-        terms.forEach(term => {
-            const trimmedTerm = term.trim();
-            if (!trimmedTerm) return;
-            
-            // 检查是否包含乘法或除法
-            if (trimmedTerm.includes('*') || trimmedTerm.includes('⋅') || trimmedTerm.includes('×')) {
-                // 乘法项
-                const parts = trimmedTerm.split(/(\*|⋅|×)/);
-                if (parts.length >= 3) {
-                    const coefficient = parseFloat(parts[0]) || 1;
-                    const variable = parts[2];
+        // 创建真正的二叉树结构（参考HeuristicLab）
+        const createBinaryTree = (terms, start, end) => {
+            if (start === end) {
+                // 单个项
+                const term = terms[start].trim();
+                const parts = term.split('*');
+                if (parts.length === 2) {
+                    const coefficient = parseFloat(parts[0].trim());
+                    const variable = parts[1].trim();
+                    const importance = featureImportance[variable] || 0.1;
                     
-                    // 创建乘法节点
-                    const multiplyNode = {
-                        name: 'Multiplication',
-                        type: 'operator',
-                        operator: '×',
-                        children: [
-                            {
-                                name: coefficient.toString(),
-                                type: 'constant',
-                                value: coefficient
-                            },
-                            {
-                                name: variable,
-                                type: 'variable',
-                                coefficient: coefficient,
-                                importance: featureImportance[variable] || 0.5,
-                                weight: getWeightClass(featureImportance[variable] || 0.5)
-                            }
-                        ]
-                    };
-                    rootNode.children.push(multiplyNode);
-                }
-            } else if (trimmedTerm.includes('/') || trimmedTerm.includes('÷')) {
-                // 除法项
-                const parts = trimmedTerm.split(/(\/|÷)/);
-                if (parts.length >= 3) {
-                    const numerator = parts[0];
-                    const denominator = parts[2];
-                    
-                    // 创建除法节点
-                    const divideNode = {
-                        name: 'Division',
-                        type: 'operator',
-                        operator: '÷',
-                        children: [
-                            {
-                                name: numerator,
-                                type: 'variable',
-                                coefficient: 1,
-                                importance: featureImportance[numerator] || 0.5,
-                                weight: getWeightClass(featureImportance[numerator] || 0.5)
-                            },
-                            {
-                                name: denominator,
-                                type: 'variable',
-                                coefficient: 1,
-                                importance: featureImportance[denominator] || 0.5,
-                                weight: getWeightClass(featureImportance[denominator] || 0.5)
-                            }
-                        ]
-                    };
-                    rootNode.children.push(divideNode);
-                }
-            } else {
-                // 简单变量项
-                const match = trimmedTerm.match(/^([+-]?\d*\.?\d*)\s*([A-Za-z_][A-Za-z0-9_]*)/);
-                if (match) {
-                    const coefficient = parseFloat(match[1]) || (match[1] === '-' ? -1 : 1);
-                    const variable = match[2];
-                    
-                    const variableNode = {
+                    return {
+                        id: `term_${start}`,
                         name: variable,
                         type: 'variable',
                         coefficient: coefficient,
-                        importance: featureImportance[variable] || 0.5,
-                        weight: getWeightClass(featureImportance[variable] || 0.5)
+                        importance: importance,
+                        weight: getWeightClass(importance),
+                        children: []
                     };
-                    rootNode.children.push(variableNode);
                 }
             }
-        });
+            
+            if (end - start === 1) {
+                // 两个项，创建加法节点
+                const left = createBinaryTree(terms, start, start);
+                const right = createBinaryTree(terms, end, end);
+                
+                return {
+                    id: `op_${start}_${end}`,
+                    name: 'Addition',
+                    type: 'operator',
+                    operator: '+',
+                    importance: 1.0,
+                    weight: 'weight-9',
+                    children: [left, right]
+                };
+            }
+            
+            // 多个项，递归创建二叉树
+            const mid = Math.floor((start + end) / 2);
+            const left = createBinaryTree(terms, start, mid);
+            const right = createBinaryTree(terms, mid + 1, end);
+            
+            return {
+                id: `op_${start}_${end}`,
+                name: 'Addition',
+                type: 'operator',
+                operator: '+',
+                importance: 1.0,
+                weight: 'weight-9',
+                children: [left, right]
+            };
+        };
         
-        console.log('Generated syntax tree:', rootNode);
+        // 处理各项，确保格式正确
+        const processedTerms = terms.map(term => {
+            term = term.trim();
+            if (term.startsWith('+')) {
+                term = term.substring(1);
+            }
+            return term;
+        }).filter(term => term !== '');
+        
+        // 创建根节点
+        const rootNode = createBinaryTree(processedTerms, 0, processedTerms.length - 1);
+        
+        console.log('Parsed tree:', rootNode);
         return rootNode;
         
     } catch (error) {
@@ -931,17 +889,24 @@ function showNodeInfo(event, node) {
     showNotification(`节点信息: ${info.name}, 类型: ${info.type}, 系数: ${info.coefficient}, 重要性: ${info.importance.toFixed(3)}`, 'info');
 }
 
-// 获取权重类别（红到绿的渐变）
+// 获取权重颜色类（负相关到正相关的渐变）
 function getWeightClass(importance) {
-    if (importance >= 0.8) return 'weight-9';
-    if (importance >= 0.7) return 'weight-8';
-    if (importance >= 0.6) return 'weight-7';
-    if (importance >= 0.5) return 'weight-6';
-    if (importance >= 0.4) return 'weight-5';
-    if (importance >= 0.3) return 'weight-4';
-    if (importance >= 0.2) return 'weight-3';
-    if (importance >= 0.1) return 'weight-2';
-    return 'weight-1';
+    // 将重要性值映射到颜色类
+    // 负相关：红色系 (weight-1 到 weight-3)
+    // 中性：白色系 (weight-4 到 weight-6)  
+    // 正相关：绿色系 (weight-7 到 weight-9)
+    
+    if (importance <= 0.1) return 'weight-1';      // 深红
+    if (importance <= 0.2) return 'weight-2';      // 红色
+    if (importance <= 0.3) return 'weight-3';      // 浅红
+    if (importance <= 0.4) return 'weight-4';      // 白色
+    if (importance <= 0.5) return 'weight-5';      // 浅白
+    if (importance <= 0.6) return 'weight-6';      // 白色
+    if (importance <= 0.7) return 'weight-7';      // 浅绿
+    if (importance <= 0.8) return 'weight-8';      // 绿色
+    if (importance <= 1.0) return 'weight-9';      // 深绿
+    
+    return 'weight-5'; // 默认中性
 }
 
 // 设置右键菜单
@@ -1003,21 +968,17 @@ function toggleNodeSelection(node) {
 
 // 删除节点
 function deleteNode(nodeId) {
-    const node = document.querySelector(`[data-node-id="${nodeId}"]`);
-    if (node) {
-        // 标记节点为删除状态
-        node.style.opacity = '0.3';
-        node.style.textDecoration = 'line-through';
-        node.classList.add('deleted');
-        
-        // 获取被删除的特征
-        const deletedFeature = node.getAttribute('data-feature');
-        const deletedFeatures = window.deletedFeatures || [];
-        deletedFeatures.push(deletedFeature);
-        window.deletedFeatures = deletedFeatures;
-        
-        showNotification(`已标记删除特征: ${deletedFeature}`, 'info');
-    }
+    console.log('Deleting node:', nodeId);
+    
+    // 添加到删除列表
+    if (!window.deletedNodes) window.deletedNodes = [];
+    window.deletedNodes.push(nodeId);
+    
+    // 更新树显示
+    updateTreeDisplay();
+    
+    // 更新树状态
+    updateTreeStatus();
 }
 
 // 删除低权重节点
@@ -1062,70 +1023,34 @@ function pruneSelectedNodes() {
 
 // 重新计算回归（排除删除的特征）
 async function recalculateRegression() {
-    if (!window.deletedFeatures || window.deletedFeatures.length === 0) {
-        showNotification('没有需要排除的特征', 'warning');
-        return;
-    }
+    console.log('Recalculating regression after node deletion');
     
+    // 获取当前数据
+    const currentData = window.currentRegressionData;
     if (!currentData) {
-        showNotification('没有可用的数据', 'warning');
+        showNotification('没有可用的回归数据', 'error');
         return;
     }
     
-    const targetColumn = document.getElementById('target-column').value;
-    const featureCheckboxes = document.querySelectorAll('#feature-columns input[type="checkbox"]:checked');
+    // 获取删除的节点
+    const deletedNodes = window.deletedNodes || [];
     
-    if (!targetColumn) {
-        showNotification('请选择目标变量', 'warning');
-        return;
-    }
+    // 从特征中移除删除的节点
+    const filteredFeatures = currentData.features.filter(feature => 
+        !deletedNodes.includes(feature)
+    );
     
-    let featureColumns = Array.from(featureCheckboxes).map(cb => cb.value);
+    // 重新构建数据
+    const filteredData = {
+        ...currentData,
+        features: filteredFeatures,
+        data: currentData.data.filter((_, index) => 
+            !deletedNodes.includes(currentData.features[index])
+        )
+    };
     
-    // 排除已删除的特征
-    featureColumns = featureColumns.filter(feature => !window.deletedFeatures.includes(feature));
-    
-    if (featureColumns.length === 0) {
-        showNotification('没有可用的特征变量', 'warning');
-        return;
-    }
-    
-    const populationSize = parseInt(document.getElementById('population-size').value) || 100;
-    const generations = parseInt(document.getElementById('generations').value) || 50;
-    const testRatio = parseInt(document.getElementById('test-ratio').value) || 30;
-    
-    // 获取选择的运算符
-    const operators = [];
-    if (document.getElementById('op-add').checked) operators.push('add');
-    if (document.getElementById('op-sub').checked) operators.push('sub');
-    if (document.getElementById('op-mul').checked) operators.push('mul');
-    if (document.getElementById('op-div').checked) operators.push('div');
-    if (document.getElementById('op-pow').checked) operators.push('pow');
-    if (document.getElementById('op-sqrt').checked) operators.push('sqrt');
-    
-    showLoading('正在重新计算回归分析...');
-    
-    try {
-        const result = await performSymbolicRegression({
-            data: currentData,
-            targetColumn,
-            featureColumns,
-            populationSize,
-            generations,
-            testRatio,
-            operators
-        });
-        
-        // 更新结果
-        displayRegressionResults(result);
-        
-        showNotification('重新计算完成', 'success');
-        
-    } catch (error) {
-        showNotification('重新计算失败: ' + error.message, 'error');
-    } finally {
-        hideLoading();
-    }
+    // 调用后端重新计算
+    performSymbolicRegression(filteredData);
 }
 
 // 重置公式
