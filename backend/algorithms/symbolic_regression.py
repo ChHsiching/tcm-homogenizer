@@ -6,417 +6,282 @@
 
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Any, Optional
-from loguru import logger
-import json
-from pathlib import Path
-import time
+from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, r2_score
-import warnings
-warnings.filterwarnings('ignore')
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures
+import sympy as sp
+from loguru import logger
+import random
 
-try:
-    from gplearn.genetic import SymbolicRegressor
-    from gplearn.functions import make_function
-    from gplearn.fitness import make_fitness
-    GPLEARN_AVAILABLE = True
-except ImportError:
-    GPLEARN_AVAILABLE = False
-    logger.warning("gplearn未安装，将使用简化实现")
-
-class SymbolicRegression:
-    """符号回归算法实现"""
+class HeuristicLabSymbolicRegression:
+    """参考HeuristicLab实现的符号回归算法"""
     
     def __init__(self):
-        self.models = {}
-        self.models_dir = Path("models")
-        self.models_dir.mkdir(exist_ok=True)
-        self._load_saved_models()
-    
-    def analyze(self, data: Dict[str, Any], target_column: str, 
-                feature_columns: List[str], population_size: int = 100, 
-                generations: int = 50, test_ratio: float = 0.3, 
-                operators: List[str] = None) -> Dict[str, Any]:
-        """执行符号回归分析"""
-        try:
-            logger.info(f"开始符号回归分析，目标变量: {target_column}, 特征变量: {feature_columns}")
-            
-            # 数据预处理
-            X_scaled, y_scaled, X, y = self._prepare_data(data, target_column, feature_columns)
-            
-            # 执行符号回归
-            if GPLEARN_AVAILABLE:
-                result = self._perform_symbolic_regression_gplearn(
-                    X_scaled, y_scaled, feature_columns, population_size, generations, test_ratio, operators
-                )
+        self.best_expression = None
+        self.best_score = -np.inf
+        self.feature_importance = {}
+        self.population = []
+        self.generations = 0
+        self.population_size = 0
+        
+    def create_expression_tree(self, operators, max_depth=3):
+        """创建表达式树（参考HeuristicLab的树结构）"""
+        if max_depth == 0:
+            # 叶子节点：变量或常数
+            if random.random() < 0.3:  # 30%概率为常数
+                return {'type': 'constant', 'value': random.uniform(-10, 10)}
             else:
-                result = self._perform_symbolic_regression_simple(
-                    X_scaled, y_scaled, feature_columns, population_size, generations, test_ratio, operators
-                )
-            
-            # 保存模型
-            model_id = int(time.time())
-            result['model_id'] = model_id
-            self._save_model(model_id, result)
-            
-            logger.info(f"符号回归分析完成，模型ID: {model_id}")
-            return result
-            
-        except Exception as e:
-            logger.error(f"符号回归分析失败: {str(e)}")
-            raise
+                return {'type': 'variable', 'name': f'x{random.randint(0, 9)}'}
+        
+        # 内部节点：运算符
+        operator = random.choice(operators)
+        if operator in ['+', '-']:
+            return {
+                'type': 'operator',
+                'operator': operator,
+                'left': self.create_expression_tree(operators, max_depth - 1),
+                'right': self.create_expression_tree(operators, max_depth - 1)
+            }
+        elif operator in ['*', '/']:
+            return {
+                'type': 'operator',
+                'operator': operator,
+                'left': self.create_expression_tree(operators, max_depth - 1),
+                'right': self.create_expression_tree(operators, max_depth - 1)
+            }
+        else:  # 幂运算或开方
+            return {
+                'type': 'operator',
+                'operator': operator,
+                'left': self.create_expression_tree(operators, max_depth - 1),
+                'right': None
+            }
     
-    def _prepare_data(self, data: Dict[str, Any], target_column: str, 
-                     feature_columns: List[str]) -> tuple:
-        """准备训练数据"""
-        try:
-            df = pd.DataFrame(data['data'])
-            
-            # 检查列是否存在
-            if target_column not in df.columns:
-                raise ValueError(f"目标变量列 '{target_column}' 不存在")
-            
-            for col in feature_columns:
-                if col not in df.columns:
-                    raise ValueError(f"特征变量列 '{col}' 不存在")
-            
-            # 提取特征和目标变量
-            X = df[feature_columns].values
-            y = df[target_column].values
-            
-            # 检查数据类型
-            if not np.issubdtype(X.dtype, np.number):
-                raise ValueError("特征变量必须为数值类型")
-            
-            if not np.issubdtype(y.dtype, np.number):
-                raise ValueError("目标变量必须为数值类型")
-            
-            # 处理缺失值
-            X = np.nan_to_num(X, nan=0.0)
-            y = np.nan_to_num(y, nan=0.0)
-            
-            # 检查数据质量
-            if len(y) < 10:
-                raise ValueError("数据样本数量太少，至少需要10个样本")
-            
-            # 检查目标变量的变化
-            y_std = np.std(y)
-            if y_std < 1e-6:
-                raise ValueError("目标变量没有变化，无法进行回归分析")
-            
-            # 检查特征变量的变化
-            for i, col in enumerate(feature_columns):
-                col_std = np.std(X[:, i])
-                if col_std < 1e-6:
-                    logger.warning(f"特征变量 '{col}' 没有变化，可能影响分析结果")
-            
-            # 数据标准化（保存原始数据用于反标准化）
-            self.X_mean = np.mean(X, axis=0)
-            self.X_std = np.std(X, axis=0)
-            self.X_std[self.X_std == 0] = 1  # 避免除零
-            X_scaled = (X - self.X_mean) / self.X_std
-            
-            self.y_mean = np.mean(y)
-            self.y_std = np.std(y)
-            if self.y_std > 0:
-                y_scaled = (y - self.y_mean) / self.y_std
+    def evaluate_tree(self, tree, X, feature_names):
+        """计算表达式树的值"""
+        if tree['type'] == 'constant':
+            return np.full(X.shape[0], tree['value'])
+        elif tree['type'] == 'variable':
+            var_name = tree['name']
+            if var_name in feature_names:
+                idx = feature_names.index(var_name)
+                return X[:, idx]
             else:
-                y_scaled = y
-            
-            logger.info(f"数据准备完成，特征形状: {X_scaled.shape}, 目标形状: {y_scaled.shape}")
-            logger.info(f"目标变量统计: 均值={self.y_mean:.3f}, 标准差={self.y_std:.3f}")
-            return X_scaled, y_scaled, X, y  # 返回标准化和原始数据
-            
-        except Exception as e:
-            logger.error(f"数据准备失败: {str(e)}")
-            raise
+                return np.zeros(X.shape[0])
+        elif tree['type'] == 'operator':
+            left_val = self.evaluate_tree(tree['left'], X, feature_names)
+            if tree['operator'] in ['+', '-', '*', '/']:
+                right_val = self.evaluate_tree(tree['right'], X, feature_names)
+                if tree['operator'] == '+':
+                    return left_val + right_val
+                elif tree['operator'] == '-':
+                    return left_val - right_val
+                elif tree['operator'] == '*':
+                    return left_val * right_val
+                elif tree['operator'] == '/':
+                    # 避免除零
+                    return np.where(right_val != 0, left_val / right_val, 0)
+            elif tree['operator'] == '^':
+                return np.power(left_val, 2)  # 简化为平方
+            elif tree['operator'] == 'sqrt':
+                return np.sqrt(np.abs(left_val))  # 避免负数开方
+        return np.zeros(X.shape[0])
     
-    def _perform_symbolic_regression_gplearn(self, X_scaled: np.ndarray, y_scaled: np.ndarray, 
-                                           feature_names: List[str], population_size: int, 
-                                           generations: int, test_ratio: float = 0.3,
-                                           operators: List[str] = None) -> Dict[str, Any]:
-        """使用gplearn执行符号回归算法"""
-        try:
-            logger.info("开始执行gplearn符号回归算法...")
-            
-            # 分割训练和测试数据（使用标准化数据训练）
-            X_train_scaled, X_test_scaled, y_train_scaled, y_test_scaled = train_test_split(
-                X_scaled, y_scaled, test_size=test_ratio, random_state=42
-            )
-            
-            # 设置运算符
-            if operators is None:
-                operators = ['add', 'sub', 'mul', 'div']
-            
-            # 创建符号回归器（使用更稳定的参数）
-            est_gp = SymbolicRegressor(
-                population_size=population_size,
-                generations=generations,
-                stopping_criteria=0.01,
-                p_crossover=0.7,
-                p_subtree_mutation=0.1,
-                p_hoist_mutation=0.05,
-                p_point_mutation=0.1,
-                max_samples=0.9,
-                verbose=0,  # 减少输出
-                random_state=42,
-                n_jobs=1  # 避免多进程问题
-            )
-            
-            # 训练模型
-            est_gp.fit(X_train_scaled, y_train_scaled)
-            
-            # 预测（使用标准化数据）
-            y_pred_train_scaled = est_gp.predict(X_train_scaled)
-            y_pred_test_scaled = est_gp.predict(X_test_scaled)
-            
-            # 反标准化预测结果用于性能评估
-            y_pred_train = y_pred_train_scaled * self.y_std + self.y_mean
-            y_pred_test = y_pred_test_scaled * self.y_std + self.y_mean
-            
-            # 获取对应的原始目标值
-            y_train_orig = y_train_scaled * self.y_std + self.y_mean
-            y_test_orig = y_test_scaled * self.y_std + self.y_mean
-            
-            # 计算性能指标（使用原始数据）
-            r2_train = r2_score(y_train_orig, y_pred_train)
-            r2_test = r2_score(y_test_orig, y_pred_test)
-            mse_train = mean_squared_error(y_train_orig, y_pred_train)
-            mse_test = mean_squared_error(y_test_orig, y_pred_test)
-            
-            # 获取最佳表达式
-            try:
-                best_program = est_gp._program
-                expression = str(best_program)
-            except:
-                # 如果无法获取程序，使用简化表达式
-                expression = " + ".join([f"{name} * {i+1}" for i, name in enumerate(feature_names)])
-            
-            # 计算特征重要性（基于相关性）
-            feature_importance = []
-            for i, name in enumerate(feature_names):
-                # 使用相关系数作为重要性指标
-                importance = abs(np.corrcoef(X_scaled[:, i], y_scaled)[0, 1]) if len(y_scaled) > 1 else 0
-                feature_importance.append({
-                    'feature': name,
-                    'coefficient': 0.0,  # gplearn不直接提供系数
-                    'importance': float(importance)
-                })
-            
-            # 按重要性排序
-            feature_importance.sort(key=lambda x: x['importance'], reverse=True)
-            
-            result = {
-                'expression': expression,
-                'r2': float(r2_test),
-                'mse': float(mse_test),
-                'r2_train': float(r2_train),
-                'mse_train': float(mse_train),
-                'feature_importance': feature_importance,
-                'predictions': {
-                    'actual': y_test_orig.tolist(),
-                    'predicted': y_pred_test.tolist()
-                },
-                'parameters': {
-                    'population_size': population_size,
-                    'generations': generations,
-                    'test_ratio': test_ratio,
-                    'operators': operators,
-                    'n_features': X_scaled.shape[1],
-                    'n_samples': len(y_scaled),
-                    'algorithm': 'gplearn'
-                },
-                'timestamp': time.time()
-            }
-            
-            logger.info(f"gplearn符号回归完成，R² = {r2_test:.3f}, MSE = {mse_test:.3f}")
-            return result
-            
-        except Exception as e:
-            logger.error(f"gplearn符号回归执行失败: {str(e)}")
-            # 如果gplearn失败，回退到简化实现
-            logger.info("回退到简化实现...")
-            return self._perform_symbolic_regression_simple(
-                X_scaled, y_scaled, feature_names, population_size, generations, test_ratio, operators
-            )
+    def tree_to_string(self, tree, feature_names):
+        """将表达式树转换为字符串"""
+        if tree['type'] == 'constant':
+            return f"{tree['value']:.4f}"
+        elif tree['type'] == 'variable':
+            var_name = tree['name']
+            if var_name in feature_names:
+                idx = feature_names.index(var_name)
+                return feature_names[idx]
+            else:
+                return "0"
+        elif tree['type'] == 'operator':
+            left_str = self.tree_to_string(tree['left'], feature_names)
+            if tree['operator'] in ['+', '-', '*', '/']:
+                right_str = self.tree_to_string(tree['right'], feature_names)
+                return f"({left_str} {tree['operator']} {right_str})"
+            elif tree['operator'] == '^':
+                return f"({left_str})^2"
+            elif tree['operator'] == 'sqrt':
+                return f"sqrt({left_str})"
+        return "0"
     
-    def _perform_symbolic_regression_simple(self, X_scaled: np.ndarray, y_scaled: np.ndarray, 
-                                          feature_names: List[str], population_size: int, 
-                                          generations: int, test_ratio: float = 0.3,
-                                          operators: List[str] = None) -> Dict[str, Any]:
-        """简化版符号回归算法（当gplearn不可用时使用）"""
-        try:
-            logger.info("开始执行简化版符号回归算法...")
-            
-            # 分割训练和测试数据（使用标准化数据训练）
-            X_train_scaled, X_test_scaled, y_train_scaled, y_test_scaled = train_test_split(
-                X_scaled, y_scaled, test_size=test_ratio, random_state=42
-            )
-            
-            # 使用多项式回归作为简化实现
-            from sklearn.preprocessing import PolynomialFeatures
-            from sklearn.linear_model import LinearRegression
-            from sklearn.pipeline import Pipeline
-            
-            # 创建多项式特征
-            poly = PolynomialFeatures(degree=2, include_bias=False)
-            lr = LinearRegression()
-            
-            # 创建管道
-            model = Pipeline([
-                ('poly', poly),
-                ('linear', lr)
-            ])
-            
-            # 训练模型
-            model.fit(X_train_scaled, y_train_scaled)
-            
-            # 预测（使用标准化数据）
-            y_pred_train_scaled = model.predict(X_train_scaled)
-            y_pred_test_scaled = model.predict(X_test_scaled)
-            
-            # 反标准化预测结果用于性能评估
-            y_pred_train = y_pred_train_scaled * self.y_std + self.y_mean
-            y_pred_test = y_pred_test_scaled * self.y_std + self.y_mean
-            
-            # 获取对应的原始目标值
-            y_train_orig = y_train_scaled * self.y_std + self.y_mean
-            y_test_orig = y_test_scaled * self.y_std + self.y_mean
-            
-            # 计算性能指标（使用原始数据）
-            r2_train = r2_score(y_train_orig, y_pred_train)
-            r2_test = r2_score(y_test_orig, y_pred_test)
-            mse_train = mean_squared_error(y_train_orig, y_pred_train)
-            mse_test = mean_squared_error(y_test_orig, y_pred_test)
-            
-            # 获取特征重要性
-            feature_importance = []
-            coefficients = model.named_steps['linear'].coef_
-            feature_names_poly = model.named_steps['poly'].get_feature_names_out(feature_names)
-            
-            # 计算原始特征的重要性
-            for i, name in enumerate(feature_names):
-                # 找到包含该特征的所有多项式项
-                importance = 0
-                for j, poly_name in enumerate(feature_names_poly):
-                    if name in poly_name:
-                        importance += abs(coefficients[j])
-                
-                feature_importance.append({
-                    'feature': name,
-                    'coefficient': 0.0,
-                    'importance': float(importance)
-                })
-            
-            # 按重要性排序
-            feature_importance.sort(key=lambda x: x['importance'], reverse=True)
-            
-            # 生成表达式字符串
-            expression_parts = []
-            for i, (name, coef) in enumerate(zip(feature_names, coefficients[:len(feature_names)])):
-                if abs(coef) > 0.01:
-                    if coef >= 0 and i > 0:
-                        expression_parts.append(f"+ {coef:.3f} * {name}")
-                    else:
-                        expression_parts.append(f"{coef:.3f} * {name}")
-            
-            expression = " + ".join(expression_parts)
-            if len(expression_parts) == 0:
-                expression = "0"
-            
-            result = {
-                'expression': expression,
-                'r2': float(r2_test),
-                'mse': float(mse_test),
-                'r2_train': float(r2_train),
-                'mse_train': float(mse_train),
-                'feature_importance': feature_importance,
-                'predictions': {
-                    'actual': y_test_orig.tolist(),
-                    'predicted': y_pred_test.tolist()
-                },
-                'parameters': {
-                    'population_size': population_size,
-                    'generations': generations,
-                    'test_ratio': test_ratio,
-                    'operators': operators or ['add', 'sub', 'mul', 'div'],
-                    'n_features': X_scaled.shape[1],
-                    'n_samples': len(y_scaled),
-                    'algorithm': 'polynomial_regression'
-                },
-                'timestamp': time.time()
-            }
-            
-            logger.info(f"简化版符号回归完成，R² = {r2_test:.3f}, MSE = {mse_test:.3f}")
-            return result
-            
-        except Exception as e:
-            logger.error(f"简化版符号回归执行失败: {str(e)}")
-            raise
+    def calculate_feature_importance(self, tree, X, y, feature_names):
+        """计算特征重要性（参考HeuristicLab）"""
+        importance = {}
+        base_score = r2_score(y, self.evaluate_tree(tree, X, feature_names))
+        
+        for i, feature in enumerate(feature_names):
+            # 临时替换特征值
+            X_temp = X.copy()
+            X_temp[:, i] = np.random.permutation(X_temp[:, i])
+            new_score = r2_score(y, self.evaluate_tree(tree, X_temp, feature_names))
+            importance[feature] = max(0, base_score - new_score)  # 重要性为性能下降程度
+        
+        return importance
     
-    def _save_model(self, model_id: int, result: Dict[str, Any]):
-        """保存模型"""
-        try:
-            # 保存到内存
-            self.models[model_id] = result
-            
-            # 保存到文件
-            model_file = self.models_dir / f"{model_id}.json"
-            with open(model_file, 'w', encoding='utf-8') as f:
-                json.dump(result, f, ensure_ascii=False, indent=2)
-            
-            logger.info(f"模型已保存: {model_file}")
-            
-        except Exception as e:
-            logger.error(f"模型保存失败: {str(e)}")
-            raise
-    
-    def get_model(self, model_id: str) -> Optional[Dict[str, Any]]:
-        """获取模型"""
-        return self.models.get(model_id)
-    
-    def get_saved_models(self) -> List[Dict[str, Any]]:
-        """获取所有已保存的模型"""
-        models = []
-        for model_id, model in self.models.items():
-            models.append({
-                'model_id': model_id,
-                'expression': model['expression'],
-                'r2': model['r2'],
-                'mse': model['mse'],
-                'timestamp': model['timestamp']
-            })
-        return models
-    
-    def _load_saved_models(self):
-        """加载已保存的模型"""
-        try:
-            for model_file in self.models_dir.glob("*.json"):
+    def genetic_programming(self, X, y, feature_names, population_size=100, generations=50, 
+                          operators=['+', '-', '*', '/'], test_ratio=0.3):
+        """遗传编程算法（参考HeuristicLab）"""
+        self.population_size = population_size
+        self.generations = generations
+        
+        # 分割数据
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=test_ratio, random_state=42
+        )
+        
+        # 初始化种群
+        self.population = []
+        for _ in range(population_size):
+            tree = self.create_expression_tree(operators, max_depth=3)
+            self.population.append(tree)
+        
+        best_individual = None
+        best_score = -np.inf
+        
+        for gen in range(generations):
+            # 评估种群
+            scores = []
+            for tree in self.population:
                 try:
-                    with open(model_file, 'r', encoding='utf-8') as f:
-                        model = json.load(f)
-                    model_id = model.get('model_id', model_file.stem)
-                    self.models[model_id] = model
-                except Exception as e:
-                    logger.warning(f"加载模型文件失败 {model_file}: {str(e)}")
+                    y_pred = self.evaluate_tree(tree, X_train, feature_names)
+                    score = r2_score(y_train, y_pred)
+                    scores.append(score)
+                    
+                    if score > best_score:
+                        best_score = score
+                        best_individual = tree.copy()
+                except:
+                    scores.append(-np.inf)
             
-            logger.info(f"已加载 {len(self.models)} 个模型")
+            # 选择、交叉、变异
+            new_population = []
+            for _ in range(population_size):
+                # 锦标赛选择
+                tournament_size = 3
+                tournament = random.sample(range(len(self.population)), tournament_size)
+                winner = max(tournament, key=lambda i: scores[i])
+                
+                # 变异
+                if random.random() < 0.1:  # 10%变异概率
+                    mutated = self.mutate_tree(self.population[winner].copy())
+                    new_population.append(mutated)
+                else:
+                    new_population.append(self.population[winner].copy())
             
-        except Exception as e:
-            logger.error(f"加载保存的模型失败: {str(e)}")
+            self.population = new_population
+            
+            # 精英保留
+            if best_individual:
+                self.population[0] = best_individual.copy()
+        
+        # 最终评估
+        if best_individual:
+            y_pred_train = self.evaluate_tree(best_individual, X_train, feature_names)
+            y_pred_test = self.evaluate_tree(best_individual, X_test, feature_names)
+            
+            train_r2 = r2_score(y_train, y_pred_train)
+            test_r2 = r2_score(y_test, y_pred_test)
+            train_mse = mean_squared_error(y_train, y_pred_train)
+            test_mse = mean_squared_error(y_test, y_pred_test)
+            
+            # 计算特征重要性
+            self.feature_importance = self.calculate_feature_importance(
+                best_individual, X_train, y_train, feature_names
+            )
+            
+            # 转换为字符串表达式
+            expression = self.tree_to_string(best_individual, feature_names)
+            
+            return {
+                'expression': expression,
+                'train_r2': train_r2,
+                'test_r2': test_r2,
+                'train_mse': train_mse,
+                'test_mse': test_mse,
+                'feature_importance': self.feature_importance,
+                'tree': best_individual
+            }
+        
+        return None
     
-    def predict(self, model_id: str, X: np.ndarray) -> np.ndarray:
-        """使用模型进行预测"""
-        try:
-            model = self.get_model(model_id)
-            if not model:
-                raise ValueError(f"模型 {model_id} 不存在")
+    def mutate_tree(self, tree):
+        """变异操作"""
+        if random.random() < 0.3:
+            # 随机替换子树
+            return self.create_expression_tree(['+', '-', '*', '/'], max_depth=2)
+        return tree
+
+def analyze_symbolic_regression(data, target_column, population_size=100, generations=50, 
+                              test_ratio=0.3, operators=None):
+    """
+    执行符号回归分析（参考HeuristicLab实现）
+    """
+    try:
+        logger.info(f"开始符号回归分析，目标变量: {target_column}")
+        
+        # 数据预处理
+        if target_column not in data.columns:
+            raise ValueError(f"目标变量 {target_column} 不存在于数据中")
+        
+        # 分离特征和目标
+        feature_columns = [col for col in data.columns if col != target_column]
+        X = data[feature_columns].values
+        y = data[target_column].values
+        
+        # 数据标准化
+        scaler_X = StandardScaler()
+        scaler_y = StandardScaler()
+        X_scaled = scaler_X.fit_transform(X)
+        y_scaled = scaler_y.fit_transform(y.reshape(-1, 1)).flatten()
+        
+        # 设置默认运算符
+        if operators is None:
+            operators = ['+', '-', '*', '/']
+        
+        # 创建符号回归实例
+        sr = HeuristicLabSymbolicRegression()
+        
+        # 执行遗传编程
+        result = sr.genetic_programming(
+            X_scaled, y_scaled, feature_columns,
+            population_size=population_size,
+            generations=generations,
+            operators=operators,
+            test_ratio=test_ratio
+        )
+        
+        if result is None:
+            logger.warning("符号回归未能找到有效解，使用线性回归作为备选")
+            # 备选方案：线性回归
+            lr = LinearRegression()
+            lr.fit(X_scaled, y_scaled)
+            y_pred = lr.predict(X_scaled)
             
-            # 这里应该实现真正的预测逻辑
-            # 目前返回随机值作为示例
-            return np.random.rand(len(X))
-            
-        except Exception as e:
-            logger.error(f"预测失败: {str(e)}")
-            raise 
+            return {
+                'expression': f"{target_column} = {lr.intercept_:.4f} + " + 
+                             " + ".join([f"{coef:.4f} * {feature}" 
+                                        for coef, feature in zip(lr.coef_, feature_columns)]),
+                'train_r2': r2_score(y_scaled, y_pred),
+                'test_r2': r2_score(y_scaled, y_pred),
+                'train_mse': mean_squared_error(y_scaled, y_pred),
+                'test_mse': mean_squared_error(y_scaled, y_pred),
+                'feature_importance': {feature: abs(coef) for feature, coef in zip(feature_columns, lr.coef_)},
+                'tree': None
+            }
+        
+        # 转换回原始尺度
+        result['expression'] = f"{target_column} = {result['expression']}"
+        
+        logger.info(f"符号回归分析完成，测试R²: {result['test_r2']:.4f}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"符号回归分析失败: {str(e)}")
+        raise 
