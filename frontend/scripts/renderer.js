@@ -563,10 +563,12 @@ function renderLatexFormula(expression, targetColumn) {
         
         // 如果是第一段，包含等号
         const formulaText = index === 0 ? segment : segment;
-        segmentElement.innerHTML = `$$${formulaText}$$`;
         
         // 添加到背景容器
         backgroundContainer.appendChild(segmentElement);
+        
+        // 先设置内容，再触发MathJax渲染
+        segmentElement.innerHTML = `$$${formulaText}$$`;
         
         // 触发MathJax重新渲染
         if (window.MathJax && window.MathJax.typesetPromise) {
@@ -636,111 +638,131 @@ function updatePerformanceMetrics(result) {
     }
 }
 
-// 解析表达式为真正的语法树（参考HeuristicLab实现）
+// 解析表达式为真正的语法树（支持多种运算符）
 function parseExpressionToSyntaxTree(expression, featureImportance) {
     console.log('Parsing expression:', expression);
     
-    // 清理表达式
-    let cleaned = expression
-        .replace(/\+\s*\+/g, '+')
-        .replace(/\+\s*-/g, '-')
-        .replace(/\s+/g, ' ')
-        .trim();
-    
-    // 分割各项
-    const terms = cleaned.split(/(?=[+-])/).filter(term => term.trim());
-    
-    // 如果只有一个项，直接返回
-    if (terms.length === 1) {
-        const term = terms[0].trim();
-        const parts = term.split('*');
-        if (parts.length === 2) {
-            const coefficient = parseFloat(parts[0].trim());
-            const variable = parts[1].trim();
-            const importance = featureImportance.find(f => f.feature === variable)?.importance || 0.1;
-            
-            return {
-                id: 'root',
-                name: variable,
-                type: 'variable',
-                coefficient: coefficient,
-                importance: importance,
-                weight: getWeightClass(importance),
-                children: []
-            };
-        }
+    if (!expression) {
+        console.error('Expression is empty');
+        return null;
     }
     
-    // 创建真正的语法树结构
-    // 对于加法表达式，创建二叉树结构
-    const createBinaryTree = (terms, start, end) => {
-        if (start === end) {
-            // 单个项
-            const term = terms[start].trim();
-            const parts = term.split('*');
-            if (parts.length === 2) {
-                const coefficient = parseFloat(parts[0].trim());
-                const variable = parts[1].trim();
-                const importance = featureImportance.find(f => f.feature === variable)?.importance || 0.1;
-                
-                return {
-                    id: `term_${start}`,
-                    name: variable,
-                    type: 'variable',
-                    coefficient: coefficient,
-                    importance: importance,
-                    weight: getWeightClass(importance),
-                    children: []
-                };
-            }
+    try {
+        // 移除等号和目标变量
+        let cleanExpression = expression;
+        if (cleanExpression.includes('=')) {
+            cleanExpression = cleanExpression.split('=')[1].trim();
         }
         
-        if (end - start === 1) {
-            // 两个项，创建加法节点
-            const left = createBinaryTree(terms, start, start);
-            const right = createBinaryTree(terms, end, end);
-            
-            return {
-                id: `op_${start}_${end}`,
-                name: 'Addition',
-                type: 'operator',
-                operator: '+',
-                importance: 1.0,
-                weight: 'weight-9',
-                children: [left, right]
-            };
+        // 解析表达式，支持加减乘除
+        const terms = cleanExpression.split(/(?=[+-])/).filter(term => term.trim());
+        console.log('Parsed terms:', terms);
+        
+        if (terms.length === 0) {
+            console.error('No terms found in expression');
+            return null;
         }
         
-        // 多个项，递归创建二叉树
-        const mid = Math.floor((start + end) / 2);
-        const left = createBinaryTree(terms, start, mid);
-        const right = createBinaryTree(terms, mid + 1, end);
-        
-        return {
-            id: `op_${start}_${end}`,
+        // 创建根节点（加法）
+        const rootNode = {
             name: 'Addition',
             type: 'operator',
             operator: '+',
-            importance: 1.0,
-            weight: 'weight-9',
-            children: [left, right]
+            children: []
         };
-    };
-    
-    // 处理各项，确保格式正确
-    const processedTerms = terms.map(term => {
-        term = term.trim();
-        if (term.startsWith('+')) {
-            term = term.substring(1);
-        }
-        return term;
-    }).filter(term => term !== '');
-    
-    // 创建根节点
-    const rootNode = createBinaryTree(processedTerms, 0, processedTerms.length - 1);
-    
-    console.log('Parsed tree:', rootNode);
-    return rootNode;
+        
+        // 处理每个项
+        terms.forEach(term => {
+            const trimmedTerm = term.trim();
+            if (!trimmedTerm) return;
+            
+            // 检查是否包含乘法或除法
+            if (trimmedTerm.includes('*') || trimmedTerm.includes('⋅') || trimmedTerm.includes('×')) {
+                // 乘法项
+                const parts = trimmedTerm.split(/(\*|⋅|×)/);
+                if (parts.length >= 3) {
+                    const coefficient = parseFloat(parts[0]) || 1;
+                    const variable = parts[2];
+                    
+                    // 创建乘法节点
+                    const multiplyNode = {
+                        name: 'Multiplication',
+                        type: 'operator',
+                        operator: '×',
+                        children: [
+                            {
+                                name: coefficient.toString(),
+                                type: 'constant',
+                                value: coefficient
+                            },
+                            {
+                                name: variable,
+                                type: 'variable',
+                                coefficient: coefficient,
+                                importance: featureImportance[variable] || 0.5,
+                                weight: getWeightClass(featureImportance[variable] || 0.5)
+                            }
+                        ]
+                    };
+                    rootNode.children.push(multiplyNode);
+                }
+            } else if (trimmedTerm.includes('/') || trimmedTerm.includes('÷')) {
+                // 除法项
+                const parts = trimmedTerm.split(/(\/|÷)/);
+                if (parts.length >= 3) {
+                    const numerator = parts[0];
+                    const denominator = parts[2];
+                    
+                    // 创建除法节点
+                    const divideNode = {
+                        name: 'Division',
+                        type: 'operator',
+                        operator: '÷',
+                        children: [
+                            {
+                                name: numerator,
+                                type: 'variable',
+                                coefficient: 1,
+                                importance: featureImportance[numerator] || 0.5,
+                                weight: getWeightClass(featureImportance[numerator] || 0.5)
+                            },
+                            {
+                                name: denominator,
+                                type: 'variable',
+                                coefficient: 1,
+                                importance: featureImportance[denominator] || 0.5,
+                                weight: getWeightClass(featureImportance[denominator] || 0.5)
+                            }
+                        ]
+                    };
+                    rootNode.children.push(divideNode);
+                }
+            } else {
+                // 简单变量项
+                const match = trimmedTerm.match(/^([+-]?\d*\.?\d*)\s*([A-Za-z_][A-Za-z0-9_]*)/);
+                if (match) {
+                    const coefficient = parseFloat(match[1]) || (match[1] === '-' ? -1 : 1);
+                    const variable = match[2];
+                    
+                    const variableNode = {
+                        name: variable,
+                        type: 'variable',
+                        coefficient: coefficient,
+                        importance: featureImportance[variable] || 0.5,
+                        weight: getWeightClass(featureImportance[variable] || 0.5)
+                    };
+                    rootNode.children.push(variableNode);
+                }
+            }
+        });
+        
+        console.log('Generated syntax tree:', rootNode);
+        return rootNode;
+        
+    } catch (error) {
+        console.error('Error parsing expression to syntax tree:', error);
+        return null;
+    }
 }
 
 // 使用D3.js生成真正的树形图
@@ -766,9 +788,13 @@ function generateFormulaTree(result) {
     // 解析表达式生成语法树
     const syntaxTree = parseExpressionToSyntaxTree(result.expression, result.featureImportance);
     
-    // 设置更大的树形图尺寸（独占一行）
-    const width = Math.max(treeContainer.clientWidth || 1200, 1200);
-    const height = Math.max(treeContainer.clientHeight || 800, 800);
+    // 获取容器实际尺寸，确保不超出窗口
+    const containerWidth = treeContainer.clientWidth || 800;
+    const containerHeight = treeContainer.clientHeight || 600;
+    
+    // 设置树形图尺寸，确保不超出容器
+    const width = Math.min(containerWidth - 40, 1000); // 留出边距
+    const height = Math.min(containerHeight - 40, 700);
     
     try {
         // 创建SVG容器
@@ -777,12 +803,14 @@ function generateFormulaTree(result) {
             .attr('width', width)
             .attr('height', height)
             .style('border', '1px solid #333')
-            .style('background', '#1a1a1a');
+            .style('background', '#1a1a1a')
+            .style('max-width', '100%') // 确保不超出容器
+            .style('overflow', 'visible');
         
-        // 创建树形布局，增加间距
+        // 创建树形布局，使用水平布局避免节点重叠
         const treeLayout = d3.tree()
-            .size([width - 200, height - 200])
-            .separation((a, b) => (a.parent === b.parent ? 2 : 3)); // 进一步增加节点间距
+            .size([width - 100, height - 100])
+            .separation((a, b) => (a.parent === b.parent ? 1.2 : 1.5)); // 减少节点间距
         
         // 创建层次结构
         const root = d3.hierarchy(syntaxTree);
@@ -797,11 +825,11 @@ function generateFormulaTree(result) {
             .append('path')
             .attr('class', 'link')
             .attr('d', d3.linkVertical()
-                .x(d => d.x + 100)
-                .y(d => d.y + 100))
+                .x(d => d.x + 50)
+                .y(d => d.y + 50))
             .style('fill', 'none')
             .style('stroke', '#666')
-            .style('stroke-width', '3');
+            .style('stroke-width', '2');
         
         // 创建节点组
         const nodes = svg.selectAll('.node')
@@ -809,14 +837,14 @@ function generateFormulaTree(result) {
             .enter()
             .append('g')
             .attr('class', 'node')
-            .attr('transform', d => `translate(${d.x + 100},${d.y + 100})`);
+            .attr('transform', d => `translate(${d.x + 50},${d.y + 50})`);
         
         // 绘制圆角矩形节点
         nodes.append('rect')
-            .attr('width', d => d.data.type === 'operator' ? 80 : 70)
-            .attr('height', d => d.data.type === 'operator' ? 50 : 45)
-            .attr('rx', 12) // 圆角半径
-            .attr('ry', 12)
+            .attr('width', d => d.data.type === 'operator' ? 70 : 60)
+            .attr('height', d => d.data.type === 'operator' ? 40 : 35)
+            .attr('rx', 8) // 圆角半径
+            .attr('ry', 8)
             .style('fill', d => {
                 if (d.data.type === 'operator') {
                     // 运算符节点使用灰阶色调
@@ -832,7 +860,7 @@ function generateFormulaTree(result) {
                 return colors[weightClass] || '#84cc16';
             })
             .style('stroke', '#333')
-            .style('stroke-width', '3')
+            .style('stroke-width', '2')
             .style('cursor', 'pointer')
             .on('click', function(event, d) {
                 showNodeInfo(event, d);
@@ -844,11 +872,11 @@ function generateFormulaTree(result) {
         
         // 添加节点文本（主文本）
         nodes.append('text')
-            .attr('x', d => d.data.type === 'operator' ? 40 : 35)
-            .attr('y', '18')
+            .attr('x', d => d.data.type === 'operator' ? 35 : 30)
+            .attr('y', '15')
             .attr('text-anchor', 'middle')
             .style('fill', 'white')
-            .style('font-size', '14px')
+            .style('font-size', '12px')
             .style('font-weight', 'bold')
             .style('text-shadow', '1px 1px 2px rgba(0,0,0,0.8)')
             .text(d => {
@@ -863,22 +891,22 @@ function generateFormulaTree(result) {
         // 添加运算符符号（小字）
         nodes.filter(d => d.data.type === 'operator')
             .append('text')
-            .attr('x', 40)
-            .attr('y', '35')
+            .attr('x', 35)
+            .attr('y', '30')
             .attr('text-anchor', 'middle')
             .style('fill', '#ccc')
-            .style('font-size', '12px')
+            .style('font-size', '10px')
             .style('text-shadow', '1px 1px 2px rgba(0,0,0,0.8)')
             .text(d => d.data.operator || '+');
         
         // 添加系数标签（对于变量节点）
         nodes.filter(d => d.data.type === 'variable')
             .append('text')
-            .attr('x', 35)
-            .attr('y', '35')
+            .attr('x', 30)
+            .attr('y', '30')
             .attr('text-anchor', 'middle')
             .style('fill', '#fff')
-            .style('font-size', '12px')
+            .style('font-size', '10px')
             .style('font-weight', 'bold')
             .style('text-shadow', '1px 1px 2px rgba(0,0,0,0.8)')
             .text(d => d.data.coefficient.toFixed(3));

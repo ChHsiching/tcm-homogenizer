@@ -665,8 +665,9 @@ body {
 .formula-display {
     margin-top: var(--spacing-lg);
     min-height: 400px;
-    overflow-x: hidden;
+    overflow-x: hidden; /* 禁止水平滚动 */
     overflow-y: auto;
+    max-width: 100%;
 }
 
 .formula-latex {
@@ -674,7 +675,7 @@ body {
     word-wrap: break-word;
     overflow-wrap: break-word;
     max-width: 100%;
-    overflow-x: auto;
+    overflow-x: hidden; /* 禁止水平滚动 */
 }
 
 .formula-latex .MathJax,
@@ -682,21 +683,26 @@ body {
     word-wrap: break-word;
     overflow-wrap: break-word;
     max-width: 100%;
-    overflow-x: auto;
+    overflow-x: hidden; /* 禁止水平滚动 */
 }
 
-.formula-content {
+.formula-background {
     padding: 20px;
     background: #2a2a2a;
     border-radius: 8px;
     margin: 10px 0;
     text-align: center;
-    overflow-x: auto;
+    overflow-x: hidden; /* 禁止水平滚动 */
     word-wrap: break-word;
     overflow-wrap: break-word;
     max-width: 100%;
+}
+
+.formula-line {
+    margin: 8px 0;
     font-size: 16px;
     line-height: 1.5;
+    color: #4a9eff;
 }
 
 /* 公式树容器 - 独占一行 */
@@ -704,11 +710,15 @@ body {
     margin-top: var(--spacing-lg);
     width: 100%;
     min-height: 800px; /* 增加最小高度 */
+    overflow-x: hidden; /* 禁止水平滚动 */
+    max-width: 100%;
 }
 
 .formula-tree-section {
     width: 100%;
     margin-bottom: var(--spacing-lg);
+    overflow-x: hidden; /* 禁止水平滚动 */
+    max-width: 100%;
 }
 
 .formula-tree {
@@ -719,6 +729,8 @@ body {
     min-height: 700px; /* 增加最小高度 */
     position: relative;
     overflow-y: auto;
+    overflow-x: hidden; /* 禁止水平滚动 */
+    max-width: 100%;
 }
 
 /* 剪枝控制区域 - 单独一行 */
@@ -729,6 +741,8 @@ body {
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     padding: var(--spacing-lg);
+    overflow-x: hidden; /* 禁止水平滚动 */
+    max-width: 100%;
 }
 
 /* 树形结构样式 */
