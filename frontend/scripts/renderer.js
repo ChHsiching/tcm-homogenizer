@@ -10,9 +10,62 @@ let currentSettings = {
     autoSave: false
 };
 
+// API基础URL
+const API_BASE_URL = 'http://127.0.0.1:5000';
+
+// 初始化设置
+function initializeSettings() {
+    console.log('初始化设置...');
+    // 设置默认值
+    if (!localStorage.getItem('settings')) {
+        localStorage.setItem('settings', JSON.stringify(currentSettings));
+    }
+}
+
+// 初始化事件监听器
+function initializeEventListeners() {
+    console.log('初始化事件监听器...');
+    
+    // 文件上传事件
+    const fileInput = document.getElementById('file-input');
+    if (fileInput) {
+        fileInput.addEventListener('change', handleFileUpload);
+    }
+    
+    // 符号回归表单提交
+    const regressionForm = document.getElementById('regression-form');
+    if (regressionForm) {
+        regressionForm.addEventListener('submit', handleRegressionSubmit);
+    }
+    
+    // 蒙特卡罗表单提交
+    const monteCarloForm = document.getElementById('monte-carlo-form');
+    if (monteCarloForm) {
+        monteCarloForm.addEventListener('submit', handleMonteCarloSubmit);
+    }
+}
+
+// 加载已保存的模型
+function loadSavedModels() {
+    console.log('加载已保存的模型...');
+    // 暂时为空，因为新的实现不保存模型
+}
+
 // DOM 加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
-    initializeApp();
+    console.log('🚀 中药多组分均化分析客户端初始化...');
+    
+    // 初始化设置
+    initializeSettings();
+    
+    // 初始化事件监听器
+    initializeEventListeners();
+    
+    // 测试后端连接
+    testBackendConnection();
+    
+    // 加载已保存的模型
+    loadSavedModels();
 });
 
 // 应用初始化
@@ -350,44 +403,20 @@ async function startRegression() {
 // 执行符号回归分析
 async function performSymbolicRegression(params) {
     try {
-        const response = await fetch('http://localhost:5000/api/regression/symbolic-regression', {
+        const response = await fetch(`${API_BASE_URL}/api/regression/symbolic-regression`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                data: params.data,
-                target_column: params.targetColumn,
-                feature_columns: params.featureColumns,
-                population_size: params.populationSize,
-                generations: params.generations,
-                test_ratio: params.testRatio,
-                operators: params.operators
-            })
+            body: JSON.stringify(params)
         });
         
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `HTTP ${response.status}`);
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
         const result = await response.json();
-        
-        if (!result.success) {
-            throw new Error(result.error || '分析失败');
-        }
-        
-        // 转换结果格式
-        return {
-            id: Date.now(),
-            model_id: result.result.id || Date.now(),
-            expression: result.result.expression || '',
-            r2: result.result.r2 || 0,
-            mse: result.result.mse || 0,
-            featureImportance: result.result.feature_importance || [],
-            predictions: result.result.predictions || {},
-            parameters: result.result.parameters || {}
-        };
+        return result;
         
     } catch (error) {
         console.error('符号回归分析失败:', error);
@@ -1135,7 +1164,7 @@ function recalculateRegression() {
     };
     
     // 调用后端API
-    fetch('/api/regression/symbolic-regression', {
+    fetch(`${API_BASE_URL}/api/regression/symbolic-regression`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -1231,7 +1260,7 @@ async function startMonteCarlo() {
 // 执行蒙特卡罗分析
 async function performMonteCarloAnalysis(params) {
     try {
-        const response = await fetch('http://localhost:5000/api/monte-carlo/analyze', {
+        const response = await fetch(`${API_BASE_URL}/api/monte-carlo/analyze`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1382,7 +1411,7 @@ async function startBackendService() {
 // 测试后端连接
 async function testBackendConnection() {
     try {
-        const response = await fetch(`http://127.0.0.1:${currentSettings.backendPort}/api/health`, {
+        const response = await fetch(`${API_BASE_URL}/api/health`, {
             method: 'GET',
             timeout: 5000
         });

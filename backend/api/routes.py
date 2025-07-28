@@ -9,21 +9,18 @@ from loguru import logger
 import traceback
 import pandas as pd
 
-from algorithms.symbolic_regression import SymbolicRegression
 from algorithms.monte_carlo import MonteCarloAnalysis
 from utils.data_loader import DataLoader
 
 # 创建蓝图
 symbolic_regression_bp = Blueprint('symbolic_regression', __name__)
 monte_carlo_bp = Blueprint('monte_carlo', __name__)
-data_bp = Blueprint('data', __name__)
 
 # 全局实例
-symbolic_regression_engine = SymbolicRegression()
 monte_carlo_engine = MonteCarloAnalysis()
 data_loader = DataLoader()
 
-# 符号回归路由
+# 符号回归分析路由
 @symbolic_regression_bp.route('/symbolic-regression', methods=['POST'])
 def symbolic_regression():
     """符号回归分析"""
@@ -95,39 +92,27 @@ def symbolic_regression():
 def get_models():
     """获取已保存的模型列表"""
     try:
-        models = symbolic_regression_engine.get_saved_models()
+        # 暂时返回空列表，因为新的实现不保存模型
         return jsonify({
             'success': True,
-            'models': models
+            'models': []
         })
     except Exception as e:
         logger.error(f"获取模型列表失败: {str(e)}")
-        return jsonify({
-            'error': '获取失败',
-            'message': str(e)
-        }), 500
+        return jsonify({'success': False, 'error': str(e)})
 
 @symbolic_regression_bp.route('/models/<model_id>', methods=['GET'])
 def get_model(model_id):
-    """获取特定模型详情"""
+    """获取特定模型"""
     try:
-        model = symbolic_regression_engine.get_model(model_id)
-        if model:
-            return jsonify({
-                'success': True,
-                'model': model
-            })
-        else:
-            return jsonify({
-                'error': '模型不存在',
-                'message': f'模型ID {model_id} 不存在'
-            }), 404
-    except Exception as e:
-        logger.error(f"获取模型详情失败: {str(e)}")
+        # 暂时返回错误，因为新的实现不保存模型
         return jsonify({
-            'error': '获取失败',
-            'message': str(e)
-        }), 500
+            'success': False,
+            'error': '模型保存功能暂未实现'
+        })
+    except Exception as e:
+        logger.error(f"获取模型失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
 
 # 蒙特卡罗分析路由
 @monte_carlo_bp.route('/analyze', methods=['POST'])
