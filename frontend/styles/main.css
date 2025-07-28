@@ -510,53 +510,9 @@ body {
     border-left-color: var(--accent-error);
 }
 
-/* 通知动画 */
 @keyframes slideIn {
-    from {
-        transform: translateX(100%);
-        opacity: 0;
-    }
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
-}
-
-@keyframes slideOut {
-    from {
-        transform: translateX(0);
-        opacity: 1;
-    }
-    to {
-        transform: translateX(100%);
-        opacity: 0;
-    }
-}
-
-/* 状态样式 */
-.status-success {
-    color: #22c55e !important;
-}
-
-.status-error {
-    color: #ef4444 !important;
-}
-
-.status-warning {
-    color: #f59e0b !important;
-}
-
-.status-info {
-    color: #3b82f6 !important;
-}
-
-/* 连接状态 */
-.status-connected {
-    color: #22c55e;
-}
-
-.status-disconnected {
-    color: #ef4444;
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
 }
 
 /* 占位符文本 */

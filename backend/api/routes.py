@@ -9,8 +9,8 @@ from loguru import logger
 import traceback
 import pandas as pd
 
-from algorithms.symbolic_regression import perform_symbolic_regression_gplearn
-from algorithms.monte_carlo import MonteCarloAnalyzer
+from algorithms.symbolic_regression import SymbolicRegression
+from algorithms.monte_carlo import MonteCarloAnalysis
 from utils.data_loader import DataLoader
 
 # 创建蓝图
@@ -18,7 +18,12 @@ symbolic_regression_bp = Blueprint('symbolic_regression', __name__)
 monte_carlo_bp = Blueprint('monte_carlo', __name__)
 data_bp = Blueprint('data', __name__)
 
-# 符号回归分析
+# 全局实例
+symbolic_regression_engine = SymbolicRegression()
+monte_carlo_engine = MonteCarloAnalysis()
+data_loader = DataLoader()
+
+# 符号回归路由
 @symbolic_regression_bp.route('/symbolic-regression', methods=['POST'])
 def symbolic_regression():
     """符号回归分析"""
@@ -47,11 +52,11 @@ def symbolic_regression():
         
         # 检查列是否存在
         if target_column not in df.columns:
-            return jsonify({'success': False, 'error': f'目标变量列 "{target_column}" 不存在'})
+            return jsonify({'success': False, 'error': f'目标变量列 "{target_column}" 不存在，请检查数据文件'})
         
         for col in feature_columns:
             if col not in df.columns:
-                return jsonify({'success': False, 'error': f'特征变量列 "{col}" 不存在'})
+                return jsonify({'success': False, 'error': f'特征变量列 "{col}" 不存在，请检查数据文件'})
         
         # 提取数据
         X = df[feature_columns]
@@ -59,12 +64,18 @@ def symbolic_regression():
         
         # 数据质量检查
         if len(y) < 10:
-            return jsonify({'success': False, 'error': '数据样本数量太少，至少需要10个样本'})
+            return jsonify({'success': False, 'error': '数据样本数量太少，至少需要10个样本才能进行分析'})
         
         if y.std() < 1e-6:
-            return jsonify({'success': False, 'error': '目标变量没有变化，无法进行回归分析'})
+            return jsonify({'success': False, 'error': '目标变量没有变化，无法进行回归分析，请检查数据'})
+        
+        # 检查数据长度一致性
+        if len(X) != len(y):
+            return jsonify({'success': False, 'error': '特征变量和目标变量的数据长度不一致，请检查数据文件'})
         
         # 执行符号回归（使用新的HeuristicLab算法）
+        from algorithms.symbolic_regression import perform_symbolic_regression_gplearn
+        
         result = perform_symbolic_regression_gplearn(
             data=df,
             target_column=target_column,
@@ -82,131 +93,226 @@ def symbolic_regression():
             
     except Exception as e:
         logger.error(f"符号回归分析失败: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)})
-
-# 蒙特卡罗分析
-@monte_carlo_bp.route('/analyze', methods=['POST'])
-def monte_carlo_analyze():
-    """蒙特卡罗分析"""
-    try:
-        data = request.get_json()
-        
-        # 验证必要参数
-        required_fields = ['data', 'target_column', 'feature_columns']
-        for field in required_fields:
-            if field not in data:
-                return jsonify({'success': False, 'error': f'缺少必要参数: {field}'})
-        
-        # 获取参数
-        input_data = data['data']
-        target_column = data['target_column']
-        feature_columns = data['feature_columns']
-        model_id = data.get('model_id')
-        iterations = data.get('iterations', 1000)
-        target_efficacy = data.get('target_efficacy', 0.8)
-        tolerance = data.get('tolerance', 0.1)
-        
-        logger.info(f"开始蒙特卡罗分析，迭代次数: {iterations}")
-        
-        # 数据预处理
-        df = pd.DataFrame(input_data)
-        
-        # 检查列是否存在
-        if target_column not in df.columns:
-            return jsonify({'success': False, 'error': f'目标变量列 "{target_column}" 不存在'})
-        
-        for col in feature_columns:
-            if col not in df.columns:
-                return jsonify({'success': False, 'error': f'特征变量列 "{col}" 不存在'})
-        
-        # 执行蒙特卡罗分析
-        analyzer = MonteCarloAnalyzer()
-        result = analyzer.analyze(
-            data=df,
-            target_column=target_column,
-            feature_columns=feature_columns,
-            model_id=model_id,
-            iterations=iterations,
-            target_efficacy=target_efficacy,
-            tolerance=tolerance
-        )
-        
-        if result['success']:
-            logger.info(f"蒙特卡罗分析完成，有效样本率: {result['result']['valid_rate']:.2%}")
-            return jsonify(result)
+        # 返回用户友好的错误消息
+        error_msg = str(e)
+        if "All arrays must be of the same length" in error_msg:
+            error_msg = "数据长度不一致，请检查特征变量和目标变量的数据行数是否相同"
+        elif "division by zero" in error_msg.lower():
+            error_msg = "计算过程中出现除零错误，请检查数据中是否包含零值"
+        elif "invalid value" in error_msg.lower():
+            error_msg = "数据包含无效值，请检查数据中是否包含NaN或无穷大值"
+        elif "memory" in error_msg.lower():
+            error_msg = "内存不足，请减少数据量或降低算法参数"
         else:
-            return jsonify({'success': False, 'error': result['error']})
-            
-    except Exception as e:
-        logger.error(f"蒙特卡罗分析失败: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)})
+            error_msg = f"符号回归分析失败: {error_msg}"
+        
+        return jsonify({'success': False, 'error': error_msg})
 
-# 数据上传
-@data_bp.route('/upload', methods=['POST'])
-def upload_data():
-    """数据上传接口"""
-    try:
-        data = request.get_json()
-        
-        if 'data' not in data:
-            return jsonify({'success': False, 'error': '缺少数据参数'})
-        
-        # 验证数据格式
-        df = pd.DataFrame(data['data'])
-        
-        if df.empty:
-            return jsonify({'success': False, 'error': '数据为空'})
-        
-        # 返回数据信息
-        result = {
-            'success': True,
-            'columns': df.columns.tolist(),
-            'rows': len(df),
-            'data': data['data']
-        }
-        
-        logger.info(f"数据上传成功，列数: {len(df.columns)}, 行数: {len(df)}")
-        return jsonify(result)
-        
-    except Exception as e:
-        logger.error(f"数据上传失败: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)})
-
-# 获取模型列表
 @symbolic_regression_bp.route('/models', methods=['GET'])
 def get_models():
-    """获取模型列表"""
+    """获取已保存的模型列表"""
     try:
-        # 这里应该从数据库或文件系统获取模型列表
-        # 目前返回空列表
-        models = []
-        
+        models = symbolic_regression_engine.get_saved_models()
         return jsonify({
             'success': True,
             'models': models
         })
-        
     except Exception as e:
         logger.error(f"获取模型列表失败: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({
+            'error': '获取失败',
+            'message': str(e)
+        }), 500
 
-# 获取模型详情
 @symbolic_regression_bp.route('/models/<model_id>', methods=['GET'])
 def get_model(model_id):
-    """获取模型详情"""
+    """获取特定模型详情"""
     try:
-        # 这里应该从数据库或文件系统获取模型详情
-        # 目前返回空数据
-        model = None
+        model = symbolic_regression_engine.get_model(model_id)
+        if model:
+            return jsonify({
+                'success': True,
+                'model': model
+            })
+        else:
+            return jsonify({
+                'error': '模型不存在',
+                'message': f'模型ID {model_id} 不存在'
+            }), 404
+    except Exception as e:
+        logger.error(f"获取模型详情失败: {str(e)}")
+        return jsonify({
+            'error': '获取失败',
+            'message': str(e)
+        }), 500
+
+# 蒙特卡罗分析路由
+@monte_carlo_bp.route('/analyze', methods=['POST'])
+def monte_carlo_analyze():
+    """蒙特卡罗配比分析"""
+    try:
+        data = request.get_json()
         
-        if model is None:
-            return jsonify({'success': False, 'error': '模型不存在'})
+        # 验证必要参数
+        required_fields = ['model_id', 'target_efficacy', 'iterations']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    'error': '参数缺失',
+                    'message': f'缺少必要参数: {field}'
+                }), 400
         
+        # 获取参数
+        model_id = data['model_id']
+        target_efficacy = data['target_efficacy']
+        iterations = data['iterations']
+        tolerance = data.get('tolerance', 0.1)
+        component_ranges = data.get('component_ranges', {})
+        
+        logger.info(f"开始蒙特卡罗分析，模型ID: {model_id}")
+        logger.info(f"目标药效: {target_efficacy}, 模拟次数: {iterations}")
+        
+        # 执行蒙特卡罗分析
+        result = monte_carlo_engine.analyze(
+            model_id=model_id,
+            target_efficacy=target_efficacy,
+            iterations=iterations,
+            tolerance=tolerance,
+            component_ranges=component_ranges
+        )
+        
+        logger.info("蒙特卡罗分析完成")
         return jsonify({
             'success': True,
-            'model': model
+            'result': result
         })
         
     except Exception as e:
-        logger.error(f"获取模型详情失败: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)}) 
+        logger.error(f"蒙特卡罗分析失败: {str(e)}")
+        logger.error(traceback.format_exc())
+        
+        # 返回用户友好的错误消息
+        error_msg = str(e)
+        if "model not found" in error_msg.lower():
+            error_msg = "模型不存在，请先进行符号回归分析"
+        elif "invalid target" in error_msg.lower():
+            error_msg = "目标药效值无效，请输入合理的数值"
+        elif "iterations" in error_msg.lower():
+            error_msg = "迭代次数无效，请输入正整数"
+        else:
+            error_msg = f"蒙特卡罗分析失败: {error_msg}"
+        
+        return jsonify({
+            'error': '分析失败',
+            'message': error_msg
+        }), 500
+
+@monte_carlo_bp.route('/results/<analysis_id>', methods=['GET'])
+def get_monte_carlo_result(analysis_id):
+    """获取蒙特卡罗分析结果"""
+    try:
+        result = monte_carlo_engine.get_result(analysis_id)
+        if result:
+            return jsonify({
+                'success': True,
+                'result': result
+            })
+        else:
+            return jsonify({
+                'error': '结果不存在',
+                'message': f'分析ID {analysis_id} 不存在'
+            }), 404
+    except Exception as e:
+        logger.error(f"获取蒙特卡罗结果失败: {str(e)}")
+        return jsonify({
+            'error': '获取失败',
+            'message': str(e)
+        }), 500
+
+# 数据处理路由
+@data_bp.route('/upload', methods=['POST'])
+def upload_data():
+    """上传数据文件"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({
+                'error': '文件缺失',
+                'message': '请选择要上传的文件'
+            }), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({
+                'error': '文件缺失',
+                'message': '请选择要上传的文件'
+            }), 400
+        
+        # 处理文件上传
+        result = data_loader.upload_file(file)
+        
+        logger.info(f"文件上传成功: {file.filename}")
+        return jsonify({
+            'success': True,
+            'result': result
+        })
+        
+    except Exception as e:
+        logger.error(f"文件上传失败: {str(e)}")
+        return jsonify({
+            'error': '上传失败',
+            'message': str(e)
+        }), 500
+
+@data_bp.route('/validate', methods=['POST'])
+def validate_data():
+    """验证数据格式"""
+    try:
+        data = request.get_json()
+        
+        if 'data' not in data:
+            return jsonify({
+                'error': '数据缺失',
+                'message': '请提供要验证的数据'
+            }), 400
+        
+        # 验证数据
+        validation_result = data_loader.validate_data(data['data'])
+        
+        return jsonify({
+            'success': True,
+            'result': validation_result
+        })
+        
+    except Exception as e:
+        logger.error(f"数据验证失败: {str(e)}")
+        return jsonify({
+            'error': '验证失败',
+            'message': str(e)
+        }), 500
+
+@data_bp.route('/preview', methods=['POST'])
+def preview_data():
+    """预览数据"""
+    try:
+        data = request.get_json()
+        
+        if 'data' not in data:
+            return jsonify({
+                'error': '数据缺失',
+                'message': '请提供要预览的数据'
+            }), 400
+        
+        # 生成数据预览
+        preview = data_loader.generate_preview(data['data'])
+        
+        return jsonify({
+            'success': True,
+            'result': preview
+        })
+        
+    except Exception as e:
+        logger.error(f"数据预览失败: {str(e)}")
+        return jsonify({
+            'error': '预览失败',
+            'message': str(e)
+        }), 500 

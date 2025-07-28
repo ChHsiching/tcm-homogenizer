@@ -349,35 +349,73 @@ async function startRegression() {
 
 // 执行符号回归分析
 async function performSymbolicRegression(params) {
+    console.log('开始符号回归分析，参数:', params);
+    
     try {
+        // 验证数据
+        if (!params.data || !params.data.length) {
+            throw new Error('没有可用的数据，请先上传数据文件');
+        }
+        
+        if (!params.targetColumn) {
+            throw new Error('请选择目标变量');
+        }
+        
+        if (!params.featureColumns || params.featureColumns.length === 0) {
+            throw new Error('请至少选择一个特征变量');
+        }
+        
+        // 检查数据长度一致性
+        const dataLength = params.data.length;
+        const targetData = params.data.map(row => row[params.targetColumn]);
+        const featureData = params.featureColumns.map(col => params.data.map(row => row[col]));
+        
+        if (targetData.length !== dataLength) {
+            throw new Error('目标变量数据长度不一致，请检查数据文件');
+        }
+        
+        for (let i = 0; i < featureData.length; i++) {
+            if (featureData[i].length !== dataLength) {
+                throw new Error(`特征变量 "${params.featureColumns[i]}" 数据长度不一致，请检查数据文件`);
+            }
+        }
+        
+        // 准备请求数据
+        const requestData = {
+            data: params.data,
+            target_column: params.targetColumn,
+            feature_columns: params.featureColumns,
+            population_size: params.populationSize || 100,
+            generations: params.generations || 50,
+            test_ratio: (params.testRatio || 30) / 100,
+            operators: params.operators || ['+', '-', '*', '/']
+        };
+        
+        console.log('发送请求数据:', requestData);
+        
+        // 发送请求
         const response = await fetch('http://localhost:5000/api/regression/symbolic-regression', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                data: params.data,
-                target_column: params.targetColumn,
-                feature_columns: params.featureColumns,
-                population_size: params.populationSize,
-                generations: params.generations,
-                test_ratio: params.testRatio,
-                operators: params.operators
-            })
+            body: JSON.stringify(requestData)
         });
         
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `HTTP ${response.status}`);
+            const errorText = await response.text();
+            console.error('HTTP错误:', response.status, errorText);
+            throw new Error(`服务器响应错误 (${response.status}): ${errorText}`);
         }
         
         const result = await response.json();
+        console.log('收到响应:', result);
         
         if (!result.success) {
-            throw new Error(result.error || '分析失败');
+            throw new Error(result.error || '符号回归分析失败');
         }
         
-        // 转换结果格式以兼容前端显示
+        // 转换结果格式
         return {
             id: Date.now(),
             model_id: result.result?.id || Date.now(),
@@ -398,7 +436,20 @@ async function performSymbolicRegression(params) {
         
     } catch (error) {
         console.error('符号回归分析失败:', error);
-        throw error;
+        
+        // 转换错误消息为用户友好的格式
+        let userMessage = error.message;
+        if (error.message.includes('fetch')) {
+            userMessage = '无法连接到后端服务，请检查后端是否正常启动';
+        } else if (error.message.includes('JSON')) {
+            userMessage = '数据格式错误，请检查上传的数据文件';
+        } else if (error.message.includes('HTTP')) {
+            userMessage = '服务器响应错误，请检查后端服务状态';
+        } else if (error.message.includes('All arrays must be of the same length')) {
+            userMessage = '数据长度不一致，请检查特征变量和目标变量的数据行数是否相同';
+        }
+        
+        throw new Error(userMessage);
     }
 }
 
@@ -1184,13 +1235,10 @@ async function startMonteCarlo() {
     
     try {
         const result = await performMonteCarloAnalysis({
-            data: currentData, // Pass currentData
-            targetColumn: document.getElementById('target-column').value, // Get target column from UI
-            featureColumns: Array.from(document.querySelectorAll('#feature-columns input[type="checkbox"]:checked')).map(cb => cb.value), // Get feature columns from UI
-            modelId: modelId,
-            iterations: iterations,
-            targetEfficacy: targetEfficacy,
-            tolerance: tolerance
+            modelId,
+            iterations,
+            targetEfficacy,
+            tolerance
         });
         
         displayMonteCarloResults(result);
@@ -1422,11 +1470,11 @@ function updateConnectionStatus(isConnected) {
     const statusElement = document.getElementById('connection-status');
     if (statusElement) {
         if (isConnected) {
-            statusElement.textContent = '后端服务已连接';
-            statusElement.className = 'status-success';
+            statusElement.textContent = `后端服务：已连接 (localhost:${currentSettings.backendPort})`;
+            statusElement.className = 'status-connected';
         } else {
-            statusElement.textContent = '后端服务未连接';
-            statusElement.className = 'status-error';
+            statusElement.textContent = `后端服务：未连接 (localhost:${currentSettings.backendPort})`;
+            statusElement.className = 'status-disconnected';
         }
     }
 }
@@ -1469,6 +1517,12 @@ function hideLoading() {
 // 显示通知（用户友好的消息）
 function showNotification(message, type = 'info') {
     console.log(`[${type.toUpperCase()}] ${message}`);
+    
+    // 移除现有通知
+    const existingNotifications = document.querySelectorAll('.notification');
+    existingNotifications.forEach(notification => {
+        notification.remove();
+    });
     
     // 创建通知元素
     const notification = document.createElement('div');
@@ -1521,12 +1575,15 @@ function showNotification(message, type = 'info') {
         userMessage = '蒙特卡罗分析失败，请检查参数设置';
     }
     
-    notification.textContent = userMessage;
+    notification.innerHTML = `
+        <div class="notification-message">${userMessage}</div>
+        <button class="notification-close" onclick="this.parentElement.remove()">×</button>
+    `;
     
     // 添加到页面
     document.body.appendChild(notification);
     
-    // 自动移除
+    // 自动移除通知
     setTimeout(() => {
         notification.style.animation = 'slideOut 0.3s ease-in';
         setTimeout(() => {
