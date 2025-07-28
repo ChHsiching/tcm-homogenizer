@@ -17,25 +17,37 @@ if [ ! -d "$BACKEND_VENV" ]; then
     exit 1
 fi
 
-# 检查前端node_modules
-FRONTEND_NODE_MODULES="$PROJECT_ROOT/frontend/node_modules"
-if [ ! -d "$FRONTEND_NODE_MODULES" ]; then
-    echo "❌ 前端依赖不存在，请先运行 setup-dev.sh"
+# 检查Node.js环境
+if ! command -v node &> /dev/null; then
+    echo "❌ Node.js未安装，请先安装Node.js"
     exit 1
 fi
 
-# 清理旧的PID文件
-rm -f .backend.pid .frontend.pid
+# 检查npm
+if ! command -v npm &> /dev/null; then
+    echo "❌ npm未安装，请先安装npm"
+    exit 1
+fi
+
+# 检查前端依赖
+if [ ! -d "$PROJECT_ROOT/frontend/node_modules" ]; then
+    echo "📦 安装前端依赖..."
+    cd "$PROJECT_ROOT/frontend"
+    npm install
+    cd "$PROJECT_ROOT"
+fi
 
 # 启动后端服务
 echo "📡 启动后端服务..."
-cd backend
+cd "$PROJECT_ROOT/backend"
+
+# 激活虚拟环境
 source venv/bin/activate
 
 # 检查Python依赖
-if ! python -c "import flask, pandas, numpy, sklearn" 2>/dev/null; then
-    echo "❌ 后端依赖不完整，请先运行 setup-dev.sh"
-    exit 1
+if ! python -c "import flask" &> /dev/null; then
+    echo "📦 安装后端依赖..."
+    pip install -r requirements.txt
 fi
 
 # 启动后端服务
@@ -67,22 +79,16 @@ done
 
 # 启动前端服务
 echo "🖥️  启动前端服务..."
-cd ../frontend
+cd "$PROJECT_ROOT/frontend"
 
-# 检查Node.js依赖
-if ! npm list --depth=0 > /dev/null 2>&1; then
-    echo "❌ 前端依赖不完整，请先运行 setup-dev.sh"
-    exit 1
-fi
-
-# 启动前端服务
+# 启动Electron应用
 npm start &
 FRONTEND_PID=$!
 echo "✅ 前端服务已启动 (PID: $FRONTEND_PID)"
 
 # 保存进程ID
-echo $BACKEND_PID > ../.backend.pid
-echo $FRONTEND_PID > ../.frontend.pid
+echo $BACKEND_PID > "$PROJECT_ROOT/.backend.pid"
+echo $FRONTEND_PID > "$PROJECT_ROOT/.frontend.pid"
 
 echo ""
 echo "🎉 开发环境启动完成！"
@@ -96,6 +102,6 @@ echo "   - 停止服务: ./scripts/stop-dev.sh"
 echo ""
 
 # 等待用户中断
-trap 'echo ""; echo "🛑 正在停止服务..."; kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; rm -f ../.backend.pid ../.frontend.pid; echo "✅ 服务已停止"; exit 0' INT
+trap 'echo ""; echo "🛑 正在停止服务..."; kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; rm -f "$PROJECT_ROOT/.backend.pid" "$PROJECT_ROOT/.frontend.pid"; echo "✅ 服务已停止"; exit 0' INT
 
 wait 

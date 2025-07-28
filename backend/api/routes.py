@@ -8,6 +8,7 @@ from flask import Blueprint, request, jsonify
 from loguru import logger
 import traceback
 import pandas as pd
+import time
 
 from algorithms.symbolic_regression import SymbolicRegression
 from algorithms.monte_carlo import MonteCarloAnalysis
@@ -89,7 +90,25 @@ def symbolic_regression():
             
     except Exception as e:
         logger.error(f"符号回归分析失败: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({'success': False, 'error': f'符号回归分析失败: {str(e)}'})
+
+@symbolic_regression_bp.route('/health', methods=['GET'])
+def health_check():
+    """健康检查接口"""
+    try:
+        return jsonify({
+            'success': True,
+            'status': 'healthy',
+            'timestamp': time.time(),
+            'version': '1.0.0'
+        })
+    except Exception as e:
+        logger.error(f"健康检查失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'status': 'unhealthy',
+            'error': str(e)
+        })
 
 @symbolic_regression_bp.route('/models', methods=['GET'])
 def get_models():

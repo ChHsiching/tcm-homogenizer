@@ -14,8 +14,25 @@ let currentSettings = {
 const API_BASE_URL = 'http://127.0.0.1:5000';
 
 // DOM 加载完成后初始化
-document.addEventListener('DOMContentLoaded', function() {
-    initializeApp();
+document.addEventListener('DOMContentLoaded', async function() {
+    console.log('DOM加载完成，开始初始化...');
+    
+    // 初始化设置
+    await initializeSettings();
+    
+    // 启动后端服务
+    if (currentSettings.autoStartBackend) {
+        await startBackendService();
+    }
+    
+    // 测试后端连接
+    await testBackendConnection();
+    
+    // 显示欢迎通知
+    showNotification('欢迎使用中药多组分均化分析客户端', 'success');
+    
+    // 初始化事件监听器
+    initializeEventListeners();
 });
 
 // 应用初始化
@@ -35,9 +52,6 @@ async function initializeApp() {
     if (currentSettings.autoStartBackend) {
         await startBackendService();
     }
-    
-    // 测试后端连接
-    await testBackendConnection();
     
     // 显示欢迎通知
     showNotification('欢迎使用中药多组分均化分析客户端', 'success');
@@ -361,29 +375,19 @@ async function performSymbolicRegression(params) {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                data: params.data,
-                target_column: params.targetColumn,
-                feature_columns: params.featureColumns,
-                population_size: params.populationSize,
-                generations: params.generations,
-                test_ratio: params.testRatio,
-                operators: params.operators
-            })
+            body: JSON.stringify(params)
         });
         
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `HTTP ${response.status}`);
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
         const result = await response.json();
         
         if (!result.success) {
-            throw new Error(result.error || '分析失败');
+            throw new Error(result.error || '符号回归分析失败');
         }
         
-        // 转换结果格式
         return {
             id: Date.now(),
             model_id: result.result?.id || Date.now(),
@@ -397,7 +401,7 @@ async function performSymbolicRegression(params) {
         
     } catch (error) {
         console.error('符号回归分析失败:', error);
-        throw error;
+        throw new Error(`符号回归分析失败: ${error.message}`);
     }
 }
 
@@ -1212,45 +1216,24 @@ async function performMonteCarloAnalysis(params) {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                data: params.data,
-                target_column: params.targetColumn,
-                feature_columns: params.featureColumns,
-                model_id: params.modelId,
-                iterations: params.iterations,
-                target_efficacy: params.targetEfficacy,
-                tolerance: params.tolerance
-            })
+            body: JSON.stringify(params)
         });
         
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `HTTP ${response.status}`);
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
         const result = await response.json();
         
         if (!result.success) {
-            throw new Error(result.error || '分析失败');
+            throw new Error(result.error || '蒙特卡罗分析失败');
         }
         
-        // 转换结果格式
-        const analysisResult = result.result;
-        return {
-            analysis_id: analysisResult.analysis_id,
-            iterations: analysisResult.iterations || 0,
-            targetEfficacy: analysisResult.target_efficacy || 0,
-            tolerance: analysisResult.tolerance || 0,
-            validSamples: analysisResult.valid_samples_count || 0,
-            validRate: analysisResult.valid_rate || 0,
-            componentStatistics: analysisResult.component_statistics || {},
-            distributionData: analysisResult.distribution_data || {},
-            sampleData: analysisResult.sample_data || {}
-        };
+        return result;
         
     } catch (error) {
         console.error('蒙特卡罗分析失败:', error);
-        throw error;
+        throw new Error(`蒙特卡罗分析失败: ${error.message}`);
     }
 }
 
@@ -1364,15 +1347,16 @@ async function testBackendConnection() {
         });
         
         if (response.ok) {
-            updateConnectionStatus(true);
-            return true;
+            const health = await response.json();
+            showNotification(`后端服务连接正常 (${health.status})`, 'success');
+            updateBackendStatus('已连接', 'success');
         } else {
-            updateConnectionStatus(false);
-            return false;
+            throw new Error(`HTTP ${response.status}`);
         }
     } catch (error) {
-        updateConnectionStatus(false);
-        return false;
+        console.error('后端连接失败:', error);
+        showNotification('后端服务连接失败，请检查服务是否启动', 'error');
+        updateBackendStatus('连接失败', 'error');
     }
 }
 
@@ -1447,53 +1431,168 @@ function updateStatusBar() {
     }
 }
 
-// 显示加载状态
-function showLoading(text = '正在处理...') {
-    const loading = document.getElementById('loading');
-    if (loading) {
-        const textElement = loading.querySelector('.loading-text');
-        if (textElement) {
-            textElement.textContent = text;
-        }
-        loading.style.display = 'flex';
-    }
-}
-
-// 隐藏加载状态
-function hideLoading() {
-    const loading = document.getElementById('loading');
-    if (loading) {
-        loading.style.display = 'none';
-    }
-}
-
-// 显示通知
+// 显示通知消息（用户友好）
 function showNotification(message, type = 'info') {
-    // 移除现有通知
-    const existingNotifications = document.querySelectorAll('.notification');
-    existingNotifications.forEach(notification => {
-        notification.remove();
-    });
+    console.log(`[${type.toUpperCase()}] ${message}`);
     
-    // 创建新通知
+    // 创建通知元素
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
-    
-    notification.innerHTML = `
-        <div class="notification-message">${message}</div>
-        <button class="notification-close" onclick="this.parentElement.remove()">×</button>
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 20px;
+        border-radius: 6px;
+        color: white;
+        font-weight: 500;
+        z-index: 10000;
+        max-width: 400px;
+        word-wrap: break-word;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        animation: slideIn 0.3s ease-out;
     `;
+    
+    // 根据类型设置颜色
+    switch (type) {
+        case 'success':
+            notification.style.backgroundColor = '#22c55e';
+            notification.style.borderLeft = '4px solid #16a34a';
+            break;
+        case 'error':
+            notification.style.backgroundColor = '#ef4444';
+            notification.style.borderLeft = '4px solid #dc2626';
+            break;
+        case 'warning':
+            notification.style.backgroundColor = '#f59e0b';
+            notification.style.borderLeft = '4px solid #d97706';
+            break;
+        default:
+            notification.style.backgroundColor = '#3b82f6';
+            notification.style.borderLeft = '4px solid #2563eb';
+    }
+    
+    notification.textContent = message;
     
     // 添加到页面
     document.body.appendChild(notification);
     
-    // 自动移除通知
+    // 自动移除
     setTimeout(() => {
-        if (notification.parentElement) {
-            notification.remove();
-        }
+        notification.style.animation = 'slideOut 0.3s ease-in';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
     }, 5000);
 }
+
+// 更新后端状态显示
+function updateBackendStatus(status, type = 'info') {
+    const statusElement = document.getElementById('backend-status');
+    if (statusElement) {
+        statusElement.textContent = status;
+        statusElement.className = `status-${type}`;
+    }
+}
+
+// 显示加载状态
+function showLoading(message = '正在处理...') {
+    const loading = document.createElement('div');
+    loading.id = 'loading-overlay';
+    loading.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    `;
+    
+    loading.innerHTML = `
+        <div style="
+            background: #2a2a2a;
+            padding: 30px;
+            border-radius: 8px;
+            text-align: center;
+            color: white;
+        ">
+            <div style="
+                width: 40px;
+                height: 40px;
+                border: 4px solid #3b82f6;
+                border-top: 4px solid transparent;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                margin: 0 auto 20px;
+            "></div>
+            <div>${message}</div>
+        </div>
+    `;
+    
+    document.body.appendChild(loading);
+}
+
+// 隐藏加载状态
+function hideLoading() {
+    const loading = document.getElementById('loading-overlay');
+    if (loading) {
+        loading.remove();
+    }
+}
+
+// 添加CSS动画
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    @keyframes slideOut {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .status-success {
+        color: #22c55e;
+    }
+    
+    .status-error {
+        color: #ef4444;
+    }
+    
+    .status-warning {
+        color: #f59e0b;
+    }
+    
+    .status-info {
+        color: #3b82f6;
+    }
+`;
+document.head.appendChild(style);
 
 // 显示关于对话框
 function showAboutDialog() {
