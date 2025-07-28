@@ -9,7 +9,7 @@ from flask_cors import CORS
 import traceback
 from loguru import logger
 
-from .routes import symbolic_regression_bp, monte_carlo_bp
+from .routes import symbolic_regression_bp, monte_carlo_bp, data_bp
 
 def create_app(config=None):
     """创建Flask应用"""
@@ -31,6 +31,7 @@ def create_app(config=None):
     # 注册蓝图
     app.register_blueprint(symbolic_regression_bp, url_prefix='/api/regression')
     app.register_blueprint(monte_carlo_bp, url_prefix='/api/monte-carlo')
+    app.register_blueprint(data_bp, url_prefix='/api/data')
     
     # 全局错误处理
     @app.errorhandler(Exception)
@@ -79,7 +80,8 @@ def create_app(config=None):
             'endpoints': {
                 'health': '/api/health',
                 'regression': '/api/regression',
-                'monte_carlo': '/api/monte-carlo'
+                'monte_carlo': '/api/monte-carlo',
+                'data': '/api/data'
             }
         })
     

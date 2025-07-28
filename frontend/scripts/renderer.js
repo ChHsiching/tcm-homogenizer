@@ -13,59 +13,9 @@ let currentSettings = {
 // API基础URL
 const API_BASE_URL = 'http://127.0.0.1:5000';
 
-// 初始化设置
-function initializeSettings() {
-    console.log('初始化设置...');
-    // 设置默认值
-    if (!localStorage.getItem('settings')) {
-        localStorage.setItem('settings', JSON.stringify(currentSettings));
-    }
-}
-
-// 初始化事件监听器
-function initializeEventListeners() {
-    console.log('初始化事件监听器...');
-    
-    // 文件上传事件
-    const fileInput = document.getElementById('file-input');
-    if (fileInput) {
-        fileInput.addEventListener('change', handleFileUpload);
-    }
-    
-    // 符号回归表单提交
-    const regressionForm = document.getElementById('regression-form');
-    if (regressionForm) {
-        regressionForm.addEventListener('submit', handleRegressionSubmit);
-    }
-    
-    // 蒙特卡罗表单提交
-    const monteCarloForm = document.getElementById('monte-carlo-form');
-    if (monteCarloForm) {
-        monteCarloForm.addEventListener('submit', handleMonteCarloSubmit);
-    }
-}
-
-// 加载已保存的模型
-function loadSavedModels() {
-    console.log('加载已保存的模型...');
-    // 暂时为空，因为新的实现不保存模型
-}
-
 // DOM 加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 中药多组分均化分析客户端初始化...');
-    
-    // 初始化设置
-    initializeSettings();
-    
-    // 初始化事件监听器
-    initializeEventListeners();
-    
-    // 测试后端连接
-    testBackendConnection();
-    
-    // 加载已保存的模型
-    loadSavedModels();
+    initializeApp();
 });
 
 // 应用初始化
@@ -85,6 +35,9 @@ async function initializeApp() {
     if (currentSettings.autoStartBackend) {
         await startBackendService();
     }
+    
+    // 测试后端连接
+    await testBackendConnection();
     
     // 显示欢迎通知
     showNotification('欢迎使用中药多组分均化分析客户端', 'success');
@@ -408,15 +361,39 @@ async function performSymbolicRegression(params) {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(params)
+            body: JSON.stringify({
+                data: params.data,
+                target_column: params.targetColumn,
+                feature_columns: params.featureColumns,
+                population_size: params.populationSize,
+                generations: params.generations,
+                test_ratio: params.testRatio,
+                operators: params.operators
+            })
         });
         
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP ${response.status}`);
         }
         
         const result = await response.json();
-        return result;
+        
+        if (!result.success) {
+            throw new Error(result.error || '分析失败');
+        }
+        
+        // 转换结果格式
+        return {
+            id: Date.now(),
+            model_id: result.result?.id || Date.now(),
+            expression: result.expression || '',
+            r2: result.metrics?.r2_test || 0,
+            mse: result.metrics?.mse_test || 0,
+            featureImportance: result.feature_importance || {},
+            predictions: result.predictions || {},
+            parameters: result.parameters || {}
+        };
         
     } catch (error) {
         console.error('符号回归分析失败:', error);
@@ -426,70 +403,40 @@ async function performSymbolicRegression(params) {
 
 // 显示回归结果
 function displayRegressionResults(result) {
-    console.log('displayRegressionResults called with:', result);
+    console.log('显示回归结果:', result);
     
-    const container = document.getElementById('regression-results');
-    const formulaDisplay = document.getElementById('formula-display');
-    
-    console.log('container:', container);
-    console.log('formulaDisplay:', formulaDisplay);
-    
-    if (!container) {
-        console.error('regression-results container not found');
-        return;
+    // 显示公式
+    if (result.expression) {
+        renderLatexFormula(result.expression, window.currentTargetColumn);
     }
     
-    // 显示基本结果
-    container.innerHTML = `
-        <div class="result-item">
-            <h4>回归表达式</h4>
-            <p class="expression">${result.expression}</p>
-        </div>
-        
-        <div class="result-item">
-            <h4>模型性能</h4>
-            <p>R² = ${result.r2.toFixed(3)}</p>
-            <p>MSE = ${result.mse.toFixed(3)}</p>
-        </div>
-        
-        <div class="result-item">
-            <h4>特征重要性</h4>
-            <ul>
-                ${result.featureImportance.map(f => 
-                    `<li>${f.feature}: ${f.importance.toFixed(3)}</li>`
-                ).join('')}
-            </ul>
-        </div>
-        
-        <div class="result-item">
-            <h4>预测结果</h4>
-            <p>样本数量: ${result.predictions.actual ? result.predictions.actual.length : 0}</p>
-            <button class="btn-secondary" onclick="visualizeResults(${result.id})">查看图表</button>
-        </div>
-    `;
-    
-    // 显示公式显示区域
-    if (formulaDisplay) {
-        console.log('Showing formula display');
-        formulaDisplay.style.display = 'block';
-        
-        // 更新LaTeX公式
-        renderLatexFormula(result.expression, document.getElementById('target-column').value);
-        
-        // 更新性能指标
-        updatePerformanceMetrics(result);
-        
-        // 生成公式树
-        generateFormulaTree(result);
+    // 更新性能指标
+    if (result.metrics) {
+        updatePerformanceMetrics(result.metrics);
     } else {
-        console.error('formula-display not found');
+        // 兼容旧格式
+        updatePerformanceMetrics({
+            r2_test: result.r2 || 0,
+            mse_test: result.mse || 0,
+            mae_test: 0,
+            rmse_test: Math.sqrt(result.mse || 0),
+            r2_train: result.r2_train || 0,
+            mse_train: result.mse_train || 0,
+            mae_train: 0,
+            rmse_train: Math.sqrt(result.mse_train || 0)
+        });
     }
     
-    // 显示结果区域
-    const resultSection = document.getElementById('regression-result');
-    if (resultSection) {
-        resultSection.style.display = 'block';
+    // 生成公式树
+    if (result.expression && result.featureImportance) {
+        generateFormulaTree(result);
     }
+    
+    // 更新模型列表
+    updateRegressionModelList();
+    
+    // 显示成功通知
+    showNotification('符号回归分析完成', 'success');
 }
 
 // 格式化公式为LaTeX（支持分段渲染）
