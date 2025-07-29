@@ -319,11 +319,11 @@ def perform_symbolic_regression_gplearn(data, target_column, population_size=100
                 }
             }
         else:
-            return {'success': False, 'error': '无法找到有效的回归模型，请尝试调整参数'}
+            return {'success': False, 'error': '无法找到有效解'}
             
     except Exception as e:
         logger.error(f"符号回归失败: {str(e)}")
-        return {'success': False, 'error': f'符号回归分析失败: {str(e)}'}
+        return {'success': False, 'error': str(e)}
 
 def calculate_feature_importance(tree, feature_names):
     """计算特征重要性（基于在树中的出现频率）"""
