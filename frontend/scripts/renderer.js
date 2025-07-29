@@ -350,6 +350,8 @@ async function startRegression() {
 // 执行符号回归分析
 async function performSymbolicRegression(params) {
     try {
+        console.log('🔬 开始符号回归分析，参数:', params);
+        
         const response = await fetch('http://localhost:5000/api/regression/symbolic-regression', {
             method: 'POST',
             headers: {
@@ -368,29 +370,33 @@ async function performSymbolicRegression(params) {
         
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.error || `HTTP ${response.status}`);
+            console.error('❌ API请求失败:', errorData);
+            throw new Error(errorData.error || `服务器错误 (${response.status})`);
         }
         
         const result = await response.json();
         
         if (!result.success) {
+            console.error('❌ 符号回归分析失败:', result.error);
             throw new Error(result.error || '分析失败');
         }
+        
+        console.log('✅ 符号回归分析成功:', result);
         
         // 转换结果格式
         return {
             id: Date.now(),
-            model_id: result.result.id || Date.now(),
-            expression: result.result.expression || '',
-            r2: result.result.r2 || 0,
-            mse: result.result.mse || 0,
-            featureImportance: result.result.feature_importance || [],
-            predictions: result.result.predictions || {},
-            parameters: result.result.parameters || {}
+            model_id: result.result?.id || Date.now(),
+            expression: result.expression || '',
+            r2: result.metrics?.r2_test || 0,
+            mse: result.metrics?.mse_test || 0,
+            featureImportance: result.feature_importance || [],
+            predictions: result.predictions || {},
+            parameters: result.parameters || {}
         };
         
     } catch (error) {
-        console.error('符号回归分析失败:', error);
+        console.error('❌ 符号回归分析失败:', error);
         throw error;
     }
 }
@@ -414,28 +420,26 @@ function displayRegressionResults(result) {
     container.innerHTML = `
         <div class="result-item">
             <h4>回归表达式</h4>
-            <p class="expression">${result.expression}</p>
+            <p class="expression">${result.expression || '无表达式'}</p>
         </div>
         
         <div class="result-item">
             <h4>模型性能</h4>
-            <p>R² = ${result.r2.toFixed(3)}</p>
-            <p>MSE = ${result.mse.toFixed(3)}</p>
+            <p>R² 训练集 = ${result.metrics?.r2_train?.toFixed(3) || 'N/A'}</p>
+            <p>R² 测试集 = ${result.metrics?.r2_test?.toFixed(3) || 'N/A'}</p>
+            <p>MSE 训练集 = ${result.metrics?.mse_train?.toFixed(6) || 'N/A'}</p>
+            <p>MSE 测试集 = ${result.metrics?.mse_test?.toFixed(6) || 'N/A'}</p>
+            <p>MAE 训练集 = ${result.metrics?.mae_train?.toFixed(6) || 'N/A'}</p>
+            <p>MAE 测试集 = ${result.metrics?.mae_test?.toFixed(6) || 'N/A'}</p>
         </div>
         
         <div class="result-item">
             <h4>特征重要性</h4>
             <ul>
-                ${result.featureImportance.map(f => 
-                    `<li>${f.feature}: ${f.importance.toFixed(3)}</li>`
+                ${(result.feature_importance || []).map(f => 
+                    `<li>${f.feature}: ${f.importance?.toFixed(3) || 'N/A'}</li>`
                 ).join('')}
             </ul>
-        </div>
-        
-        <div class="result-item">
-            <h4>预测结果</h4>
-            <p>样本数量: ${result.predictions.actual ? result.predictions.actual.length : 0}</p>
-            <button class="btn-secondary" onclick="visualizeResults(${result.id})">查看图表</button>
         </div>
     `;
     
@@ -445,10 +449,10 @@ function displayRegressionResults(result) {
         formulaDisplay.style.display = 'block';
         
         // 更新LaTeX公式
-        renderLatexFormula(result.expression, document.getElementById('target-column').value);
+        renderLatexFormula(result.expression || '', document.getElementById('target-column').value);
         
         // 更新性能指标
-        updatePerformanceMetrics(result);
+        updatePerformanceMetrics(result.metrics || {});
         
         // 生成公式树
         generateFormulaTree(result);
@@ -1135,14 +1139,21 @@ function recalculateRegression() {
     };
     
     // 调用后端API
-    fetch('/api/regression/symbolic-regression', {
+    fetch('http://localhost:5000/api/regression/symbolic-regression', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify(params)
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(errorData => {
+                throw new Error(errorData.error || `服务器错误 (${response.status})`);
+            });
+        }
+        return response.json();
+    })
     .then(result => {
         if (result.success) {
             // 更新结果
@@ -1576,13 +1587,19 @@ async function uploadCSVFile(file) {
         console.log('📊 解析的CSV数据:', { headers, rows: data.length });
         
         // 发送到后端验证
-        const response = await fetch('/api/data/upload', {
+        const response = await fetch('http://localhost:5000/api/data/upload', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ data: data })
         });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('❌ 数据上传API请求失败:', errorData);
+            throw new Error(errorData.error || `服务器错误 (${response.status})`);
+        }
         
         const result = await response.json();
         
@@ -1665,7 +1682,7 @@ async function performSymbolicRegression() {
         console.log('📤 发送请求数据:', requestData);
         
         // 调用后端API
-        const response = await fetch('/api/regression/symbolic-regression', {
+        const response = await fetch('http://localhost:5000/api/regression/symbolic-regression', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1674,7 +1691,9 @@ async function performSymbolicRegression() {
         });
         
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            const errorData = await response.json();
+            console.error('❌ 符号回归分析API请求失败:', errorData);
+            throw new Error(errorData.error || `服务器错误 (${response.status})`);
         }
         
         const result = await response.json();
@@ -1743,7 +1762,7 @@ async function performMonteCarloAnalysis() {
         console.log('📤 发送蒙特卡罗请求:', requestData);
         
         // 调用后端API
-        const response = await fetch('/api/monte-carlo/analysis', {
+        const response = await fetch('http://localhost:5000/api/monte-carlo/analysis', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1752,23 +1771,23 @@ async function performMonteCarloAnalysis() {
         });
         
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            const errorData = await response.json();
+            console.error('❌ 蒙特卡罗分析API请求失败:', errorData);
+            throw new Error(errorData.error || `服务器错误 (${response.status})`);
         }
         
         const result = await response.json();
-        console.log('📥 收到蒙特卡罗响应:', result);
         
-        if (result.success) {
-            console.log('✅ 蒙特卡罗分析成功');
-            showNotification('蒙特卡罗分析完成！', 'success');
-            
-            // 显示结果
-            displayMonteCarloResults(result.result);
-            
-        } else {
+        if (!result.success) {
             console.error('❌ 蒙特卡罗分析失败:', result.error);
-            showNotification(`蒙特卡罗分析失败: ${result.error}`, 'error');
+            throw new Error(result.error || '分析失败');
         }
+        
+        console.log('✅ 蒙特卡罗分析成功:', result);
+        
+        // 显示结果
+        displayMonteCarloResults(result.result);
+        showNotification('蒙特卡罗分析完成！', 'success');
         
     } catch (error) {
         console.error('❌ 蒙特卡罗分析异常:', error);

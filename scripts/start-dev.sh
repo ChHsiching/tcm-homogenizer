@@ -30,36 +30,36 @@ cd backend
 # 检查Python依赖
 echo "🔍 检查Python依赖..."
 source venv/bin/activate
-python -c "import flask, pandas, numpy, sklearn, loguru" 2>/dev/null || {
+python -c "import flask, pandas, numpy, sklearn, loguru, sympy" 2>/dev/null || {
     echo "❌ Python依赖不完整，请运行: pip install -r requirements.txt"
     exit 1
 }
 
-# 启动Flask后端服务
+# 启动Flask后端服务（实时输出日志）
 echo "🚀 启动Flask后端服务..."
-nohup python main.py > backend.log 2>&1 &
+python main.py 2>&1 | tee ../backend.log &
 BACKEND_PID=$!
 echo "✅ 后端服务已启动 (PID: $BACKEND_PID)"
 
 # 等待后端服务启动
 echo "⏳ 等待后端服务启动..."
-sleep 5
+sleep 3
 
 # 检查后端服务是否正常
 echo "🔍 检查后端服务状态..."
-for i in {1..10}; do
+for i in {1..15}; do
     if curl -s http://127.0.0.1:5000/api/health > /dev/null 2>&1; then
         echo "✅ 后端服务运行正常"
         break
     else
-        echo "⏳ 等待后端服务启动... (尝试 $i/10)"
+        echo "⏳ 等待后端服务启动... (尝试 $i/15)"
         sleep 2
     fi
     
-    if [ $i -eq 10 ]; then
+    if [ $i -eq 15 ]; then
         echo "❌ 后端服务启动失败，请检查 backend.log"
         echo "📋 后端日志内容:"
-        tail -20 backend.log
+        tail -20 ../backend.log
         exit 1
     fi
 done
@@ -75,15 +75,15 @@ if [ ! -d "node_modules" ]; then
     npm install
 fi
 
-# 启动Electron前端应用
+# 启动Electron前端应用（实时输出日志）
 echo "🚀 启动Electron前端应用..."
-nohup npm start > frontend.log 2>&1 &
+npm start 2>&1 | tee ../frontend.log &
 FRONTEND_PID=$!
 echo "✅ 前端服务已启动 (PID: $FRONTEND_PID)"
 
 # 保存进程ID
-echo $BACKEND_PID > .backend.pid
-echo $FRONTEND_PID > .frontend.pid
+echo $BACKEND_PID > ../.backend.pid
+echo $FRONTEND_PID > ../.frontend.pid
 
 echo ""
 echo "🎉 开发环境启动完成！"
@@ -92,12 +92,19 @@ echo "🖥️  前端应用: Electron 窗口"
 echo ""
 echo "💡 提示:"
 echo "   - 使用 Ctrl+C 停止服务"
-echo "   - 查看后端日志: tail -f backend/backend.log"
-echo "   - 查看前端日志: tail -f frontend/frontend.log"
+echo "   - 查看后端日志: tail -f backend.log"
+echo "   - 查看前端日志: tail -f frontend.log"
 echo "   - 停止服务: ./scripts/stop-dev.sh"
 echo ""
 
+# 实时显示日志
+echo "📋 实时日志输出 (Ctrl+C 停止):"
+echo "=================================="
+
+# 同时显示后端和前端日志
+tail -f ../backend.log ../frontend.log &
+
 # 等待用户中断
-trap 'echo ""; echo "🛑 正在停止服务..."; kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; rm -f .backend.pid .frontend.pid; echo "✅ 服务已停止"; exit 0' INT
+trap 'echo ""; echo "🛑 正在停止服务..."; kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; pkill -f "tail -f" 2>/dev/null; rm -f ../.backend.pid ../.frontend.pid; echo "✅ 服务已停止"; exit 0' INT
 
 wait 

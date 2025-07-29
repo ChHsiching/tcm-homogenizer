@@ -164,41 +164,22 @@ ipcMain.handle('stop-backend', async () => {
 
 // 启动后端服务
 function startBackendService() {
-    if (backendProcess) {
-        console.log('Backend service already running');
-        return;
-    }
-
-    console.log('Starting backend service...');
+    console.log('Checking if backend service is already running...');
     
-    // 启动Python后端服务
-    backendProcess = spawn('python', ['../backend/main.py'], {
-        cwd: path.join(__dirname, '..', 'backend'),
-        stdio: ['pipe', 'pipe', 'pipe']
+    // 检查后端是否已经运行
+    checkBackendHealth().then(isHealthy => {
+        if (isHealthy) {
+            console.log('Backend service is already running');
+            if (mainWindow) {
+                mainWindow.webContents.send('backend-status', { connected: true });
+            }
+        } else {
+            console.log('Backend service is not running, please start it manually');
+            if (mainWindow) {
+                mainWindow.webContents.send('backend-status', { connected: false });
+            }
+        }
     });
-
-    backendProcess.stdout.on('data', (data) => {
-        console.log('Backend stdout:', data.toString());
-    });
-
-    backendProcess.stderr.on('data', (data) => {
-        console.log('Backend stderr:', data.toString());
-    });
-
-    backendProcess.on('close', (code) => {
-        console.log('Backend process exited with code:', code);
-        backendProcess = null;
-    });
-
-    backendProcess.on('error', (error) => {
-        console.error('Backend process error:', error);
-        dialog.showErrorBox('后端服务错误', `启动后端服务失败: ${error.message}`);
-    });
-
-    // 等待后端服务启动
-    setTimeout(() => {
-        checkBackendHealth();
-    }, 2000);
 }
 
 // 停止后端服务
@@ -216,20 +197,14 @@ async function checkBackendHealth() {
         const response = await fetch(`http://localhost:${backendPort}/api/health`);
         if (response.ok) {
             console.log('Backend service is healthy');
-            if (mainWindow) {
-                mainWindow.webContents.send('backend-status', { connected: true });
-            }
+            return true;
         } else {
             console.log('Backend service health check failed');
-            if (mainWindow) {
-                mainWindow.webContents.send('backend-status', { connected: false });
-            }
+            return false;
         }
     } catch (error) {
         console.log('Backend service not available:', error.message);
-        if (mainWindow) {
-            mainWindow.webContents.send('backend-status', { connected: false });
-        }
+        return false;
     }
 }
 

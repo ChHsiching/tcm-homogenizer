@@ -342,6 +342,10 @@ def perform_symbolic_regression_gplearn(data, target_column, population_size=100
         logger.info(f"📊 原始数据形状: X={X.shape}, y={y.shape}")
         logger.info(f"📊 特征名称: {feature_names}")
         
+        # 确保数据类型正确
+        X = np.array(X, dtype=np.float64)
+        y = np.array(y, dtype=np.float64)
+        
         # 检查NaN值
         if np.isnan(X).any():
             logger.error("❌ 特征数据包含NaN值")
