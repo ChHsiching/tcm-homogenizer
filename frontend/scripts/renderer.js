@@ -304,13 +304,13 @@ async function startRegression() {
     const generations = parseInt(document.getElementById('generations').value) || 50;
     const testRatio = parseInt(document.getElementById('test-ratio').value) || 30;
     
-    // 获取选择的运算符并映射到后端格式
+    // 获取选择的运算符
     const operators = [];
-    if (document.getElementById('op-add').checked) operators.push('+');
-    if (document.getElementById('op-sub').checked) operators.push('-');
-    if (document.getElementById('op-mul').checked) operators.push('*');
-    if (document.getElementById('op-div').checked) operators.push('/');
-    if (document.getElementById('op-pow').checked) operators.push('^');
+    if (document.getElementById('op-add').checked) operators.push('add');
+    if (document.getElementById('op-sub').checked) operators.push('sub');
+    if (document.getElementById('op-mul').checked) operators.push('mul');
+    if (document.getElementById('op-div').checked) operators.push('div');
+    if (document.getElementById('op-pow').checked) operators.push('pow');
     if (document.getElementById('op-sqrt').checked) operators.push('sqrt');
     
     if (operators.length === 0) {
@@ -350,69 +350,57 @@ async function startRegression() {
 // 执行符号回归分析
 async function performSymbolicRegression(params) {
     try {
-        console.log('发送数据到后端:', {
-            data: params.data,
+        console.log('开始符号回归分析，参数:', params);
+        
+        // 检查数据
+        if (!params.data || !params.data.data || params.data.data.length === 0) {
+            throw new Error('没有可用的数据，请先上传数据文件');
+        }
+        
+        // 检查目标变量
+        if (!params.targetColumn) {
+            throw new Error('请选择目标变量');
+        }
+        
+        // 检查特征变量
+        if (!params.featureColumns || params.featureColumns.length === 0) {
+            throw new Error('请选择至少一个特征变量');
+        }
+        
+        // 准备请求数据
+        const requestData = {
+            data: params.data.data,
             target_column: params.targetColumn,
             feature_columns: params.featureColumns,
-            population_size: params.populationSize,
-            generations: params.generations,
-            test_ratio: params.testRatio / 100, // 转换为小数
-            operators: params.operators
-        });
+            population_size: params.populationSize || 100,
+            generations: params.generations || 50,
+            test_ratio: (params.testRatio || 30) / 100,
+            operators: params.operators || ['+', '-', '*', '/']
+        };
         
-        const response = await fetch('http://localhost:5000/api/regression/symbolic-regression', {
+        console.log('发送请求数据:', requestData);
+        
+        // 调用后端API
+        const response = await fetch('/api/regression/symbolic-regression', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                data: params.data.data, // 发送实际的数据数组
-                target_column: params.targetColumn,
-                feature_columns: params.featureColumns,
-                population_size: params.populationSize,
-                generations: params.generations,
-                test_ratio: params.testRatio / 100, // 转换为小数
-                operators: params.operators
-            })
+            body: JSON.stringify(requestData)
         });
         
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `HTTP ${response.status}`);
+            throw new Error(`HTTP错误: ${response.status}`);
         }
         
         const result = await response.json();
+        console.log('符号回归分析结果:', result);
         
-        if (!result.success) {
-            throw new Error(result.error || '分析失败');
+        if (result.success) {
+            return result;
+        } else {
+            throw new Error(result.message || result.error || '符号回归分析失败');
         }
-        
-        // 转换结果格式以匹配前端期望
-        return {
-            id: Date.now(),
-            model_id: Date.now(),
-            expression: result.expression || '',
-            r2: result.metrics ? result.metrics.r2_test : 0,
-            mse: result.metrics ? result.metrics.mse_test : 0,
-            featureImportance: result.feature_importance ? 
-                Object.entries(result.feature_importance).map(([feature, importance]) => ({
-                    feature: feature,
-                    importance: importance
-                })) : [],
-            predictions: {
-                actual: [],
-                predicted: []
-            },
-            parameters: {
-                population_size: params.populationSize,
-                generations: params.generations,
-                test_ratio: params.testRatio,
-                operators: params.operators
-            },
-            // 添加新的指标
-            metrics: result.metrics || {},
-            tree: result.tree || null
-        };
         
     } catch (error) {
         console.error('符号回归分析失败:', error);
@@ -464,38 +452,28 @@ function displayRegressionResults(result) {
         </div>
     `;
     
-    // 渲染LaTeX公式
-    if (result.expression && formulaDisplay) {
-        const targetColumn = document.getElementById('target-column').value;
-        renderLatexFormula(result.expression, targetColumn);
-    }
-    
-    // 更新性能指标
-    if (result.metrics) {
-        updatePerformanceMetrics(result.metrics);
-    }
-    
-    // 生成公式结构树
-    if (result.expression && result.featureImportance) {
-        const featureImportance = {};
-        result.featureImportance.forEach(f => {
-            featureImportance[f.feature] = f.importance;
-        });
+    // 显示公式显示区域
+    if (formulaDisplay) {
+        console.log('Showing formula display');
+        formulaDisplay.style.display = 'block';
         
-        const syntaxTree = parseExpressionToSyntaxTree(result.expression, featureImportance);
-        if (syntaxTree) {
-            generateFormulaTree({
-                expression: result.expression,
-                featureImportance: result.featureImportance,
-                tree: syntaxTree
-            });
-        }
+        // 更新LaTeX公式
+        renderLatexFormula(result.expression, document.getElementById('target-column').value);
+        
+        // 更新性能指标
+        updatePerformanceMetrics(result);
+        
+        // 生成公式树
+        generateFormulaTree(result);
+    } else {
+        console.error('formula-display not found');
     }
     
-    // 保存当前结果到全局变量
-    window.currentRegressionResult = result;
-    
-    console.log('Regression results displayed successfully');
+    // 显示结果区域
+    const resultSection = document.getElementById('regression-result');
+    if (resultSection) {
+        resultSection.style.display = 'block';
+    }
 }
 
 // 格式化公式为LaTeX（支持分段渲染）
@@ -1247,10 +1225,11 @@ async function startMonteCarlo() {
     
     try {
         const result = await performMonteCarloAnalysis({
-            modelId,
-            iterations,
-            targetEfficacy,
-            tolerance
+            data: currentData,
+            targetColumn: document.getElementById('target-column').value,
+            featureColumns: Array.from(document.querySelectorAll('#feature-columns input[type="checkbox"]:checked')).map(cb => cb.value),
+            nSimulations: iterations,
+            confidenceLevel: tolerance
         });
         
         displayMonteCarloResults(result);
@@ -1266,46 +1245,55 @@ async function startMonteCarlo() {
 // 执行蒙特卡罗分析
 async function performMonteCarloAnalysis(params) {
     try {
-        const response = await fetch('http://localhost:5000/api/monte-carlo/analyze', {
+        console.log('开始蒙特卡罗分析，参数:', params);
+        
+        // 检查数据
+        if (!params.data || !params.data.data || params.data.data.length === 0) {
+            throw new Error('没有可用的数据，请先上传数据文件');
+        }
+        
+        // 检查目标变量
+        if (!params.targetColumn) {
+            throw new Error('请选择目标变量');
+        }
+        
+        // 检查特征变量
+        if (!params.featureColumns || params.featureColumns.length === 0) {
+            throw new Error('请选择至少一个特征变量');
+        }
+        
+        // 准备请求数据
+        const requestData = {
+            data: params.data.data,
+            target_column: params.targetColumn,
+            feature_columns: params.featureColumns,
+            n_simulations: params.nSimulations || 1000,
+            confidence_level: params.confidenceLevel || 0.95
+        };
+        
+        console.log('发送蒙特卡罗请求数据:', requestData);
+        
+        // 调用后端API
+        const response = await fetch('/api/monte-carlo/analyze', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                data: params.data,
-                target_column: params.targetColumn,
-                feature_columns: params.featureColumns,
-                model_id: params.modelId,
-                iterations: params.iterations,
-                target_efficacy: params.targetEfficacy,
-                tolerance: params.tolerance
-            })
+            body: JSON.stringify(requestData)
         });
         
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `HTTP ${response.status}`);
+            throw new Error(`HTTP错误: ${response.status}`);
         }
         
         const result = await response.json();
+        console.log('蒙特卡罗分析结果:', result);
         
-        if (!result.success) {
-            throw new Error(result.error || '分析失败');
+        if (result.success) {
+            return result.result;
+        } else {
+            throw new Error(result.message || result.error || '蒙特卡罗分析失败');
         }
-        
-        // 转换结果格式
-        const analysisResult = result.result;
-        return {
-            analysis_id: analysisResult.analysis_id,
-            iterations: analysisResult.iterations || 0,
-            targetEfficacy: analysisResult.target_efficacy || 0,
-            tolerance: analysisResult.tolerance || 0,
-            validSamples: analysisResult.valid_samples_count || 0,
-            validRate: analysisResult.valid_rate || 0,
-            componentStatistics: analysisResult.component_statistics || {},
-            distributionData: analysisResult.distribution_data || {},
-            sampleData: analysisResult.sample_data || {}
-        };
         
     } catch (error) {
         console.error('蒙特卡罗分析失败:', error);
@@ -1507,51 +1495,117 @@ function updateStatusBar() {
 }
 
 // 显示加载状态
-function showLoading(text = '正在处理...') {
-    const loading = document.getElementById('loading');
-    if (loading) {
-        const textElement = loading.querySelector('.loading-text');
-        if (textElement) {
-            textElement.textContent = text;
+function showLoading(message = '正在处理...') {
+    const loading = document.createElement('div');
+    loading.id = 'loading-overlay';
+    loading.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    `;
+    
+    loading.innerHTML = `
+        <div style="
+            background: #2a2a2a;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            color: white;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        ">
+            <div style="
+                width: 40px;
+                height: 40px;
+                border: 3px solid #3b82f6;
+                border-top: 3px solid transparent;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                margin: 0 auto 15px;
+            "></div>
+            <div>${message}</div>
+        </div>
+    `;
+    
+    // 添加CSS动画
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
-        loading.style.display = 'flex';
-    }
+    `;
+    document.head.appendChild(style);
+    
+    document.body.appendChild(loading);
 }
 
 // 隐藏加载状态
 function hideLoading() {
-    const loading = document.getElementById('loading');
+    const loading = document.getElementById('loading-overlay');
     if (loading) {
-        loading.style.display = 'none';
+        loading.parentNode.removeChild(loading);
     }
 }
 
-// 显示通知
+// 显示通知（用户友好的错误消息）
 function showNotification(message, type = 'info') {
-    // 移除现有通知
-    const existingNotifications = document.querySelectorAll('.notification');
-    existingNotifications.forEach(notification => {
-        notification.remove();
-    });
+    console.log(`[${type.toUpperCase()}] ${message}`);
     
-    // 创建新通知
+    // 创建通知元素
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
-    
-    notification.innerHTML = `
-        <div class="notification-message">${message}</div>
-        <button class="notification-close" onclick="this.parentElement.remove()">×</button>
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        z-index: 10000;
+        max-width: 400px;
+        word-wrap: break-word;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        border-left: 4px solid;
     `;
+    
+    // 根据类型设置样式
+    switch (type) {
+        case 'success':
+            notification.style.background = '#1a1a1a';
+            notification.style.borderLeftColor = '#22c55e';
+            break;
+        case 'error':
+            notification.style.background = '#1a1a1a';
+            notification.style.borderLeftColor = '#ef4444';
+            break;
+        case 'warning':
+            notification.style.background = '#1a1a1a';
+            notification.style.borderLeftColor = '#f59e0b';
+            break;
+        default:
+            notification.style.background = '#1a1a1a';
+            notification.style.borderLeftColor = '#3b82f6';
+    }
+    
+    notification.textContent = message;
     
     // 添加到页面
     document.body.appendChild(notification);
     
-    // 自动移除通知
+    // 3秒后自动移除
     setTimeout(() => {
-        if (notification.parentElement) {
-            notification.remove();
+        if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
         }
-    }, 5000);
+    }, 3000);
 }
 
 // 显示关于对话框

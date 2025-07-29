@@ -44,14 +44,8 @@ class HeuristicLabSymbolicRegression:
             # 加减法可以有多个子节点
             num_children = random.randint(2, 4)
             children = [self.create_expression_tree(max_depth - 1) for _ in range(num_children)]
-        elif operator in ['*', '/', '^']:
-            # 乘除法只有两个子节点
-            children = [self.create_expression_tree(max_depth - 1) for _ in range(2)]
-        elif operator == 'sqrt':
-            # 平方根只有一个子节点
-            children = [self.create_expression_tree(max_depth - 1)]
         else:
-            # 默认两个子节点
+            # 乘除法只有两个子节点
             children = [self.create_expression_tree(max_depth - 1) for _ in range(2)]
             
         return {
@@ -92,21 +86,6 @@ class HeuristicLabSymbolicRegression:
                     # 避免除零
                     result = np.where(child_val != 0, result / child_val, result)
                 return result
-            elif tree['operator'] == '^':
-                result = children_values[0]
-                for child_val in children_values[1:]:
-                    # 幂运算
-                    result = np.power(result, child_val)
-                return result
-            elif tree['operator'] == 'sqrt':
-                # 平方根
-                return np.sqrt(np.abs(children_values[0]))
-            else:
-                # 默认加法
-                result = children_values[0]
-                for child_val in children_values[1:]:
-                    result += child_val
-                return result
     
     def tree_to_expression(self, tree):
         """将表达式树转换为字符串表达式"""
@@ -124,12 +103,6 @@ class HeuristicLabSymbolicRegression:
                 return ' * '.join(children_expr)
             elif tree['operator'] == '/':
                 return ' / '.join(children_expr)
-            elif tree['operator'] == '^':
-                return ' ^ '.join(children_expr)
-            elif tree['operator'] == 'sqrt':
-                return f'sqrt({children_expr[0]})'
-            else:
-                return ' + '.join(children_expr)
     
     def calculate_fitness(self, tree, X_train, y_train, X_test, y_test):
         """计算适应度（MSE）"""

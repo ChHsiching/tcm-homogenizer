@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-蒙特卡罗分析算法模块
+蒙特卡罗分析算法
 """
 
 import numpy as np
@@ -11,45 +11,66 @@ from loguru import logger
 import json
 from pathlib import Path
 import time
-from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
 import warnings
 warnings.filterwarnings('ignore')
 
 class MonteCarloAnalysis:
-    """蒙特卡罗配比分析算法实现"""
+    """蒙特卡罗分析算法实现"""
     
     def __init__(self):
         self.results = {}
-        self.results_dir = Path("monte_carlo_results")
+        self.results_dir = Path("results")
         self.results_dir.mkdir(exist_ok=True)
         self._load_saved_results()
     
-    def analyze(self, model_id: str, target_efficacy: float, iterations: int = 10000,
-                tolerance: float = 0.1, component_ranges: Optional[Dict[str, List[float]]] = None) -> Dict[str, Any]:
-        """
-        执行蒙特卡罗配比分析
-        
-        Args:
-            model_id: 回归模型ID
-            target_efficacy: 目标药效值
-            iterations: 模拟次数
-            tolerance: 容差范围
-            component_ranges: 各成分的范围定义
-            
-        Returns:
-            分析结果字典
-        """
+    def analyze(self, data: Dict[str, Any], target_column: str, 
+                feature_columns: List[str], n_simulations: int = 1000,
+                confidence_level: float = 0.95) -> Dict[str, Any]:
+        """执行蒙特卡罗分析"""
         try:
-            logger.info(f"开始蒙特卡罗分析，模型ID: {model_id}")
-            logger.info(f"目标药效: {target_efficacy}, 模拟次数: {iterations}")
+            logger.info(f"开始蒙特卡罗分析，目标变量: {target_column}, 特征变量: {feature_columns}")
             
-            # 执行蒙特卡罗模拟
-            result = self._perform_monte_carlo_simulation(
-                model_id, target_efficacy, iterations, tolerance, component_ranges
+            # 数据预处理
+            df = pd.DataFrame(data['data'])
+            
+            # 检查列是否存在
+            if target_column not in df.columns:
+                raise ValueError(f"目标变量列 '{target_column}' 不存在")
+            
+            for col in feature_columns:
+                if col not in df.columns:
+                    raise ValueError(f"特征变量列 '{col}' 不存在")
+            
+            # 提取特征和目标变量
+            X = df[feature_columns].values
+            y = df[target_column].values
+            
+            # 检查数据类型
+            if not np.issubdtype(X.dtype, np.number):
+                raise ValueError("特征变量必须为数值类型")
+            
+            if not np.issubdtype(y.dtype, np.number):
+                raise ValueError("目标变量必须为数值类型")
+            
+            # 处理缺失值
+            X = np.nan_to_num(X, nan=0.0)
+            y = np.nan_to_num(y, nan=0.0)
+            
+            # 检查数据质量
+            if len(y) < 10:
+                raise ValueError("数据样本数量太少，至少需要10个样本")
+            
+            # 执行蒙特卡罗分析
+            result = self._perform_monte_carlo_analysis(
+                X, y, feature_columns, n_simulations, confidence_level
             )
             
             # 保存结果
-            analysis_id = self._save_result(result)
+            analysis_id = int(time.time())
+            result['analysis_id'] = analysis_id
+            self._save_result(analysis_id, result)
             
             logger.info(f"蒙特卡罗分析完成，分析ID: {analysis_id}")
             return result
@@ -58,194 +79,116 @@ class MonteCarloAnalysis:
             logger.error(f"蒙特卡罗分析失败: {str(e)}")
             raise
     
-    def _perform_monte_carlo_simulation(self, model_id: str, target_efficacy: float,
-                                      iterations: int, tolerance: float,
-                                      component_ranges: Optional[Dict[str, List[float]]] = None) -> Dict[str, Any]:
-        """执行蒙特卡罗模拟"""
+    def _perform_monte_carlo_analysis(self, X: np.ndarray, y: np.ndarray, 
+                                    feature_names: List[str], n_simulations: int,
+                                    confidence_level: float) -> Dict[str, Any]:
+        """执行蒙特卡罗分析"""
         try:
-            logger.info("开始执行蒙特卡罗模拟...")
+            logger.info("开始执行蒙特卡罗分析...")
             
-            # 模拟特征信息（实际应该从模型获取）
-            feature_names = ['Component_A', 'Component_B', 'Component_C', 'Component_D']
-            n_components = len(feature_names)
+            # 分割训练和测试数据
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.3, random_state=42
+            )
             
-            # 如果没有提供成分范围，使用默认范围
-            if component_ranges is None:
-                component_ranges = {}
-                for feature in feature_names:
-                    component_ranges[feature] = [0.0, 1.0]
+            # 存储所有模拟结果
+            all_predictions = []
+            all_coefficients = []
             
-            # 生成随机样本
-            valid_samples = []
-            all_samples = []
-            
-            # 使用向量化操作提高性能
-            logger.info("生成随机样本...")
-            
-            for i in range(0, iterations, 1000):  # 分批处理
-                batch_size = min(1000, iterations - i)
+            for i in range(n_simulations):
+                # 随机采样训练数据
+                indices = np.random.choice(len(X_train), size=len(X_train), replace=True)
+                X_boot = X_train[indices]
+                y_boot = y_train[indices]
                 
-                # 生成随机配比
-                batch_samples = []
-                for _ in range(batch_size):
-                    sample = {}
-                    for feature_name in feature_names:
-                        if feature_name in component_ranges:
-                            min_val, max_val = component_ranges[feature_name]
-                            sample[feature_name] = np.random.uniform(min_val, max_val)
-                        else:
-                            sample[feature_name] = np.random.uniform(0.0, 1.0)
-                    batch_samples.append(sample)
+                # 使用线性回归作为基础模型
+                from sklearn.linear_model import LinearRegression
+                model = LinearRegression()
+                model.fit(X_boot, y_boot)
                 
-                # 批量预测药效
-                for sample in batch_samples:
-                    predicted_efficacy = self._predict_efficacy(sample, model_id, feature_names)
-                    
-                    # 检查是否在目标范围内
-                    if abs(predicted_efficacy - target_efficacy) <= tolerance:
-                        valid_samples.append({
-                            'sample': sample,
-                            'predicted_efficacy': predicted_efficacy
-                        })
-                    
-                    all_samples.append({
-                        'sample': sample,
-                        'predicted_efficacy': predicted_efficacy
-                    })
-                
-                # 显示进度
-                if (i + batch_size) % 5000 == 0:
-                    logger.info(f"已处理 {i + batch_size}/{iterations} 个样本")
+                # 预测
+                y_pred = model.predict(X_test)
+                all_predictions.append(y_pred)
+                all_coefficients.append(model.coef_)
             
             # 计算统计信息
-            valid_count = len(valid_samples)
-            valid_rate = valid_count / iterations
+            predictions_array = np.array(all_predictions)
+            coefficients_array = np.array(all_coefficients)
             
-            # 计算各成分的分布统计
-            component_stats = self._calculate_component_statistics(valid_samples, feature_names)
+            # 计算预测的置信区间
+            mean_predictions = np.mean(predictions_array, axis=0)
+            std_predictions = np.std(predictions_array, axis=0)
             
-            # 生成分布数据
-            distribution_data = self._generate_distribution_data(all_samples)
+            # 计算置信区间
+            alpha = 1 - confidence_level
+            z_score = 1.96  # 95%置信区间
+            ci_lower = mean_predictions - z_score * std_predictions
+            ci_upper = mean_predictions + z_score * std_predictions
+            
+            # 计算系数的重要性
+            mean_coefficients = np.mean(coefficients_array, axis=0)
+            std_coefficients = np.std(coefficients_array, axis=0)
+            
+            # 计算性能指标
+            r2_scores = []
+            mse_scores = []
+            
+            for pred in all_predictions:
+                r2 = r2_score(y_test, pred)
+                mse = mean_squared_error(y_test, pred)
+                r2_scores.append(r2)
+                mse_scores.append(mse)
+            
+            # 计算特征重要性
+            feature_importance = []
+            for i, name in enumerate(feature_names):
+                importance = abs(mean_coefficients[i])
+                feature_importance.append({
+                    'feature': name,
+                    'coefficient': float(mean_coefficients[i]),
+                    'std': float(std_coefficients[i]),
+                    'importance': float(importance)
+                })
+            
+            # 按重要性排序
+            feature_importance.sort(key=lambda x: x['importance'], reverse=True)
             
             result = {
-                'analysis_id': f"mc_{int(time.time())}",
-                'model_id': model_id,
-                'target_efficacy': target_efficacy,
-                'tolerance': tolerance,
-                'iterations': iterations,
-                'valid_samples_count': valid_count,
-                'valid_rate': valid_rate,
-                'component_statistics': component_stats,
-                'distribution_data': distribution_data,
-                'sample_data': {
-                    'valid_samples': valid_samples[:100],  # 只保存前100个有效样本
-                    'all_samples_summary': {
-                        'min_efficacy': min(s['predicted_efficacy'] for s in all_samples),
-                        'max_efficacy': max(s['predicted_efficacy'] for s in all_samples),
-                        'mean_efficacy': np.mean([s['predicted_efficacy'] for s in all_samples]),
-                        'std_efficacy': np.std([s['predicted_efficacy'] for s in all_samples])
-                    }
+                'n_simulations': n_simulations,
+                'confidence_level': confidence_level,
+                'predictions': {
+                    'mean': mean_predictions.tolist(),
+                    'std': std_predictions.tolist(),
+                    'ci_lower': ci_lower.tolist(),
+                    'ci_upper': ci_upper.tolist(),
+                    'actual': y_test.tolist()
+                },
+                'performance': {
+                    'r2_mean': float(np.mean(r2_scores)),
+                    'r2_std': float(np.std(r2_scores)),
+                    'mse_mean': float(np.mean(mse_scores)),
+                    'mse_std': float(np.std(mse_scores))
+                },
+                'feature_importance': feature_importance,
+                'parameters': {
+                    'n_features': X.shape[1],
+                    'n_samples': len(y),
+                    'n_train': len(y_train),
+                    'n_test': len(y_test)
                 },
                 'timestamp': time.time()
             }
             
-            logger.info(f"蒙特卡罗模拟完成，有效样本数: {valid_count}, 有效率: {valid_rate:.2%}")
+            logger.info(f"蒙特卡罗分析完成，R²均值 = {np.mean(r2_scores):.3f}, MSE均值 = {np.mean(mse_scores):.3f}")
             return result
             
         except Exception as e:
-            logger.error(f"蒙特卡罗模拟执行失败: {str(e)}")
+            logger.error(f"蒙特卡罗分析执行失败: {str(e)}")
             raise
     
-    def _predict_efficacy(self, sample: Dict[str, float], model_id: str, feature_names: List[str]) -> float:
-        """预测药效值（基于回归模型）"""
-        try:
-            # 简化实现：使用线性组合
-            prediction = 0.0
-            total_weight = 0.0
-            
-            for feature_name in feature_names:
-                if feature_name in sample:
-                    # 使用随机权重模拟
-                    weight = np.random.uniform(0.1, 0.9)
-                    prediction += sample[feature_name] * weight
-                    total_weight += weight
-            
-            if total_weight > 0:
-                prediction = prediction / total_weight
-            
-            # 添加一些随机噪声模拟真实情况
-            noise = np.random.normal(0, 0.05)
-            prediction += noise
-            
-            return max(0.0, min(1.0, prediction))
-            
-        except Exception as e:
-            logger.error(f"药效预测失败: {str(e)}")
-            return 0.0
-    
-    def _calculate_component_statistics(self, valid_samples: List[Dict], 
-                                      feature_names: List[str]) -> Dict[str, Dict]:
-        """计算各成分的统计信息"""
-        try:
-            component_stats = {}
-            
-            for feature_name in feature_names:
-                values = [sample['sample'][feature_name] for sample in valid_samples]
-                
-                if values:
-                    component_stats[feature_name] = {
-                        'min': float(np.min(values)),
-                        'max': float(np.max(values)),
-                        'mean': float(np.mean(values)),
-                        'std': float(np.std(values)),
-                        'median': float(np.median(values)),
-                        'q25': float(np.percentile(values, 25)),
-                        'q75': float(np.percentile(values, 75))
-                    }
-                else:
-                    component_stats[feature_name] = {
-                        'min': 0.0, 'max': 0.0, 'mean': 0.0, 'std': 0.0,
-                        'median': 0.0, 'q25': 0.0, 'q75': 0.0
-                    }
-            
-            return component_stats
-            
-        except Exception as e:
-            logger.error(f"计算成分统计信息失败: {str(e)}")
-            return {}
-    
-    def _generate_distribution_data(self, all_samples: List[Dict]) -> Dict[str, Any]:
-        """生成分布数据"""
-        try:
-            efficacies = [sample['predicted_efficacy'] for sample in all_samples]
-            
-            # 创建直方图数据
-            hist, bins = np.histogram(efficacies, bins=50, range=(0, 1))
-            
-            return {
-                'efficacies': efficacies,
-                'histogram': {
-                    'counts': hist.tolist(),
-                    'bins': bins.tolist()
-                },
-                'statistics': {
-                    'min': float(np.min(efficacies)),
-                    'max': float(np.max(efficacies)),
-                    'mean': float(np.mean(efficacies)),
-                    'std': float(np.std(efficacies)),
-                    'median': float(np.median(efficacies))
-                }
-            }
-            
-        except Exception as e:
-            logger.error(f"生成分布数据失败: {str(e)}")
-            return {}
-    
-    def _save_result(self, result: Dict[str, Any]) -> str:
+    def _save_result(self, analysis_id: int, result: Dict[str, Any]):
         """保存分析结果"""
         try:
-            analysis_id = result['analysis_id']
-            
             # 保存到内存
             self.results[analysis_id] = result
             
@@ -255,32 +198,30 @@ class MonteCarloAnalysis:
                 json.dump(result, f, ensure_ascii=False, indent=2)
             
             logger.info(f"分析结果已保存: {result_file}")
-            return analysis_id
             
         except Exception as e:
-            logger.error(f"结果保存失败: {str(e)}")
+            logger.error(f"分析结果保存失败: {str(e)}")
             raise
     
     def get_result(self, analysis_id: str) -> Optional[Dict[str, Any]]:
         """获取分析结果"""
         return self.results.get(analysis_id)
     
-    def get_all_results(self) -> List[Dict[str, Any]]:
-        """获取所有分析结果"""
+    def get_saved_results(self) -> List[Dict[str, Any]]:
+        """获取所有已保存的分析结果"""
         results = []
         for analysis_id, result in self.results.items():
             results.append({
                 'analysis_id': analysis_id,
-                'model_id': result.get('model_id'),
-                'target_efficacy': result.get('target_efficacy'),
-                'valid_rate': result.get('valid_rate'),
-                'iterations': result.get('iterations'),
-                'timestamp': result.get('timestamp')
+                'n_simulations': result['n_simulations'],
+                'confidence_level': result['confidence_level'],
+                'performance': result['performance'],
+                'timestamp': result['timestamp']
             })
         return results
     
     def _load_saved_results(self):
-        """加载已保存的结果"""
+        """加载已保存的分析结果"""
         try:
             for result_file in self.results_dir.glob("*.json"):
                 try:
@@ -289,43 +230,24 @@ class MonteCarloAnalysis:
                     analysis_id = result.get('analysis_id', result_file.stem)
                     self.results[analysis_id] = result
                 except Exception as e:
-                    logger.warning(f"加载结果文件失败 {result_file}: {str(e)}")
+                    logger.warning(f"加载分析结果文件失败 {result_file}: {str(e)}")
             
             logger.info(f"已加载 {len(self.results)} 个分析结果")
             
         except Exception as e:
-            logger.error(f"加载保存的结果失败: {str(e)}")
+            logger.error(f"加载保存的分析结果失败: {str(e)}")
     
-    def generate_optimal_ranges(self, analysis_id: str, confidence_level: float = 0.95) -> Dict[str, Any]:
-        """生成最优配比区间"""
+    def predict(self, analysis_id: str, X: np.ndarray) -> np.ndarray:
+        """使用分析结果进行预测"""
         try:
             result = self.get_result(analysis_id)
             if not result:
                 raise ValueError(f"分析结果 {analysis_id} 不存在")
             
-            component_stats = result['component_statistics']
-            optimal_ranges = {}
-            
-            for component, stats in component_stats.items():
-                # 使用分位数计算置信区间
-                alpha = 1 - confidence_level
-                lower_percentile = (alpha / 2) * 100
-                upper_percentile = (1 - alpha / 2) * 100
-                
-                # 这里简化处理，使用q25和q75作为区间
-                optimal_ranges[component] = {
-                    'min': stats['q25'],
-                    'max': stats['q75'],
-                    'mean': stats['mean'],
-                    'confidence_level': confidence_level
-                }
-            
-            return {
-                'analysis_id': analysis_id,
-                'confidence_level': confidence_level,
-                'optimal_ranges': optimal_ranges
-            }
+            # 这里应该实现真正的预测逻辑
+            # 目前返回随机值作为示例
+            return np.random.rand(len(X))
             
         except Exception as e:
-            logger.error(f"生成最优配比区间失败: {str(e)}")
+            logger.error(f"预测失败: {str(e)}")
             raise 
