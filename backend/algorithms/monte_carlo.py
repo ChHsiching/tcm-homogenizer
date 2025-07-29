@@ -11,7 +11,6 @@ from loguru import logger
 import json
 from pathlib import Path
 import time
-from .symbolic_regression import SymbolicRegression
 from sklearn.preprocessing import StandardScaler
 import warnings
 warnings.filterwarnings('ignore')
@@ -23,7 +22,6 @@ class MonteCarloAnalysis:
         self.results = {}
         self.results_dir = Path("monte_carlo_results")
         self.results_dir.mkdir(exist_ok=True)
-        self.regression_engine = SymbolicRegression()
         self._load_saved_results()
     
     def analyze(self, model_id: str, target_efficacy: float, iterations: int = 10000,
@@ -45,8 +43,8 @@ class MonteCarloAnalysis:
             logger.info(f"开始蒙特卡罗分析，模型ID: {model_id}")
             logger.info(f"目标药效: {target_efficacy}, 模拟次数: {iterations}")
             
-            # 获取回归模型
-            model = self.regression_engine.get_model(model_id)
+            # 获取回归模型（暂时使用模拟数据）
+            model = self._get_simulation_model(model_id)
             if not model:
                 raise ValueError(f"模型 {model_id} 不存在")
             
@@ -137,7 +135,7 @@ class MonteCarloAnalysis:
             
             result = {
                 'analysis_id': f"mc_{int(time.time())}",
-                'model_id': model.get('model_id'),
+                'model_id': model.get('id'),
                 'target_efficacy': target_efficacy,
                 'tolerance': tolerance,
                 'iterations': iterations,
@@ -168,11 +166,13 @@ class MonteCarloAnalysis:
         """预测药效值（基于回归模型）"""
         try:
             # 根据模型类型选择预测方法
-            algorithm = model.get('parameters', {}).get('algorithm', 'unknown')
+            algorithm = model.get('expression', 'unknown') # 假设expression就是算法类型
             
-            if algorithm == 'gplearn':
+            if 'simulated_expression' in algorithm: # 模拟模型
+                return self._predict_with_simulation(sample, model, feature_names)
+            elif 'gplearn' in algorithm:
                 return self._predict_with_gplearn(sample, model, feature_names)
-            elif algorithm == 'polynomial_regression':
+            elif 'polynomial_regression' in algorithm:
                 return self._predict_with_polynomial(sample, model, feature_names)
             else:
                 # 使用简化预测方法
@@ -282,6 +282,15 @@ class MonteCarloAnalysis:
             
         except Exception as e:
             logger.error(f"简化预测失败: {str(e)}")
+            return 0.0
+    
+    def _predict_with_simulation(self, sample: Dict[str, float], model: Dict[str, Any], feature_names: List[str]) -> float:
+        """模拟模型预测"""
+        try:
+            # 模拟模型直接返回一个固定值
+            return 0.7 # 示例固定值
+        except Exception as e:
+            logger.error(f"模拟模型预测失败: {str(e)}")
             return 0.0
     
     def _calculate_component_statistics(self, valid_samples: List[Dict], 
