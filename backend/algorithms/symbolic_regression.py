@@ -56,36 +56,55 @@ class HeuristicLabSymbolicRegression:
     
     def evaluate_tree(self, tree, X):
         """计算表达式树的值"""
-        if tree['type'] == 'constant':
-            return np.full(X.shape[0], tree['value'])
-        elif tree['type'] == 'variable':
-            var_idx = self.feature_names.index(tree['name'])
-            return X[:, var_idx]
-        else:
-            # 运算符节点
-            children_values = [self.evaluate_tree(child, X) for child in tree['children']]
-            
-            if tree['operator'] == '+':
-                result = children_values[0]
-                for child_val in children_values[1:]:
-                    result += child_val
-                return result
-            elif tree['operator'] == '-':
-                result = children_values[0]
-                for child_val in children_values[1:]:
-                    result -= child_val
-                return result
-            elif tree['operator'] == '*':
-                result = children_values[0]
-                for child_val in children_values[1:]:
-                    result *= child_val
-                return result
-            elif tree['operator'] == '/':
-                result = children_values[0]
-                for child_val in children_values[1:]:
-                    # 避免除零
-                    result = np.where(child_val != 0, result / child_val, result)
-                return result
+        try:
+            if tree['type'] == 'constant':
+                value = float(tree['value'])
+                # 限制常数范围
+                value = np.clip(value, -1e6, 1e6)
+                return np.full(X.shape[0], value)
+            elif tree['type'] == 'variable':
+                var_idx = self.feature_names.index(tree['name'])
+                values = X[:, var_idx]
+                # 限制变量范围
+                values = np.clip(values, -1e6, 1e6)
+                return values
+            else:
+                # 运算符节点
+                children_values = [self.evaluate_tree(child, X) for child in tree['children']]
+                
+                # 检查子节点值是否有效
+                for i, child_val in enumerate(children_values):
+                    if np.isnan(child_val).any() or np.isinf(child_val).any():
+                        logger.warning(f"子节点 {i} 包含无效值，使用零数组")
+                        children_values[i] = np.zeros(X.shape[0])
+                
+                if tree['operator'] == '+':
+                    result = children_values[0].copy()
+                    for child_val in children_values[1:]:
+                        result = np.clip(result + child_val, -1e6, 1e6)
+                    return result
+                elif tree['operator'] == '-':
+                    result = children_values[0].copy()
+                    for child_val in children_values[1:]:
+                        result = np.clip(result - child_val, -1e6, 1e6)
+                    return result
+                elif tree['operator'] == '*':
+                    result = children_values[0].copy()
+                    for child_val in children_values[1:]:
+                        # 防止乘法溢出
+                        result = np.clip(result * child_val, -1e6, 1e6)
+                    return result
+                elif tree['operator'] == '/':
+                    result = children_values[0].copy()
+                    for child_val in children_values[1:]:
+                        # 避免除零和溢出
+                        safe_child_val = np.where(np.abs(child_val) < 1e-10, 1e-10, child_val)
+                        result = np.clip(result / safe_child_val, -1e6, 1e6)
+                    return result
+        except Exception as e:
+            logger.error(f"表达式树计算失败: {str(e)}")
+            # 返回零数组作为fallback
+            return np.zeros(X.shape[0])
     
     def tree_to_expression(self, tree):
         """将表达式树转换为字符串表达式"""
@@ -110,15 +129,31 @@ class HeuristicLabSymbolicRegression:
             y_pred_train = self.evaluate_tree(tree, X_train)
             y_pred_test = self.evaluate_tree(tree, X_test)
             
+            # 检查预测值是否有效
+            if np.isnan(y_pred_train).any() or np.isnan(y_pred_test).any():
+                return float('inf'), float('inf'), float('inf')
+            
+            if np.isinf(y_pred_train).any() or np.isinf(y_pred_test).any():
+                return float('inf'), float('inf'), float('inf')
+            
+            # 限制预测值范围
+            y_pred_train = np.clip(y_pred_train, -1e6, 1e6)
+            y_pred_test = np.clip(y_pred_test, -1e6, 1e6)
+            
             # 计算训练和测试误差
             mse_train = mean_squared_error(y_train, y_pred_train)
             mse_test = mean_squared_error(y_test, y_pred_test)
+            
+            # 检查误差是否有效
+            if np.isnan(mse_train) or np.isnan(mse_test) or np.isinf(mse_train) or np.isinf(mse_test):
+                return float('inf'), float('inf'), float('inf')
             
             # 综合适应度（参考HeuristicLab）
             fitness = mse_test + 0.1 * mse_train + 0.01 * self.tree_complexity(tree)
             
             return fitness, mse_train, mse_test
-        except:
+        except Exception as e:
+            logger.error(f"适应度计算失败: {str(e)}")
             return float('inf'), float('inf'), float('inf')
     
     def tree_complexity(self, tree):
@@ -252,14 +287,50 @@ def perform_symbolic_regression_gplearn(data, target_column, population_size=100
     使用参考HeuristicLab的算法进行符号回归
     """
     try:
+        logger.info(f"开始符号回归分析，数据形状: {data.shape}")
+        
         # 数据预处理
         X = data.drop(columns=[target_column]).values
         y = data[target_column].values
         feature_names = data.drop(columns=[target_column]).columns.tolist()
         
+        logger.info(f"特征数量: {len(feature_names)}, 样本数量: {len(y)}")
+        
+        # 数据清理：处理NaN值
+        logger.info("开始数据清理...")
+        
+        # 检查并处理NaN值
+        if np.isnan(X).any():
+            logger.warning("发现特征变量中的NaN值，进行清理...")
+            # 用列均值填充NaN
+            for i in range(X.shape[1]):
+                col_mean = np.nanmean(X[:, i])
+                if np.isnan(col_mean):
+                    col_mean = 0.0  # 如果整列都是NaN，用0填充
+                X[:, i] = np.nan_to_num(X[:, i], nan=col_mean)
+        
+        if np.isnan(y).any():
+            logger.warning("发现目标变量中的NaN值，进行清理...")
+            y_mean = np.nanmean(y)
+            if np.isnan(y_mean):
+                y_mean = 0.0
+            y = np.nan_to_num(y, nan=y_mean)
+        
+        # 检查数据有效性
+        if np.isnan(X).any() or np.isnan(y).any():
+            raise ValueError("数据清理后仍存在NaN值")
+        
+        logger.info("数据清理完成")
+        
         # 数据标准化
         scaler_X = StandardScaler()
         X_scaled = scaler_X.fit_transform(X)
+        
+        # 最终检查
+        if np.isnan(X_scaled).any() or np.isnan(y).any():
+            raise ValueError("标准化后仍存在NaN值")
+        
+        logger.info("数据预处理完成，开始训练...")
         
         # 创建符号回归模型
         model = HeuristicLabSymbolicRegression(

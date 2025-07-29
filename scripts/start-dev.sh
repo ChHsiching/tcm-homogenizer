@@ -31,21 +31,18 @@ echo "✅ 后端虚拟环境检查通过"
 echo "📡 启动后端服务..."
 cd backend
 
-# 激活虚拟环境
-source venv/bin/activate
-
 # 检查Python依赖
 echo "🔍 检查Python依赖..."
+source venv/bin/activate
 python -c "import flask, pandas, numpy, sklearn, loguru" 2>/dev/null || {
-    echo "❌ Python依赖不完整，请运行: pip install -r requirements.txt"
+    echo "❌ Python依赖检查失败，请运行: pip install -r requirements.txt"
     exit 1
 }
-
 echo "✅ Python依赖检查通过"
 
-# 启动Flask后端服务
+# 启动Flask后端服务（前台运行，实时显示日志）
 echo "🚀 启动Flask后端服务..."
-nohup python main.py > backend.log 2>&1 &
+python main.py &
 BACKEND_PID=$!
 echo "✅ 后端服务已启动 (PID: $BACKEND_PID)"
 
@@ -67,7 +64,7 @@ for i in {1..10}; do
     if [ $i -eq 10 ]; then
         echo "❌ 后端服务启动失败，请检查 backend.log"
         echo "📋 后端日志内容:"
-        tail -20 backend.log
+        tail -n 20 backend.log 2>/dev/null || echo "无法读取日志文件"
         exit 1
     fi
 done
@@ -82,22 +79,17 @@ if [ ! -d "node_modules" ]; then
     echo "📦 安装Node.js依赖..."
     npm install
 fi
-
 echo "✅ Node.js依赖检查通过"
 
 # 启动Electron前端应用
 echo "🚀 启动Electron前端应用..."
-nohup npm start > ../frontend.log 2>&1 &
+npm start &
 FRONTEND_PID=$!
 echo "✅ 前端服务已启动 (PID: $FRONTEND_PID)"
 
 # 保存进程ID
-echo $BACKEND_PID > ../.backend.pid
-echo $FRONTEND_PID > ../.frontend.pid
-
-# 等待前端启动
-echo "⏳ 等待前端应用启动..."
-sleep 3
+echo $BACKEND_PID > .backend.pid
+echo $FRONTEND_PID > .frontend.pid
 
 echo ""
 echo "🎉 开发环境启动完成！"
@@ -107,19 +99,10 @@ echo ""
 echo "💡 提示:"
 echo "   - 使用 Ctrl+C 停止服务"
 echo "   - 查看后端日志: tail -f backend/backend.log"
-echo "   - 查看前端日志: tail -f frontend.log"
 echo "   - 停止服务: ./scripts/stop-dev.sh"
 echo ""
 
-# 显示实时日志
-echo "📋 实时日志输出:"
-echo "===================="
-
 # 等待用户中断
-trap 'echo ""; echo "🛑 正在停止服务..."; kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; rm -f ../.backend.pid ../.frontend.pid; echo "✅ 服务已停止"; exit 0' INT
+trap 'echo ""; echo "🛑 正在停止服务..."; kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; rm -f .backend.pid .frontend.pid; echo "✅ 服务已停止"; exit 0' INT
 
-# 显示实时日志
-tail -f backend/backend.log &
-TAIL_PID=$!
-
-wait $TAIL_PID 
+wait 

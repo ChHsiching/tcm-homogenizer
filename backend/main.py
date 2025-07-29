@@ -27,7 +27,7 @@ def main():
     config = load_config()
     
     # 创建Flask应用
-    app = create_app(config)
+    app = create_app()
     
     # 获取运行参数
     host = config.get('host', '127.0.0.1')
