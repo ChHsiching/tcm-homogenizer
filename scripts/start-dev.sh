@@ -10,12 +10,10 @@ echo "🚀 启动中药多组分均化分析客户端开发环境..."
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
-echo "📁 项目根目录: $PROJECT_ROOT"
-
 # 停止可能存在的进程
 echo "🛑 停止可能存在的进程..."
 pkill -f "python.*main.py" 2>/dev/null || true
-pkill -f "electron.*tcm-homogenizer" 2>/dev/null || true
+pkill -f "electron.*frontend" 2>/dev/null || true
 sleep 2
 
 # 检查后端虚拟环境
@@ -25,8 +23,6 @@ if [ ! -d "$BACKEND_VENV" ]; then
     exit 1
 fi
 
-echo "✅ 后端虚拟环境检查通过"
-
 # 启动后端服务
 echo "📡 启动后端服务..."
 cd backend
@@ -35,14 +31,13 @@ cd backend
 echo "🔍 检查Python依赖..."
 source venv/bin/activate
 python -c "import flask, pandas, numpy, sklearn, loguru" 2>/dev/null || {
-    echo "❌ Python依赖检查失败，请运行: pip install -r requirements.txt"
+    echo "❌ Python依赖不完整，请运行: pip install -r requirements.txt"
     exit 1
 }
-echo "✅ Python依赖检查通过"
 
-# 启动Flask后端服务（前台运行，实时显示日志）
+# 启动Flask后端服务
 echo "🚀 启动Flask后端服务..."
-python main.py &
+nohup python main.py > backend.log 2>&1 &
 BACKEND_PID=$!
 echo "✅ 后端服务已启动 (PID: $BACKEND_PID)"
 
@@ -64,7 +59,7 @@ for i in {1..10}; do
     if [ $i -eq 10 ]; then
         echo "❌ 后端服务启动失败，请检查 backend.log"
         echo "📋 后端日志内容:"
-        tail -n 20 backend.log 2>/dev/null || echo "无法读取日志文件"
+        tail -20 backend.log
         exit 1
     fi
 done
@@ -79,11 +74,10 @@ if [ ! -d "node_modules" ]; then
     echo "📦 安装Node.js依赖..."
     npm install
 fi
-echo "✅ Node.js依赖检查通过"
 
 # 启动Electron前端应用
 echo "🚀 启动Electron前端应用..."
-npm start &
+nohup npm start > frontend.log 2>&1 &
 FRONTEND_PID=$!
 echo "✅ 前端服务已启动 (PID: $FRONTEND_PID)"
 
@@ -99,6 +93,7 @@ echo ""
 echo "💡 提示:"
 echo "   - 使用 Ctrl+C 停止服务"
 echo "   - 查看后端日志: tail -f backend/backend.log"
+echo "   - 查看前端日志: tail -f frontend/frontend.log"
 echo "   - 停止服务: ./scripts/stop-dev.sh"
 echo ""
 

@@ -15,6 +15,7 @@ import sympy as sp
 from loguru import logger
 import random
 import math
+import traceback
 
 class HeuristicLabSymbolicRegression:
     """参考HeuristicLab实现的符号回归算法"""
@@ -58,51 +59,40 @@ class HeuristicLabSymbolicRegression:
         """计算表达式树的值"""
         try:
             if tree['type'] == 'constant':
-                value = float(tree['value'])
-                # 限制常数范围
-                value = np.clip(value, -1e6, 1e6)
-                return np.full(X.shape[0], value)
+                return np.full(X.shape[0], tree['value'])
             elif tree['type'] == 'variable':
                 var_idx = self.feature_names.index(tree['name'])
-                values = X[:, var_idx]
-                # 限制变量范围
-                values = np.clip(values, -1e6, 1e6)
-                return values
+                return X[:, var_idx]
             else:
                 # 运算符节点
                 children_values = [self.evaluate_tree(child, X) for child in tree['children']]
                 
-                # 检查子节点值是否有效
-                for i, child_val in enumerate(children_values):
-                    if np.isnan(child_val).any() or np.isinf(child_val).any():
-                        logger.warning(f"子节点 {i} 包含无效值，使用零数组")
-                        children_values[i] = np.zeros(X.shape[0])
-                
                 if tree['operator'] == '+':
-                    result = children_values[0].copy()
+                    result = children_values[0]
                     for child_val in children_values[1:]:
-                        result = np.clip(result + child_val, -1e6, 1e6)
+                        result += child_val
                     return result
                 elif tree['operator'] == '-':
-                    result = children_values[0].copy()
+                    result = children_values[0]
                     for child_val in children_values[1:]:
-                        result = np.clip(result - child_val, -1e6, 1e6)
+                        result -= child_val
                     return result
                 elif tree['operator'] == '*':
-                    result = children_values[0].copy()
+                    result = children_values[0]
                     for child_val in children_values[1:]:
-                        # 防止乘法溢出
-                        result = np.clip(result * child_val, -1e6, 1e6)
+                        result *= child_val
                     return result
                 elif tree['operator'] == '/':
-                    result = children_values[0].copy()
+                    result = children_values[0]
                     for child_val in children_values[1:]:
-                        # 避免除零和溢出
-                        safe_child_val = np.where(np.abs(child_val) < 1e-10, 1e-10, child_val)
-                        result = np.clip(result / safe_child_val, -1e6, 1e6)
+                        # 避免除零和数值溢出
+                        safe_divisor = np.where(np.abs(child_val) < 1e-10, 1e-10, child_val)
+                        result = np.where(np.abs(result) > 1e10, np.sign(result) * 1e10, result)
+                        result = np.where(np.abs(safe_divisor) > 1e10, np.sign(safe_divisor) * 1e10, safe_divisor)
+                        result = result / safe_divisor
                     return result
         except Exception as e:
-            logger.error(f"表达式树计算失败: {str(e)}")
+            logger.error(f"❌ 表达式树计算失败: {str(e)}")
             # 返回零数组作为fallback
             return np.zeros(X.shape[0])
     
@@ -136,9 +126,22 @@ class HeuristicLabSymbolicRegression:
             if np.isinf(y_pred_train).any() or np.isinf(y_pred_test).any():
                 return float('inf'), float('inf'), float('inf')
             
-            # 限制预测值范围
-            y_pred_train = np.clip(y_pred_train, -1e6, 1e6)
-            y_pred_test = np.clip(y_pred_test, -1e6, 1e6)
+            # 限制预测值范围，避免数值溢出
+            y_pred_train = np.clip(y_pred_train, -1e10, 1e10)
+            y_pred_test = np.clip(y_pred_test, -1e10, 1e10)
+            
+            # 确保数据类型正确
+            y_pred_train = y_pred_train.astype(np.float64)
+            y_pred_test = y_pred_test.astype(np.float64)
+            y_train = y_train.astype(np.float64)
+            y_test = y_test.astype(np.float64)
+            
+            # 再次检查数据有效性
+            if not np.all(np.isfinite(y_pred_train)) or not np.all(np.isfinite(y_pred_test)):
+                return float('inf'), float('inf'), float('inf')
+            
+            if not np.all(np.isfinite(y_train)) or not np.all(np.isfinite(y_test)):
+                return float('inf'), float('inf'), float('inf')
             
             # 计算训练和测试误差
             mse_train = mean_squared_error(y_train, y_pred_train)
@@ -153,7 +156,7 @@ class HeuristicLabSymbolicRegression:
             
             return fitness, mse_train, mse_test
         except Exception as e:
-            logger.error(f"适应度计算失败: {str(e)}")
+            logger.error(f"❌ 适应度计算失败: {str(e)}")
             return float('inf'), float('inf'), float('inf')
     
     def tree_complexity(self, tree):
@@ -256,18 +259,195 @@ class HeuristicLabSymbolicRegression:
             y_pred_train = self.evaluate_tree(self.best_individual, X_train)
             y_pred_test = self.evaluate_tree(self.best_individual, X_test)
             
-            r2_train = r2_score(y_train, y_pred_train)
-            r2_test = r2_score(y_test, y_pred_test)
-            mse_train = mean_squared_error(y_train, y_pred_train)
-            mse_test = mean_squared_error(y_test, y_pred_test)
-            mae_train = mean_absolute_error(y_train, y_pred_train)
-            mae_test = mean_absolute_error(y_test, y_pred_test)
+            # 检查预测值有效性
+            if np.isnan(y_pred_train).any() or np.isnan(y_pred_test).any():
+                logger.error("❌ 最终评估失败：预测值包含NaN")
+                return None
             
-            expression = self.tree_to_expression(self.best_individual)
+            if np.isinf(y_pred_train).any() or np.isinf(y_pred_test).any():
+                logger.error("❌ 最终评估失败：预测值包含无穷值")
+                return None
             
-            return {
-                'expression': expression,
-                'tree': self.best_individual,
+            # 限制预测值范围
+            y_pred_train = np.clip(y_pred_train, -1e10, 1e10)
+            y_pred_test = np.clip(y_pred_test, -1e10, 1e10)
+            
+            # 确保数据类型正确
+            y_pred_train = y_pred_train.astype(np.float64)
+            y_pred_test = y_pred_test.astype(np.float64)
+            y_train = y_train.astype(np.float64)
+            y_test = y_test.astype(np.float64)
+            
+            # 再次检查数据有效性
+            if not np.all(np.isfinite(y_pred_train)) or not np.all(np.isfinite(y_pred_test)):
+                logger.error("❌ 最终评估失败：预测值包含无效值")
+                return None
+            
+            if not np.all(np.isfinite(y_train)) or not np.all(np.isfinite(y_test)):
+                logger.error("❌ 最终评估失败：目标值包含无效值")
+                return None
+            
+            try:
+                r2_train = r2_score(y_train, y_pred_train)
+                r2_test = r2_score(y_test, y_pred_test)
+                mse_train = mean_squared_error(y_train, y_pred_train)
+                mse_test = mean_squared_error(y_test, y_pred_test)
+                mae_train = mean_absolute_error(y_train, y_pred_train)
+                mae_test = mean_absolute_error(y_test, y_pred_test)
+                
+                # 检查计算结果有效性
+                if np.isnan(r2_train) or np.isnan(r2_test) or np.isnan(mse_train) or np.isnan(mse_test):
+                    logger.error("❌ 最终评估失败：计算结果包含NaN")
+                    return None
+                
+                if np.isinf(r2_train) or np.isinf(r2_test) or np.isinf(mse_train) or np.isinf(mse_test):
+                    logger.error("❌ 最终评估失败：计算结果包含无穷值")
+                    return None
+                
+                expression = self.tree_to_expression(self.best_individual)
+                
+                return {
+                    'expression': expression,
+                    'tree': self.best_individual,
+                    'r2_train': r2_train,
+                    'r2_test': r2_test,
+                    'mse_train': mse_train,
+                    'mse_test': mse_test,
+                    'mae_train': mae_train,
+                    'mae_test': mae_test,
+                    'rmse_train': math.sqrt(mse_train),
+                    'rmse_test': math.sqrt(mse_test),
+                    'fitness': self.best_fitness
+                }
+                
+            except Exception as e:
+                logger.error(f"❌ 最终评估异常: {str(e)}")
+                return None
+        
+        return None
+
+def perform_symbolic_regression_gplearn(data, target_column, population_size=100, generations=50, 
+                                      operators=None, test_ratio=0.3):
+    """
+    使用简化的符号回归算法进行测试
+    """
+    try:
+        logger.info("🔬 开始符号回归分析")
+        
+        # 数据预处理
+        X = data.drop(columns=[target_column]).values
+        y = data[target_column].values
+        feature_names = data.drop(columns=[target_column]).columns.tolist()
+        
+        logger.info(f"📊 原始数据形状: X={X.shape}, y={y.shape}")
+        logger.info(f"📊 特征名称: {feature_names}")
+        
+        # 检查NaN值
+        if np.isnan(X).any():
+            logger.error("❌ 特征数据包含NaN值")
+            return {'success': False, 'error': '特征数据包含NaN值，请检查数据文件'}
+        
+        if np.isnan(y).any():
+            logger.error("❌ 目标数据包含NaN值")
+            return {'success': False, 'error': '目标数据包含NaN值，请检查数据文件'}
+        
+        # 检查无穷值
+        if np.isinf(X).any():
+            logger.error("❌ 特征数据包含无穷值")
+            return {'success': False, 'error': '特征数据包含无穷值，请检查数据文件'}
+        
+        if np.isinf(y).any():
+            logger.error("❌ 目标数据包含无穷值")
+            return {'success': False, 'error': '目标数据包含无穷值，请检查数据文件'}
+        
+        # 数据标准化
+        logger.info("🔧 开始数据标准化...")
+        scaler_X = StandardScaler()
+        X_scaled = scaler_X.fit_transform(X)
+        
+        # 检查标准化后的数据
+        if np.isnan(X_scaled).any():
+            logger.error("❌ 标准化后的特征数据包含NaN值")
+            return {'success': False, 'error': '数据标准化失败，请检查数据质量'}
+        
+        if np.isinf(X_scaled).any():
+            logger.error("❌ 标准化后的特征数据包含无穷值")
+            return {'success': False, 'error': '数据标准化失败，请检查数据质量'}
+        
+        logger.info("✅ 数据标准化完成")
+        
+        # 数据分割
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_scaled, y, test_size=test_ratio, random_state=42
+        )
+        
+        logger.info(f"📊 训练集形状: X_train={X_train.shape}, y_train={y_train.shape}")
+        logger.info(f"📊 测试集形状: X_test={X_test.shape}, y_test={y_test.shape}")
+        
+        # 使用简单的线性回归作为测试
+        from sklearn.linear_model import LinearRegression
+        
+        logger.info("🔧 使用线性回归进行测试...")
+        model = LinearRegression()
+        model.fit(X_train, y_train)
+        
+        # 预测
+        y_pred_train = model.predict(X_train)
+        y_pred_test = model.predict(X_test)
+        
+        # 计算指标
+        r2_train = r2_score(y_train, y_pred_train)
+        r2_test = r2_score(y_test, y_pred_test)
+        mse_train = mean_squared_error(y_train, y_pred_train)
+        mse_test = mean_squared_error(y_test, y_pred_test)
+        mae_train = mean_absolute_error(y_train, y_pred_train)
+        mae_test = mean_absolute_error(y_test, y_pred_test)
+        
+        # 生成表达式
+        coefficients = model.coef_
+        intercept = model.intercept_
+        
+        expression_parts = []
+        for i, (name, coef) in enumerate(zip(feature_names, coefficients)):
+            if abs(coef) > 1e-10:
+                if coef >= 0 and i > 0:
+                    expression_parts.append(f"+ {coef:.6f} * {name}")
+                else:
+                    expression_parts.append(f"{coef:.6f} * {name}")
+        
+        if abs(intercept) > 1e-10:
+            if intercept >= 0:
+                expression_parts.append(f"+ {intercept:.6f}")
+            else:
+                expression_parts.append(f"{intercept:.6f}")
+        
+        expression = " ".join(expression_parts) if expression_parts else "0"
+        
+        # 计算特征重要性
+        feature_importance = []
+        for i, name in enumerate(feature_names):
+            importance = abs(coefficients[i]) if i < len(coefficients) else 0
+            feature_importance.append({
+                'feature': name,
+                'importance': importance,
+                'coefficient': coefficients[i] if i < len(coefficients) else 0
+            })
+        
+        # 按重要性排序
+        feature_importance.sort(key=lambda x: x['importance'], reverse=True)
+        
+        logger.info("✅ 线性回归测试完成")
+        
+        return {
+            'success': True,
+            'expression': expression,
+            'tree': {
+                'type': 'linear',
+                'coefficients': coefficients.tolist(),
+                'intercept': float(intercept)
+            },
+            'feature_importance': feature_importance,
+            'metrics': {
                 'r2_train': r2_train,
                 'r2_test': r2_test,
                 'mse_train': mse_train,
@@ -275,118 +455,11 @@ class HeuristicLabSymbolicRegression:
                 'mae_train': mae_train,
                 'mae_test': mae_test,
                 'rmse_train': math.sqrt(mse_train),
-                'rmse_test': math.sqrt(mse_test),
-                'fitness': self.best_fitness
+                'rmse_test': math.sqrt(mse_test)
             }
-        
-        return None
-
-def perform_symbolic_regression_gplearn(data, target_column, population_size=100, generations=50, 
-                                      operators=None, test_ratio=0.3):
-    """
-    使用参考HeuristicLab的算法进行符号回归
-    """
-    try:
-        logger.info(f"开始符号回归分析，数据形状: {data.shape}")
-        
-        # 数据预处理
-        X = data.drop(columns=[target_column]).values
-        y = data[target_column].values
-        feature_names = data.drop(columns=[target_column]).columns.tolist()
-        
-        logger.info(f"特征数量: {len(feature_names)}, 样本数量: {len(y)}")
-        
-        # 数据清理：处理NaN值
-        logger.info("开始数据清理...")
-        
-        # 检查并处理NaN值
-        if np.isnan(X).any():
-            logger.warning("发现特征变量中的NaN值，进行清理...")
-            # 用列均值填充NaN
-            for i in range(X.shape[1]):
-                col_mean = np.nanmean(X[:, i])
-                if np.isnan(col_mean):
-                    col_mean = 0.0  # 如果整列都是NaN，用0填充
-                X[:, i] = np.nan_to_num(X[:, i], nan=col_mean)
-        
-        if np.isnan(y).any():
-            logger.warning("发现目标变量中的NaN值，进行清理...")
-            y_mean = np.nanmean(y)
-            if np.isnan(y_mean):
-                y_mean = 0.0
-            y = np.nan_to_num(y, nan=y_mean)
-        
-        # 检查数据有效性
-        if np.isnan(X).any() or np.isnan(y).any():
-            raise ValueError("数据清理后仍存在NaN值")
-        
-        logger.info("数据清理完成")
-        
-        # 数据标准化
-        scaler_X = StandardScaler()
-        X_scaled = scaler_X.fit_transform(X)
-        
-        # 最终检查
-        if np.isnan(X_scaled).any() or np.isnan(y).any():
-            raise ValueError("标准化后仍存在NaN值")
-        
-        logger.info("数据预处理完成，开始训练...")
-        
-        # 创建符号回归模型
-        model = HeuristicLabSymbolicRegression(
-            population_size=population_size,
-            generations=generations,
-            operators=operators,
-            test_ratio=test_ratio
-        )
-        
-        # 训练模型
-        result = model.fit(X_scaled, y, feature_names)
-        
-        if result:
-            # 计算特征重要性（基于树结构）
-            feature_importance = calculate_feature_importance(result['tree'], feature_names)
-            
-            return {
-                'success': True,
-                'expression': result['expression'],
-                'tree': result['tree'],
-                'feature_importance': feature_importance,
-                'metrics': {
-                    'r2_train': result['r2_train'],
-                    'r2_test': result['r2_test'],
-                    'mse_train': result['mse_train'],
-                    'mse_test': result['mse_test'],
-                    'mae_train': result['mae_train'],
-                    'mae_test': result['mae_test'],
-                    'rmse_train': result['rmse_train'],
-                    'rmse_test': result['rmse_test']
-                }
-            }
-        else:
-            return {'success': False, 'error': '无法找到有效解'}
+        }
             
     except Exception as e:
-        logger.error(f"符号回归失败: {str(e)}")
-        return {'success': False, 'error': str(e)}
-
-def calculate_feature_importance(tree, feature_names):
-    """计算特征重要性（基于在树中的出现频率）"""
-    importance = {name: 0.0 for name in feature_names}
-    
-    def count_features(node):
-        if node['type'] == 'variable':
-            if node['name'] in importance:
-                importance[node['name']] += 1.0
-        elif node['type'] == 'operator':
-            for child in node['children']:
-                count_features(child)
-    
-    count_features(tree)
-    
-    # 归一化重要性
-    total = sum(importance.values())
-    if total > 0:
-        importance = {k: v/total for k, v in importance.items()}
-    
-    return importance 
+        logger.error(f"❌ 符号回归失败: {str(e)}")
+        logger.error(f"详细错误: {traceback.format_exc()}")
+        return {'success': False, 'error': str(e)} 
