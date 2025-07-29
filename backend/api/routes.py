@@ -21,7 +21,7 @@ data_bp = Blueprint('data', __name__)
 monte_carlo_engine = MonteCarloAnalysis()
 data_loader = DataLoader()
 
-# 符号回归路由
+# 符号回归分析路由
 @symbolic_regression_bp.route('/symbolic-regression', methods=['POST'])
 def symbolic_regression():
     """符号回归分析"""
@@ -93,27 +93,39 @@ def symbolic_regression():
 def get_models():
     """获取已保存的模型列表"""
     try:
-        # 暂时返回空列表，因为新的算法还没有保存模型的功能
+        # The original code had symbolic_regression_engine.get_saved_models() here,
+        # but symbolic_regression_engine was removed.
+        # Assuming this function is no longer relevant or will be re-added later.
+        # For now, returning an empty list or a placeholder message.
         return jsonify({
             'success': True,
-            'models': []
+            'models': [] # Placeholder, as symbolic_regression_engine is removed
         })
     except Exception as e:
         logger.error(f"获取模型列表失败: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({
+            'error': '获取失败',
+            'message': str(e)
+        }), 500
 
 @symbolic_regression_bp.route('/models/<model_id>', methods=['GET'])
 def get_model(model_id):
-    """获取特定模型"""
+    """获取特定模型详情"""
     try:
-        # 暂时返回错误，因为新的算法还没有保存模型的功能
+        # The original code had symbolic_regression_engine.get_model(model_id) here,
+        # but symbolic_regression_engine was removed.
+        # Assuming this function is no longer relevant or will be re-added later.
+        # For now, returning a placeholder message.
         return jsonify({
-            'success': False,
-            'error': '模型不存在'
-        })
+            'error': '模型详情获取失败',
+            'message': f'模型ID {model_id} 不存在或获取失败' # Placeholder
+        }), 404
     except Exception as e:
-        logger.error(f"获取模型失败: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)})
+        logger.error(f"获取模型详情失败: {str(e)}")
+        return jsonify({
+            'error': '获取失败',
+            'message': str(e)
+        }), 500
 
 # 蒙特卡罗分析路由
 @monte_carlo_bp.route('/analyze', methods=['POST'])

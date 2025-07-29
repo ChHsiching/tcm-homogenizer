@@ -279,149 +279,112 @@ function updateFeatureColumnsCheckboxes(columns) {
     });
 }
 
-// 开始符号回归
+// 开始符号回归分析
 async function startRegression() {
-    if (!currentData) {
-        showNotification('请先上传数据文件', 'warning');
-        return;
-    }
-    
-    const targetColumn = document.getElementById('target-column').value;
-    const featureCheckboxes = document.querySelectorAll('#feature-columns input[type="checkbox"]:checked');
-    
-    if (!targetColumn) {
-        showNotification('请选择目标变量', 'warning');
-        return;
-    }
-    
-    if (featureCheckboxes.length === 0) {
-        showNotification('请选择至少一个特征变量', 'warning');
-        return;
-    }
-    
-    const featureColumns = Array.from(featureCheckboxes).map(cb => cb.value);
-    const populationSize = parseInt(document.getElementById('population-size').value) || 100;
-    const generations = parseInt(document.getElementById('generations').value) || 50;
-    const testRatio = parseInt(document.getElementById('test-ratio').value) || 30;
-    
-    // 获取选择的运算符并映射到后端期望的格式
-    const operators = [];
-    if (document.getElementById('op-add').checked) operators.push('+');
-    if (document.getElementById('op-sub').checked) operators.push('-');
-    if (document.getElementById('op-mul').checked) operators.push('*');
-    if (document.getElementById('op-div').checked) operators.push('/');
-    if (document.getElementById('op-pow').checked) operators.push('**');
-    if (document.getElementById('op-sqrt').checked) operators.push('sqrt');
-    
-    if (operators.length === 0) {
-        showNotification('请至少选择一个运算符号', 'warning');
-        return;
-    }
-    
-    showLoading('正在进行符号回归分析...');
-    
     try {
-        const result = await performSymbolicRegression({
-            data: currentData,
-            targetColumn,
-            featureColumns,
-            populationSize,
-            generations,
-            testRatio: testRatio / 100, // 转换为小数
-            operators
-        });
+        // 获取数据
+        const data = window.currentData;
+        if (!data || !data.data || data.data.length === 0) {
+            showNotification('没有可用的数据，请先上传数据文件', 'error');
+            return;
+        }
         
-        // 保存模型
-        regressionModels.push(result);
-        updateRegressionModelList();
+        // 获取目标变量
+        const targetColumn = document.getElementById('target-column').value;
+        if (!targetColumn) {
+            showNotification('请选择目标变量', 'error');
+            return;
+        }
+        
+        // 获取特征变量
+        const featureCheckboxes = document.querySelectorAll('#feature-columns input[type="checkbox"]:checked');
+        if (featureCheckboxes.length === 0) {
+            showNotification('请至少选择一个特征变量', 'error');
+            return;
+        }
+        
+        const featureColumns = Array.from(featureCheckboxes).map(cb => cb.value);
+        
+        // 获取参数
+        const populationSize = parseInt(document.getElementById('population-size').value) || 100;
+        const generations = parseInt(document.getElementById('generations').value) || 50;
+        const testRatio = parseFloat(document.getElementById('test-ratio').value) / 100 || 0.3;
+        
+        // 获取选择的运算符
+        const operators = getSelectedOperators();
+        if (operators.length === 0) {
+            showNotification('请至少选择一个运算符', 'error');
+            return;
+        }
+        
+        // 显示加载状态
+        showNotification('正在执行符号回归分析，请稍候...', 'info');
+        
+        // 保存当前数据供后续使用
+        window.currentData = data;
+        window.currentTargetColumn = targetColumn;
+        window.currentFeatureColumns = featureColumns;
+        
+        // 执行符号回归分析
+        const result = await performSymbolicRegression({
+            data: data.data,
+            targetColumn: targetColumn,
+            featureColumns: featureColumns,
+            populationSize: populationSize,
+            generations: generations,
+            testRatio: testRatio,
+            operators: operators
+        });
         
         // 显示结果
         displayRegressionResults(result);
         
-        showNotification('符号回归分析完成', 'success');
-        
     } catch (error) {
-        // 提供用户友好的错误消息
-        let userMessage = '符号回归分析失败';
-        if (error.message.includes('All arrays must be of the same length')) {
-            userMessage = '数据格式错误：请检查CSV文件中的数据列长度是否一致';
-        } else if (error.message.includes('没有可用的数据')) {
-            userMessage = '请先上传数据文件，并确保数据格式正确';
-        } else if (error.message.includes('目标变量列')) {
-            userMessage = '目标变量列不存在，请检查数据文件';
-        } else if (error.message.includes('特征变量列')) {
-            userMessage = '特征变量列不存在，请检查数据文件';
-        } else if (error.message.includes('数据样本数量太少')) {
-            userMessage = '数据样本数量太少，至少需要10个样本';
-        } else if (error.message.includes('目标变量没有变化')) {
-            userMessage = '目标变量没有变化，无法进行回归分析';
-        } else if (error.message.includes('HTTP')) {
-            userMessage = '后端服务连接失败，请检查服务是否正常运行';
-        } else {
-            userMessage += ': ' + error.message;
-        }
+        console.error('符号回归分析失败:', error);
+        const userMessage = handleApiError(error);
         showNotification(userMessage, 'error');
-    } finally {
-        hideLoading();
     }
 }
 
 // 执行符号回归分析
 async function performSymbolicRegression(params) {
     try {
-        console.log('Calling symbolic regression API with params:', params);
+        console.log('开始符号回归分析，参数:', params);
         
-        const response = await fetch('http://localhost:5000/api/regression/symbolic-regression', {
+        // 准备请求数据
+        const requestData = {
+            data: params.data,
+            target_column: params.targetColumn,
+            feature_columns: params.featureColumns,
+            population_size: params.populationSize,
+            generations: params.generations,
+            test_ratio: params.testRatio,
+            operators: params.operators
+        };
+        
+        console.log('发送请求数据:', requestData);
+        
+        // 调用后端API
+        const response = await fetch('/api/regression/symbolic-regression', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                data: params.data,
-                target_column: params.targetColumn,
-                feature_columns: params.featureColumns,
-                population_size: params.populationSize,
-                generations: params.generations,
-                test_ratio: params.testRatio,
-                operators: params.operators
-            })
+            body: JSON.stringify(requestData)
         });
         
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `HTTP ${response.status}`);
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
         const result = await response.json();
-        console.log('API response:', result);
+        console.log('符号回归分析结果:', result);
         
-        if (!result.success) {
-            throw new Error(result.error || '分析失败');
+        if (result.success) {
+            return result;
+        } else {
+            throw new Error(result.error || '符号回归分析失败');
         }
-        
-        // 转换结果格式以匹配前端期望
-        return {
-            id: Date.now(),
-            model_id: Date.now(),
-            expression: result.expression || '',
-            r2: result.metrics ? result.metrics.r2_test : 0,
-            mse: result.metrics ? result.metrics.mse_test : 0,
-            featureImportance: result.feature_importance ? 
-                Object.entries(result.feature_importance).map(([feature, importance]) => ({
-                    feature: feature,
-                    importance: importance
-                })) : [],
-            predictions: {},
-            parameters: {
-                population_size: params.populationSize,
-                generations: params.generations,
-                test_ratio: params.testRatio,
-                operators: params.operators
-            },
-            // 添加新的字段以支持新的显示
-            tree: result.tree,
-            metrics: result.metrics
-        };
         
     } catch (error) {
         console.error('符号回归分析失败:', error);
@@ -429,80 +392,34 @@ async function performSymbolicRegression(params) {
     }
 }
 
-// 显示回归结果
+// 显示符号回归结果
 function displayRegressionResults(result) {
-    console.log('displayRegressionResults called with:', result);
+    console.log('显示符号回归结果:', result);
     
-    const container = document.getElementById('regression-results');
-    const formulaDisplay = document.getElementById('formula-display');
-    
-    console.log('container:', container);
-    console.log('formulaDisplay:', formulaDisplay);
-    
-    if (!container) {
-        console.error('regression-results container not found');
-        return;
-    }
-    
-    // 获取目标变量列名
-    const targetColumn = document.getElementById('target-column').value;
-    
-    // 渲染LaTeX公式
-    if (result.expression && formulaDisplay) {
-        renderLatexFormula(result.expression, targetColumn);
-    }
-    
-    // 更新性能指标
-    if (result.metrics) {
-        updatePerformanceMetrics(result.metrics);
-    }
-    
-    // 生成公式结构树
-    if (result.tree && result.featureImportance) {
-        const featureImportance = {};
-        result.featureImportance.forEach(f => {
-            featureImportance[f.feature] = f.importance;
-        });
-        generateFormulaTree({
-            expression: result.expression,
-            tree: result.tree,
-            featureImportance: featureImportance
-        });
-    }
-    
-    // 显示基本结果
-    container.innerHTML = `
-        <div class="result-item">
-            <h4>回归表达式</h4>
-            <p class="expression">${result.expression || '无表达式'}</p>
-        </div>
+    try {
+        // 更新性能指标
+        if (result.metrics) {
+            updatePerformanceMetrics(result.metrics);
+        }
         
-        <div class="result-item">
-            <h4>模型性能</h4>
-            <p>R² = ${result.r2 ? result.r2.toFixed(3) : '0.000'}</p>
-            <p>MSE = ${result.mse ? result.mse.toFixed(3) : '0.000'}</p>
-        </div>
+        // 渲染LaTeX公式
+        if (result.expression) {
+            const targetColumn = document.getElementById('target-column').value;
+            renderLatexFormula(result.expression, targetColumn);
+        }
         
-        <div class="result-item">
-            <h4>特征重要性</h4>
-            <ul>
-                ${result.featureImportance && result.featureImportance.length > 0 ? 
-                    result.featureImportance.map(f => 
-                        `<li>${f.feature}: ${f.importance ? f.importance.toFixed(3) : '0.000'}</li>`
-                    ).join('') : '<li>无特征重要性数据</li>'
-                }
-            </ul>
-        </div>
+        // 生成公式结构树
+        if (result.tree && result.feature_importance) {
+            generateFormulaTree(result);
+        }
         
-        <div class="result-item">
-            <h4>分析参数</h4>
-            <p>种群大小: ${result.parameters ? result.parameters.population_size : 'N/A'}</p>
-            <p>进化代数: ${result.parameters ? result.parameters.generations : 'N/A'}</p>
-            <p>测试比例: ${result.parameters ? (result.parameters.test_ratio * 100).toFixed(1) + '%' : 'N/A'}</p>
-        </div>
-    `;
-    
-    console.log('Regression results displayed successfully');
+        // 显示成功消息
+        showNotification('符号回归分析完成！', 'success');
+        
+    } catch (error) {
+        console.error('显示结果失败:', error);
+        showNotification('显示结果失败: ' + error.message, 'error');
+    }
 }
 
 // 格式化公式为LaTeX（支持分段渲染）
@@ -865,7 +782,7 @@ function generateFormulaTree(result) {
     treeContainer.innerHTML = '';
     
     // 解析表达式生成语法树
-    const syntaxTree = parseExpressionToSyntaxTree(result.expression, result.featureImportance);
+    const syntaxTree = parseExpressionToSyntaxTree(result.expression, result.feature_importance);
     
     // 获取容器实际尺寸，确保不超出窗口
     const containerWidth = treeContainer.clientWidth || 800;
@@ -1533,32 +1450,81 @@ function hideLoading() {
     }
 }
 
-// 显示通知
+// 显示用户友好的通知
 function showNotification(message, type = 'info') {
-    // 移除现有通知
-    const existingNotifications = document.querySelectorAll('.notification');
-    existingNotifications.forEach(notification => {
-        notification.remove();
-    });
+    console.log(`[${type.toUpperCase()}] ${message}`);
     
-    // 创建新通知
+    // 创建通知元素
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
-    
-    notification.innerHTML = `
-        <div class="notification-message">${message}</div>
-        <button class="notification-close" onclick="this.parentElement.remove()">×</button>
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        z-index: 10000;
+        max-width: 400px;
+        word-wrap: break-word;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        border-left: 4px solid;
+        animation: slideIn 0.3s ease-out;
     `;
+    
+    // 根据类型设置样式
+    switch (type) {
+        case 'success':
+            notification.style.background = '#1a1a1a';
+            notification.style.borderLeftColor = '#22c55e';
+            break;
+        case 'error':
+            notification.style.background = '#1a1a1a';
+            notification.style.borderLeftColor = '#ef4444';
+            break;
+        case 'warning':
+            notification.style.background = '#1a1a1a';
+            notification.style.borderLeftColor = '#f59e0b';
+            break;
+        default:
+            notification.style.background = '#1a1a1a';
+            notification.style.borderLeftColor = '#3b82f6';
+    }
+    
+    notification.textContent = message;
     
     // 添加到页面
     document.body.appendChild(notification);
     
-    // 自动移除通知
+    // 自动移除
     setTimeout(() => {
-        if (notification.parentElement) {
-            notification.remove();
+        if (notification.parentNode) {
+            notification.style.animation = 'slideOut 0.3s ease-in';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
         }
     }, 5000);
+    
+    // 添加动画样式
+    if (!document.getElementById('notification-styles')) {
+        const style = document.createElement('style');
+        style.id = 'notification-styles';
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
 }
 
 // 显示关于对话框
@@ -1574,4 +1540,42 @@ function visualizeResults(modelId) {
 // 导出蒙特卡罗结果
 function exportMonteCarloResults(analysisId) {
     showNotification('导出功能开发中...', 'info');
+} 
+
+// 处理API错误，转换为用户友好的消息
+function handleApiError(error) {
+    console.error('API错误:', error);
+    
+    let userMessage = '操作失败，请稍后重试';
+    
+    if (error.message) {
+        const message = error.message.toLowerCase();
+        
+        if (message.includes('all arrays must be of the same length')) {
+            userMessage = '数据格式错误：请检查CSV文件中的数据列长度是否一致';
+        } else if (message.includes('没有可用的数据')) {
+            userMessage = '没有可用的数据，请先上传数据文件';
+        } else if (message.includes('数据样本数量太少')) {
+            userMessage = '数据样本数量太少，至少需要10个样本才能进行可靠分析';
+        } else if (message.includes('目标变量没有变化')) {
+            userMessage = '目标变量没有变化，无法进行回归分析';
+        } else if (message.includes('数据包含非数值类型')) {
+            userMessage = '数据格式错误：请确保所有特征和目标变量都是数值类型';
+        } else if (message.includes('特征数据与目标数据长度不匹配')) {
+            userMessage = '数据格式错误：特征数据与目标数据长度不匹配';
+        } else if (message.includes('目标变量列') && message.includes('不存在')) {
+            userMessage = '目标变量列不存在，请检查数据文件';
+        } else if (message.includes('特征变量列') && message.includes('不存在')) {
+            userMessage = '特征变量列不存在，请检查数据文件';
+        } else if (message.includes('network') || message.includes('fetch')) {
+            userMessage = '网络连接失败，请检查后端服务是否正常运行';
+        } else if (message.includes('http')) {
+            userMessage = '服务器连接失败，请检查后端服务状态';
+        } else {
+            // 保留原始错误信息，但简化技术细节
+            userMessage = error.message.replace(/^.*?:\s*/, '').replace(/\[.*?\]/g, '');
+        }
+    }
+    
+    return userMessage;
 } 
