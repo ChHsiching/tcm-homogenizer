@@ -11,7 +11,6 @@ from loguru import logger
 import json
 from pathlib import Path
 import time
-from .symbolic_regression import SymbolicRegression
 from sklearn.preprocessing import StandardScaler
 import warnings
 warnings.filterwarnings('ignore')
@@ -23,7 +22,6 @@ class MonteCarloAnalysis:
         self.results = {}
         self.results_dir = Path("monte_carlo_results")
         self.results_dir.mkdir(exist_ok=True)
-        self.regression_engine = SymbolicRegression()
         self._load_saved_results()
     
     def analyze(self, model_id: str, target_efficacy: float, iterations: int = 10000,
@@ -45,8 +43,8 @@ class MonteCarloAnalysis:
             logger.info(f"开始蒙特卡罗分析，模型ID: {model_id}")
             logger.info(f"目标药效: {target_efficacy}, 模拟次数: {iterations}")
             
-            # 获取回归模型
-            model = self.regression_engine.get_model(model_id)
+            # 获取回归模型（从保存的结果中）
+            model = self._get_saved_model(model_id)
             if not model:
                 raise ValueError(f"模型 {model_id} 不存在")
             
@@ -430,149 +428,3 @@ class MonteCarloAnalysis:
         except Exception as e:
             logger.error(f"生成最优配比区间失败: {str(e)}")
             raise 
-
-def perform_monte_carlo_analysis(data, target_column, feature_columns, iterations=10000, 
-                                confidence_level=0.95, sample_size=1000):
-    """
-    执行蒙特卡罗分析（直接使用数据）
-    """
-    try:
-        logger.info(f"开始蒙特卡罗分析，目标变量: {target_column}, 特征数量: {len(feature_columns)}")
-        
-        # 数据预处理
-        df = pd.DataFrame(data)
-        
-        # 检查列是否存在
-        if target_column not in df.columns:
-            return {'success': False, 'error': f'目标变量列 "{target_column}" 不存在'}
-        
-        for col in feature_columns:
-            if col not in df.columns:
-                return {'success': False, 'error': f'特征变量列 "{col}" 不存在'}
-        
-        # 提取数据
-        X = df[feature_columns].values
-        y = df[target_column].values
-        
-        # 数据验证
-        if len(df) < 10:
-            return {'success': False, 'error': '数据样本数量太少，至少需要10个样本'}
-        
-        if len(feature_columns) == 0:
-            return {'success': False, 'error': '没有可用的特征变量'}
-        
-        # 检查数据类型
-        try:
-            X = X.astype(float)
-            y = y.astype(float)
-        except Exception as e:
-            return {'success': False, 'error': '数据包含非数值类型，请确保所有特征和目标变量都是数值'}
-        
-        # 检查数据长度一致性
-        if len(X) != len(y):
-            return {'success': False, 'error': '特征数据与目标数据长度不匹配'}
-        
-        # 检查目标变量变化
-        if np.std(y) < 1e-6:
-            return {'success': False, 'error': '目标变量没有变化，无法进行分析'}
-        
-        # 处理缺失值
-        X = np.nan_to_num(X, nan=0.0)
-        y = np.nan_to_num(y, nan=np.nanmean(y))
-        
-        # 数据标准化
-        scaler_X = StandardScaler()
-        X_scaled = scaler_X.fit_transform(X)
-        
-        # 计算目标药效值（使用均值）
-        target_efficacy = np.mean(y)
-        
-        # 生成随机样本
-        valid_samples = []
-        all_samples = []
-        
-        logger.info(f"生成 {iterations} 个随机样本...")
-        
-        for i in range(iterations):
-            # 生成随机配比
-            sample = {}
-            for feature_name in feature_columns:
-                # 使用0-1范围的随机值
-                sample[feature_name] = np.random.uniform(0.0, 1.0)
-            
-            all_samples.append(sample)
-            
-            # 预测药效值
-            predicted_efficacy = _predict_efficacy_simple(sample, X_scaled, y, feature_columns)
-            
-            # 检查是否在目标范围内
-            tolerance = 0.1 * target_efficacy  # 10%容差
-            if abs(predicted_efficacy - target_efficacy) <= tolerance:
-                valid_samples.append(sample)
-        
-        # 计算统计信息
-        valid_rate = len(valid_samples) / iterations if iterations > 0 else 0
-        
-        # 计算成分统计
-        component_statistics = {}
-        if valid_samples:
-            for feature in feature_columns:
-                values = [sample[feature] for sample in valid_samples]
-                component_statistics[feature] = {
-                    'mean': np.mean(values),
-                    'std': np.std(values),
-                    'min': np.min(values),
-                    'max': np.max(values),
-                    'median': np.median(values)
-                }
-        
-        # 生成分布数据
-        distribution_data = {
-            'target_efficacy': float(target_efficacy),
-            'valid_rate': float(valid_rate),
-            'total_samples': iterations,
-            'valid_samples': len(valid_samples),
-            'tolerance': float(tolerance)
-        }
-        
-        # 生成样本数据（限制数量）
-        sample_data = {
-            'valid_samples': valid_samples[:sample_size],
-            'all_samples': all_samples[:sample_size]
-        }
-        
-        result = {
-            'analysis_id': f"mc_{int(time.time())}",
-            'target_efficacy': target_efficacy,
-            'iterations': iterations,
-            'valid_rate': valid_rate,
-            'component_statistics': component_statistics,
-            'distribution_data': distribution_data,
-            'sample_data': sample_data,
-            'confidence_level': confidence_level
-        }
-        
-        logger.info(f"蒙特卡罗分析完成，有效样本率: {valid_rate:.2%}")
-        return {'success': True, 'result': result}
-        
-    except Exception as e:
-        logger.error(f"蒙特卡罗分析失败: {str(e)}")
-        return {'success': False, 'error': str(e)}
-
-def _predict_efficacy_simple(sample, X_scaled, y, feature_names):
-    """简单的药效预测（基于最近邻）"""
-    try:
-        # 将样本转换为标准化格式
-        sample_values = np.array([sample[feature] for feature in feature_names])
-        
-        # 使用简单的线性组合预测
-        # 这里使用训练数据的加权平均作为预测
-        weights = np.exp(-np.sum((X_scaled - sample_values) ** 2, axis=1))
-        weights = weights / np.sum(weights) if np.sum(weights) > 0 else np.ones(len(y)) / len(y)
-        
-        predicted = np.sum(y * weights)
-        return predicted
-        
-    except Exception as e:
-        logger.error(f"药效预测失败: {str(e)}")
-        return 0.0 

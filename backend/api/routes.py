@@ -9,7 +9,6 @@ from loguru import logger
 import traceback
 import pandas as pd
 
-from algorithms.symbolic_regression import SymbolicRegression
 from algorithms.monte_carlo import MonteCarloAnalysis
 from utils.data_loader import DataLoader
 
@@ -19,7 +18,6 @@ monte_carlo_bp = Blueprint('monte_carlo', __name__)
 data_bp = Blueprint('data', __name__)
 
 # 全局实例
-symbolic_regression_engine = SymbolicRegression()
 monte_carlo_engine = MonteCarloAnalysis()
 data_loader = DataLoader()
 
@@ -95,84 +93,76 @@ def symbolic_regression():
 def get_models():
     """获取已保存的模型列表"""
     try:
-        models = symbolic_regression_engine.get_saved_models()
+        # 暂时返回空列表，因为新的算法还没有保存模型的功能
         return jsonify({
             'success': True,
-            'models': models
+            'models': []
         })
     except Exception as e:
         logger.error(f"获取模型列表失败: {str(e)}")
-        return jsonify({
-            'error': '获取失败',
-            'message': str(e)
-        }), 500
+        return jsonify({'success': False, 'error': str(e)})
 
 @symbolic_regression_bp.route('/models/<model_id>', methods=['GET'])
 def get_model(model_id):
-    """获取特定模型详情"""
+    """获取特定模型"""
     try:
-        model = symbolic_regression_engine.get_model(model_id)
-        if model:
-            return jsonify({
-                'success': True,
-                'model': model
-            })
-        else:
-            return jsonify({
-                'error': '模型不存在',
-                'message': f'模型ID {model_id} 不存在'
-            }), 404
-    except Exception as e:
-        logger.error(f"获取模型详情失败: {str(e)}")
+        # 暂时返回错误，因为新的算法还没有保存模型的功能
         return jsonify({
-            'error': '获取失败',
-            'message': str(e)
-        }), 500
+            'success': False,
+            'error': '模型不存在'
+        })
+    except Exception as e:
+        logger.error(f"获取模型失败: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
 
 # 蒙特卡罗分析路由
 @monte_carlo_bp.route('/analyze', methods=['POST'])
 def monte_carlo_analyze():
-    """蒙特卡罗分析"""
+    """蒙特卡罗配比分析"""
     try:
         data = request.get_json()
         
         # 验证必要参数
-        required_fields = ['data', 'target_column', 'feature_columns']
+        required_fields = ['model_id', 'target_efficacy', 'iterations']
         for field in required_fields:
             if field not in data:
-                return jsonify({'success': False, 'error': f'缺少必要参数: {field}'})
+                return jsonify({
+                    'error': '参数缺失',
+                    'message': f'缺少必要参数: {field}'
+                }), 400
         
         # 获取参数
-        input_data = data['data']
-        target_column = data['target_column']
-        feature_columns = data['feature_columns']
-        iterations = data.get('iterations', 10000)
-        confidence_level = data.get('confidence_level', 0.95)
-        sample_size = data.get('sample_size', 1000)
+        model_id = data['model_id']
+        target_efficacy = data['target_efficacy']
+        iterations = data['iterations']
+        tolerance = data.get('tolerance', 0.1)
+        component_ranges = data.get('component_ranges', {})
         
-        logger.info(f"开始蒙特卡罗分析，目标变量: {target_column}, 特征数量: {len(feature_columns)}")
+        logger.info(f"开始蒙特卡罗分析，模型ID: {model_id}")
+        logger.info(f"目标药效: {target_efficacy}, 模拟次数: {iterations}")
         
-        # 执行蒙特卡罗分析（使用新的函数）
-        from algorithms.monte_carlo import perform_monte_carlo_analysis
-        
-        result = perform_monte_carlo_analysis(
-            data=input_data,
-            target_column=target_column,
-            feature_columns=feature_columns,
+        # 执行蒙特卡罗分析
+        result = monte_carlo_engine.analyze(
+            model_id=model_id,
+            target_efficacy=target_efficacy,
             iterations=iterations,
-            confidence_level=confidence_level,
-            sample_size=sample_size
+            tolerance=tolerance,
+            component_ranges=component_ranges
         )
         
-        if result['success']:
-            logger.info(f"蒙特卡罗分析完成，有效样本率: {result['result']['valid_rate']:.2%}")
-            return jsonify(result)
-        else:
-            return jsonify({'success': False, 'error': result['error']})
-            
+        logger.info("蒙特卡罗分析完成")
+        return jsonify({
+            'success': True,
+            'result': result
+        })
+        
     except Exception as e:
         logger.error(f"蒙特卡罗分析失败: {str(e)}")
-        return jsonify({'success': False, 'error': str(e)})
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'error': '分析失败',
+            'message': str(e)
+        }), 500
 
 @monte_carlo_bp.route('/results/<analysis_id>', methods=['GET'])
 def get_monte_carlo_result(analysis_id):
