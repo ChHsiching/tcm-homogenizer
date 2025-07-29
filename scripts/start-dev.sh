@@ -22,23 +22,15 @@ echo "📡 启动后端服务..."
 cd backend
 source venv/bin/activate
 
-# 检查后端依赖
-echo "🔍 检查后端依赖..."
+# 检查依赖
+echo "🔍 检查Python依赖..."
 python -c "import flask, pandas, numpy, sklearn, loguru" 2>/dev/null || {
-    echo "❌ 后端依赖不完整，请运行: cd backend && source venv/bin/activate && pip install -r requirements.txt"
+    echo "❌ Python依赖不完整，请运行: pip install -r requirements.txt"
     exit 1
 }
 
-# 确保端口5000没有被占用
-echo "🔍 检查端口5000..."
-if lsof -ti:5000 > /dev/null 2>&1; then
-    echo "⚠️  端口5000被占用，正在停止占用进程..."
-    lsof -ti:5000 | xargs kill -9 2>/dev/null || true
-    sleep 2
-fi
-
-# 启动后端服务（使用nohup后台运行）
-echo "🚀 启动后端服务..."
+# 启动后端服务
+echo "🚀 启动Flask后端服务..."
 nohup python main.py > backend.log 2>&1 &
 BACKEND_PID=$!
 echo "✅ 后端服务已启动 (PID: $BACKEND_PID)"
@@ -49,39 +41,28 @@ sleep 5
 
 # 检查后端服务是否正常
 echo "🔍 检查后端服务状态..."
-for i in {1..15}; do
-    if curl -s http://127.0.0.1:5000/api/health > /dev/null 2>&1; then
-        echo "✅ 后端服务运行正常"
-        break
-    else
-        echo "⏳ 等待后端服务启动... (尝试 $i/15)"
-        sleep 2
-    fi
-    
-    if [ $i -eq 15 ]; then
-        echo "❌ 后端服务启动失败，请检查 backend.log"
-        echo "📋 后端日志:"
-        tail -20 backend.log
-        echo ""
-        echo "🔧 尝试手动启动后端服务:"
-        echo "cd backend && source venv/bin/activate && python main.py"
-        exit 1
-    fi
-done
+if curl -s http://127.0.0.1:5000/api/health > /dev/null 2>&1; then
+    echo "✅ 后端服务运行正常"
+else
+    echo "❌ 后端服务启动失败，请检查 backend.log"
+    echo "📋 后端日志内容:"
+    tail -20 backend.log
+    exit 1
+fi
 
 # 启动前端服务
 echo "🖥️  启动前端服务..."
 cd ../frontend
 
-# 检查前端依赖
-echo "🔍 检查前端依赖..."
+# 检查Node.js依赖
+echo "🔍 检查Node.js依赖..."
 if [ ! -d "node_modules" ]; then
-    echo "📦 安装前端依赖..."
+    echo "📦 安装Node.js依赖..."
     npm install
 fi
 
 # 启动前端服务
-echo "🚀 启动前端服务..."
+echo "🚀 启动Electron前端应用..."
 npm start &
 FRONTEND_PID=$!
 echo "✅ 前端服务已启动 (PID: $FRONTEND_PID)"

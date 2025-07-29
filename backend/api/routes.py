@@ -9,6 +9,7 @@ from loguru import logger
 import traceback
 import pandas as pd
 
+from algorithms.symbolic_regression import perform_symbolic_regression_gplearn
 from algorithms.monte_carlo import MonteCarloAnalysis
 from utils.data_loader import DataLoader
 
@@ -21,7 +22,7 @@ data_bp = Blueprint('data', __name__)
 monte_carlo_engine = MonteCarloAnalysis()
 data_loader = DataLoader()
 
-# 符号回归分析路由
+# 符号回归路由
 @symbolic_regression_bp.route('/symbolic-regression', methods=['POST'])
 def symbolic_regression():
     """符号回归分析"""
@@ -68,8 +69,6 @@ def symbolic_regression():
             return jsonify({'success': False, 'error': '目标变量没有变化，无法进行回归分析'})
         
         # 执行符号回归（使用新的HeuristicLab算法）
-        from algorithms.symbolic_regression import perform_symbolic_regression_gplearn
-        
         result = perform_symbolic_regression_gplearn(
             data=df,
             target_column=target_column,
@@ -93,39 +92,31 @@ def symbolic_regression():
 def get_models():
     """获取已保存的模型列表"""
     try:
-        # The original code had symbolic_regression_engine.get_saved_models() here,
-        # but symbolic_regression_engine was removed.
-        # Assuming this function is no longer relevant or will be re-added later.
-        # For now, returning an empty list or a placeholder message.
         return jsonify({
             'success': True,
-            'models': [] # Placeholder, as symbolic_regression_engine is removed
+            'models': []
         })
     except Exception as e:
         logger.error(f"获取模型列表失败: {str(e)}")
         return jsonify({
-            'error': '获取失败',
-            'message': str(e)
-        }), 500
+            'success': False,
+            'error': str(e)
+        })
 
 @symbolic_regression_bp.route('/models/<model_id>', methods=['GET'])
 def get_model(model_id):
     """获取特定模型详情"""
     try:
-        # The original code had symbolic_regression_engine.get_model(model_id) here,
-        # but symbolic_regression_engine was removed.
-        # Assuming this function is no longer relevant or will be re-added later.
-        # For now, returning a placeholder message.
         return jsonify({
-            'error': '模型详情获取失败',
-            'message': f'模型ID {model_id} 不存在或获取失败' # Placeholder
-        }), 404
+            'success': False,
+            'error': '模型不存在'
+        })
     except Exception as e:
         logger.error(f"获取模型详情失败: {str(e)}")
         return jsonify({
-            'error': '获取失败',
-            'message': str(e)
-        }), 500
+            'success': False,
+            'error': str(e)
+        })
 
 # 蒙特卡罗分析路由
 @monte_carlo_bp.route('/analyze', methods=['POST'])
@@ -139,9 +130,9 @@ def monte_carlo_analyze():
         for field in required_fields:
             if field not in data:
                 return jsonify({
-                    'error': '参数缺失',
-                    'message': f'缺少必要参数: {field}'
-                }), 400
+                    'success': False,
+                    'error': f'缺少必要参数: {field}'
+                })
         
         # 获取参数
         model_id = data['model_id']
@@ -172,9 +163,9 @@ def monte_carlo_analyze():
         logger.error(f"蒙特卡罗分析失败: {str(e)}")
         logger.error(traceback.format_exc())
         return jsonify({
-            'error': '分析失败',
-            'message': str(e)
-        }), 500
+            'success': False,
+            'error': str(e)
+        })
 
 @monte_carlo_bp.route('/results/<analysis_id>', methods=['GET'])
 def get_monte_carlo_result(analysis_id):
@@ -188,15 +179,15 @@ def get_monte_carlo_result(analysis_id):
             })
         else:
             return jsonify({
-                'error': '结果不存在',
-                'message': f'分析ID {analysis_id} 不存在'
-            }), 404
+                'success': False,
+                'error': f'分析ID {analysis_id} 不存在'
+            })
     except Exception as e:
         logger.error(f"获取蒙特卡罗结果失败: {str(e)}")
         return jsonify({
-            'error': '获取失败',
-            'message': str(e)
-        }), 500
+            'success': False,
+            'error': str(e)
+        })
 
 # 数据处理路由
 @data_bp.route('/upload', methods=['POST'])
@@ -205,16 +196,16 @@ def upload_data():
     try:
         if 'file' not in request.files:
             return jsonify({
-                'error': '文件缺失',
-                'message': '请选择要上传的文件'
-            }), 400
+                'success': False,
+                'error': '请选择要上传的文件'
+            })
         
         file = request.files['file']
         if file.filename == '':
             return jsonify({
-                'error': '文件缺失',
-                'message': '请选择要上传的文件'
-            }), 400
+                'success': False,
+                'error': '请选择要上传的文件'
+            })
         
         # 处理文件上传
         result = data_loader.upload_file(file)
@@ -228,9 +219,9 @@ def upload_data():
     except Exception as e:
         logger.error(f"文件上传失败: {str(e)}")
         return jsonify({
-            'error': '上传失败',
-            'message': str(e)
-        }), 500
+            'success': False,
+            'error': str(e)
+        })
 
 @data_bp.route('/validate', methods=['POST'])
 def validate_data():
@@ -240,9 +231,9 @@ def validate_data():
         
         if 'data' not in data:
             return jsonify({
-                'error': '数据缺失',
-                'message': '请提供要验证的数据'
-            }), 400
+                'success': False,
+                'error': '请提供要验证的数据'
+            })
         
         # 验证数据
         validation_result = data_loader.validate_data(data['data'])
@@ -255,9 +246,9 @@ def validate_data():
     except Exception as e:
         logger.error(f"数据验证失败: {str(e)}")
         return jsonify({
-            'error': '验证失败',
-            'message': str(e)
-        }), 500
+            'success': False,
+            'error': str(e)
+        })
 
 @data_bp.route('/preview', methods=['POST'])
 def preview_data():
@@ -267,9 +258,9 @@ def preview_data():
         
         if 'data' not in data:
             return jsonify({
-                'error': '数据缺失',
-                'message': '请提供要预览的数据'
-            }), 400
+                'success': False,
+                'error': '请提供要预览的数据'
+            })
         
         # 生成数据预览
         preview = data_loader.generate_preview(data['data'])
@@ -282,6 +273,6 @@ def preview_data():
     except Exception as e:
         logger.error(f"数据预览失败: {str(e)}")
         return jsonify({
-            'error': '预览失败',
-            'message': str(e)
-        }), 500 
+            'success': False,
+            'error': str(e)
+        }) 

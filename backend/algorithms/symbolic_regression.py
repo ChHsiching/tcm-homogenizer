@@ -44,8 +44,14 @@ class HeuristicLabSymbolicRegression:
             # 加减法可以有多个子节点
             num_children = random.randint(2, 4)
             children = [self.create_expression_tree(max_depth - 1) for _ in range(num_children)]
-        else:
+        elif operator in ['*', '/', '^']:
             # 乘除法只有两个子节点
+            children = [self.create_expression_tree(max_depth - 1) for _ in range(2)]
+        elif operator == 'sqrt':
+            # 平方根只有一个子节点
+            children = [self.create_expression_tree(max_depth - 1)]
+        else:
+            # 默认两个子节点
             children = [self.create_expression_tree(max_depth - 1) for _ in range(2)]
             
         return {
@@ -86,6 +92,21 @@ class HeuristicLabSymbolicRegression:
                     # 避免除零
                     result = np.where(child_val != 0, result / child_val, result)
                 return result
+            elif tree['operator'] == '^':
+                result = children_values[0]
+                for child_val in children_values[1:]:
+                    # 幂运算
+                    result = np.power(result, child_val)
+                return result
+            elif tree['operator'] == 'sqrt':
+                # 平方根
+                return np.sqrt(np.abs(children_values[0]))
+            else:
+                # 默认加法
+                result = children_values[0]
+                for child_val in children_values[1:]:
+                    result += child_val
+                return result
     
     def tree_to_expression(self, tree):
         """将表达式树转换为字符串表达式"""
@@ -103,6 +124,12 @@ class HeuristicLabSymbolicRegression:
                 return ' * '.join(children_expr)
             elif tree['operator'] == '/':
                 return ' / '.join(children_expr)
+            elif tree['operator'] == '^':
+                return ' ^ '.join(children_expr)
+            elif tree['operator'] == 'sqrt':
+                return f'sqrt({children_expr[0]})'
+            else:
+                return ' + '.join(children_expr)
     
     def calculate_fitness(self, tree, X_train, y_train, X_test, y_test):
         """计算适应度（MSE）"""
@@ -256,32 +283,6 @@ def perform_symbolic_regression_gplearn(data, target_column, population_size=100
         X = data.drop(columns=[target_column]).values
         y = data[target_column].values
         feature_names = data.drop(columns=[target_column]).columns.tolist()
-        
-        # 数据验证
-        if len(data) < 10:
-            return {'success': False, 'error': '数据样本数量太少，至少需要10个样本才能进行可靠分析'}
-        
-        if len(feature_names) == 0:
-            return {'success': False, 'error': '没有可用的特征变量，请检查数据文件'}
-        
-        # 检查数据类型
-        try:
-            X = X.astype(float)
-            y = y.astype(float)
-        except Exception as e:
-            return {'success': False, 'error': '数据包含非数值类型，请确保所有特征和目标变量都是数值'}
-        
-        # 检查数据长度一致性
-        if len(X) != len(y):
-            return {'success': False, 'error': '特征数据与目标数据长度不匹配，请检查数据文件'}
-        
-        # 检查目标变量变化
-        if np.std(y) < 1e-6:
-            return {'success': False, 'error': '目标变量没有变化，无法进行回归分析'}
-        
-        # 处理缺失值
-        X = np.nan_to_num(X, nan=0.0)
-        y = np.nan_to_num(y, nan=np.nanmean(y))
         
         # 数据标准化
         scaler_X = StandardScaler()
