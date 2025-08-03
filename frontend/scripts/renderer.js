@@ -112,22 +112,47 @@ async function handleFileUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
     
-    showLoading('正在解析文件...');
+    showLoading('正在上传文件...');
     
     try {
-        const data = await parseFile(file);
-        currentData = data;
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await fetch(`${API_BASE_URL}/api/data/upload`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || '文件上传失败');
+        }
+        
+        // 使用API返回的数据
+        currentData = {
+            data: result.result.data_preview,
+            headers: result.result.columns_list,
+            rows: result.result.rows,
+            columns: result.result.columns,
+            filename: result.result.filename
+        };
         
         // 更新目标列选择
-        updateTargetColumnSelect(Object.keys(data.data[0]));
+        updateTargetColumnSelect(result.result.columns_list);
         
         // 更新特征列复选框
-        updateFeatureColumnsCheckboxes(Object.keys(data.data[0]));
+        updateFeatureColumnsCheckboxes(result.result.columns_list);
         
-        showNotification('文件解析成功', 'success');
+        showNotification('文件上传成功', 'success');
     } catch (error) {
-        showNotification('文件解析失败: ' + error.message, 'error');
-        console.error('❌ 文件解析错误:', error);
+        showNotification('文件上传失败: ' + error.message, 'error');
+        console.error('❌ 文件上传错误:', error);
     } finally {
         hideLoading();
     }
