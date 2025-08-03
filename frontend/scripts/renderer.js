@@ -10,6 +10,9 @@ let currentSettings = {
     autoSave: false
 };
 
+// API基础URL
+const API_BASE_URL = 'http://127.0.0.1:5000';
+
 // DOM 加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
@@ -100,10 +103,8 @@ function switchTab(tabName) {
         targetButton.classList.add('active');
     }
     
-    // 特殊处理
-    if (tabName === 'regression') {
-        updateRegressionModelList();
-    }
+    // 更新状态栏
+    updateStatusBar();
 }
 
 // 处理文件上传
@@ -111,23 +112,22 @@ async function handleFileUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
     
-    showLoading('正在解析数据文件...');
+    showLoading('正在解析文件...');
     
     try {
         const data = await parseFile(file);
         currentData = data;
         
-        // 更新目标变量选择
-        updateTargetColumnSelect(data.columns);
+        // 更新目标列选择
+        updateTargetColumnSelect(Object.keys(data.data[0]));
         
-        // 更新特征变量选择
-        updateFeatureColumnsCheckboxes(data.columns);
+        // 更新特征列复选框
+        updateFeatureColumnsCheckboxes(Object.keys(data.data[0]));
         
-        showNotification('数据文件加载成功', 'success');
-        console.log('📊 数据加载完成:', data);
+        showNotification('文件解析成功', 'success');
     } catch (error) {
-        showNotification('数据文件解析失败: ' + error.message, 'error');
-        console.error('❌ 数据解析错误:', error);
+        showNotification('文件解析失败: ' + error.message, 'error');
+        console.error('❌ 文件解析错误:', error);
     } finally {
         hideLoading();
     }
@@ -141,55 +141,48 @@ async function parseFile(file) {
         reader.onload = function(e) {
             try {
                 const content = e.target.result;
-                let data;
-                
-                if (file.name.endsWith('.csv')) {
-                    data = parseCSV(content);
-                } else if (file.name.endsWith('.json')) {
-                    data = JSON.parse(content);
-                } else {
-                    reject(new Error('不支持的文件格式'));
-                    return;
-                }
-                
+                const data = parseCSV(content);
                 resolve(data);
             } catch (error) {
                 reject(error);
             }
         };
         
-        reader.onerror = () => reject(new Error('文件读取失败'));
+        reader.onerror = function() {
+            reject(new Error('文件读取失败'));
+        };
         
-        if (file.name.endsWith('.csv')) {
-            reader.readAsText(file);
-        } else {
-            reader.readAsText(file);
-        }
+        reader.readAsText(file);
     });
 }
 
-// 解析CSV
+// 解析CSV内容
 function parseCSV(content) {
     const lines = content.trim().split('\n');
     const headers = lines[0].split(',').map(h => h.trim());
     const data = [];
     
     for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim());
+        const values = lines[i].split(',');
         const row = {};
+        
         headers.forEach((header, index) => {
-            row[header] = values[index] || '';
+            const value = values[index] ? values[index].trim() : '';
+            row[header] = isNaN(value) ? value : parseFloat(value);
         });
+        
         data.push(row);
     }
     
     return {
-        columns: headers,
-        data: data
+        data: data,
+        headers: headers,
+        rows: data.length,
+        columns: headers.length
     };
 }
 
-// 更新目标变量选择
+// 更新目标列选择
 function updateTargetColumnSelect(columns) {
     const select = document.getElementById('target-column');
     if (!select) return;
@@ -203,93 +196,99 @@ function updateTargetColumnSelect(columns) {
     });
 }
 
-// 更新特征变量复选框
+// 更新特征列复选框
 function updateFeatureColumnsCheckboxes(columns) {
     const container = document.getElementById('feature-columns');
     if (!container) return;
     
     container.innerHTML = '';
     columns.forEach(column => {
-        const label = document.createElement('label');
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.value = column;
-        checkbox.checked = true;
-        
-        label.appendChild(checkbox);
-        label.appendChild(document.createTextNode(column));
-        container.appendChild(label);
+        const div = document.createElement('div');
+        div.className = 'checkbox-item';
+        div.innerHTML = `
+            <input type="checkbox" id="feature-${column}" value="${column}" checked>
+            <label for="feature-${column}">${column}</label>
+        `;
+        container.appendChild(div);
     });
 }
 
-// 开始符号回归
+// 开始符号回归分析
 async function startRegression() {
-    if (!currentData) {
-        showNotification('请先选择数据文件', 'warning');
-        return;
-    }
-    
     const targetColumn = document.getElementById('target-column').value;
-    const featureColumns = Array.from(document.querySelectorAll('#feature-columns input:checked'))
-        .map(input => input.value);
+    const featureCheckboxes = document.querySelectorAll('#feature-columns input[type="checkbox"]:checked');
+    const populationSize = parseInt(document.getElementById('population-size').value) || 100;
+    const generations = parseInt(document.getElementById('generations').value) || 50;
     
     if (!targetColumn) {
         showNotification('请选择目标变量', 'warning');
         return;
     }
     
-    if (featureColumns.length === 0) {
+    if (featureCheckboxes.length === 0) {
         showNotification('请选择至少一个特征变量', 'warning');
         return;
     }
     
-    const populationSize = parseInt(document.getElementById('population-size').value);
-    const generations = parseInt(document.getElementById('generations').value);
+    if (!currentData) {
+        showNotification('请先上传数据', 'warning');
+        return;
+    }
+    
+    const featureColumns = Array.from(featureCheckboxes).map(cb => cb.value);
     
     showLoading('正在进行符号回归分析...');
     
     try {
         const result = await performSymbolicRegression({
-            data: currentData,
-            targetColumn,
-            featureColumns,
-            populationSize,
-            generations
+            data: currentData.data,
+            target_column: targetColumn,
+            feature_columns: featureColumns,
+            population_size: populationSize,
+            generations: generations
         });
         
-        displayRegressionResults(result);
+        // 保存模型到列表
         regressionModels.push(result);
         updateRegressionModelList();
         
+        displayRegressionResults(result);
         showNotification('符号回归分析完成', 'success');
     } catch (error) {
         showNotification('符号回归分析失败: ' + error.message, 'error');
-        console.error('❌ 回归分析错误:', error);
+        console.error('❌ 符号回归分析错误:', error);
     } finally {
         hideLoading();
     }
 }
 
-// 执行符号回归（模拟）
+// 执行符号回归（真实API调用）
 async function performSymbolicRegression(params) {
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // 模拟结果
-    return {
-        id: Date.now(),
-        expression: `${params.featureColumns[0]} * 0.5 + ${params.featureColumns[1]} * 0.3 + 0.1`,
-        r2: 0.85,
-        mse: 0.12,
-        featureImportance: params.featureColumns.map((col, i) => ({
-            feature: col,
-            importance: 0.8 - i * 0.2
-        })),
-        predictions: params.data.data.map((row, i) => ({
-            actual: parseFloat(row[params.targetColumn]) || 0,
-            predicted: Math.random() * 10
-        }))
-    };
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/regression/analyze`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(params)
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || 'API调用失败');
+        }
+        
+        return result.result;
+    } catch (error) {
+        console.error('API调用失败:', error);
+        throw error;
+    }
 }
 
 // 显示回归结果
@@ -312,7 +311,7 @@ function displayRegressionResults(result) {
         <div class="result-item">
             <h4>特征重要性</h4>
             <ul>
-                ${result.featureImportance.map(f => 
+                ${result.feature_importance.map(f => 
                     `<li>${f.feature}: ${f.importance.toFixed(3)}</li>`
                 ).join('')}
             </ul>
@@ -361,9 +360,9 @@ async function startMonteCarlo() {
     
     try {
         const result = await performMonteCarloAnalysis({
-            modelId: parseInt(modelId),
+            model_id: parseInt(modelId),
             iterations,
-            targetEfficacy,
+            target_efficacy: targetEfficacy,
             tolerance
         });
         
@@ -377,24 +376,33 @@ async function startMonteCarlo() {
     }
 }
 
-// 执行蒙特卡罗分析（模拟）
+// 执行蒙特卡罗分析（真实API调用）
 async function performMonteCarloAnalysis(params) {
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    // 模拟结果
-    return {
-        iterations: params.iterations,
-        targetEfficacy: params.targetEfficacy,
-        tolerance: params.tolerance,
-        validSamples: Math.floor(params.iterations * 0.15),
-        optimalRanges: [
-            { component: '成分A', min: 0.2, max: 0.4, mean: 0.3 },
-            { component: '成分B', min: 0.1, max: 0.3, mean: 0.2 },
-            { component: '成分C', min: 0.05, max: 0.15, mean: 0.1 }
-        ],
-        distribution: Array.from({length: 100}, () => Math.random() * 2)
-    };
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/monte-carlo/analyze`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(params)
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || 'API调用失败');
+        }
+        
+        return result.result;
+    } catch (error) {
+        console.error('API调用失败:', error);
+        throw error;
+    }
 }
 
 // 显示蒙特卡罗结果
@@ -405,42 +413,29 @@ function displayMonteCarloResults(result) {
     container.innerHTML = `
         <div class="result-item">
             <h4>分析参数</h4>
-            <p>模拟次数: ${result.iterations.toLocaleString()}</p>
-            <p>目标药效: ${result.targetEfficacy}</p>
-            <p>容差范围: ±${result.tolerance}</p>
+            <p>模拟次数: ${result.iterations}</p>
+            <p>目标药效: ${result.target_efficacy}</p>
+            <p>容差: ${result.tolerance}</p>
         </div>
         
         <div class="result-item">
-            <h4>有效样本</h4>
-            <p>符合条件样本数: ${result.validSamples.toLocaleString()}</p>
-            <p>有效率: ${((result.validSamples / result.iterations) * 100).toFixed(2)}%</p>
+            <h4>分析结果</h4>
+            <p>有效样本数: ${result.valid_samples}</p>
+            <p>成功率: ${(result.success_rate * 100).toFixed(1)}%</p>
+            <p>分析时间: ${result.analysis_time}秒</p>
         </div>
         
         <div class="result-item">
-            <h4>推荐配比区间</h4>
-            <table class="result-table">
-                <thead>
-                    <tr>
-                        <th>成分</th>
-                        <th>最小值</th>
-                        <th>最大值</th>
-                        <th>平均值</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${result.optimalRanges.map(range => `
-                        <tr>
-                            <td>${range.component}</td>
-                            <td>${range.min.toFixed(3)}</td>
-                            <td>${range.max.toFixed(3)}</td>
-                            <td>${range.mean.toFixed(3)}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
+            <h4>最优配比范围</h4>
+            <ul>
+                ${result.optimal_ranges.map(r => 
+                    `<li>${r.component}: ${r.min.toFixed(2)} - ${r.max.toFixed(2)} (均值: ${r.mean.toFixed(2)})</li>`
+                ).join('')}
+            </ul>
         </div>
         
         <div class="result-item">
+            <h4>操作</h4>
             <button class="btn-secondary" onclick="exportMonteCarloResults(${result.iterations})">导出结果</button>
         </div>
     `;
@@ -448,42 +443,61 @@ function displayMonteCarloResults(result) {
 
 // 导入数据
 async function importData() {
-    try {
-        const result = await window.electronAPI.openFile();
-        if (result && !result.canceled) {
-            showNotification('数据导入成功', 'success');
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv,.xlsx,.xls';
+    
+    input.onchange = async function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            try {
+                const data = await parseFile(file);
+                currentData = data;
+                updateTargetColumnSelect(Object.keys(data.data[0]));
+                updateFeatureColumnsCheckboxes(Object.keys(data.data[0]));
+                showNotification('数据导入成功', 'success');
+            } catch (error) {
+                showNotification('数据导入失败: ' + error.message, 'error');
+            }
         }
-    } catch (error) {
-        showNotification('数据导入失败: ' + error.message, 'error');
-    }
+    };
+    
+    input.click();
 }
 
 // 导出结果
 async function exportResults() {
-    try {
-        const result = await window.electronAPI.saveFile();
-        if (result && !result.canceled) {
-            showNotification('结果导出成功', 'success');
-        }
-    } catch (error) {
-        showNotification('结果导出失败: ' + error.message, 'error');
+    if (regressionModels.length === 0) {
+        showNotification('没有可导出的结果', 'warning');
+        return;
     }
+    
+    const dataStr = JSON.stringify(regressionModels, null, 2);
+    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+    
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = `regression_results_${Date.now()}.json`;
+    link.click();
+    
+    showNotification('结果导出成功', 'success');
 }
 
 // 启动后端服务
 async function startBackendService() {
     try {
-        const result = await window.electronAPI.startBackend();
-        if (result.success) {
+        // 检查后端健康状态
+        const healthResponse = await fetch(`${API_BASE_URL}/api/health`);
+        if (healthResponse.ok) {
             updateConnectionStatus('已连接');
-            showNotification('后端服务启动成功', 'success');
+            showNotification('后端服务已连接', 'success');
         } else {
             updateConnectionStatus('连接失败');
-            showNotification('后端服务启动失败', 'error');
+            showNotification('后端服务连接失败', 'error');
         }
     } catch (error) {
         updateConnectionStatus('连接失败');
-        showNotification('后端服务启动失败: ' + error.message, 'error');
+        showNotification('后端服务连接失败: ' + error.message, 'error');
     }
 }
 
@@ -492,9 +506,13 @@ async function testBackendConnection() {
     showLoading('正在测试后端连接...');
     
     try {
-        // 模拟连接测试
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        showNotification('后端连接测试成功', 'success');
+        const response = await fetch(`${API_BASE_URL}/api/health`);
+        if (response.ok) {
+            const data = await response.json();
+            showNotification(`后端连接正常: ${data.service}`, 'success');
+        } else {
+            showNotification('后端连接失败', 'error');
+        }
     } catch (error) {
         showNotification('后端连接测试失败: ' + error.message, 'error');
     } finally {
@@ -569,8 +587,9 @@ function showLoading(text = '正在处理...') {
     const textElement = document.getElementById('loading-text');
     
     if (overlay) {
-        overlay.classList.remove('hidden');
+        overlay.style.display = 'flex';
     }
+    
     if (textElement) {
         textElement.textContent = text;
     }
@@ -580,46 +599,43 @@ function showLoading(text = '正在处理...') {
 function hideLoading() {
     const overlay = document.getElementById('loading-overlay');
     if (overlay) {
-        overlay.classList.add('hidden');
+        overlay.style.display = 'none';
     }
 }
 
 // 显示通知
 function showNotification(message, type = 'info') {
-    const container = document.getElementById('notification-container');
-    if (!container) return;
-    
     const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
+    notification.className = `notification notification-${type}`;
     notification.innerHTML = `
-        <div class="notification-content">
-            <p>${message}</p>
-        </div>
+        <span class="notification-message">${message}</span>
+        <button class="notification-close" onclick="this.parentElement.remove()">×</button>
     `;
     
-    container.appendChild(notification);
+    // 添加到页面
+    document.body.appendChild(notification);
     
-    // 自动移除通知
+    // 自动移除
     setTimeout(() => {
-        if (notification.parentNode) {
-            notification.parentNode.removeChild(notification);
+        if (notification.parentElement) {
+            notification.remove();
         }
     }, 5000);
 }
 
 // 显示关于对话框
 function showAboutDialog() {
-    showNotification('中药多组分均化分析客户端 v1.0.0', 'info');
+    alert('中药多组分均化分析客户端 v1.0.0\n\n基于Electron + Flask的跨平台桌面应用');
 }
 
 // 可视化结果
 function visualizeResults(modelId) {
-    showNotification('图表功能开发中...', 'warning');
+    showNotification('图表功能开发中...', 'info');
 }
 
 // 导出蒙特卡罗结果
 function exportMonteCarloResults(iterations) {
-    showNotification(`导出 ${iterations.toLocaleString()} 次模拟结果`, 'success');
+    showNotification('导出功能开发中...', 'info');
 }
 
 // 全局函数（供HTML调用）
