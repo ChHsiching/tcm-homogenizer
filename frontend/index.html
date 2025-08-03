@@ -5,20 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>中药多组分均化分析客户端</title>
     <link rel="stylesheet" href="styles/main.css">
-    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
-    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script>
-        window.MathJax = {
-            tex: {
-                inlineMath: [['$', '$'], ['\\(', '\\)']],
-                displayMath: [['$$', '$$'], ['\\[', '\\]']]
-            },
-            svg: {
-                fontCache: 'global'
-            }
-        };
-    </script>
 </head>
 <body>
     <div id="app">
@@ -101,55 +87,13 @@
                         </div>
                         
                         <div class="form-group">
-                            <label for="population-size">配方组合数量：</label>
+                            <label for="population-size">种群大小：</label>
                             <input type="number" id="population-size" value="100" min="10" max="1000">
-                            <small class="form-help">控制算法探索的配方组合数量，数量越大探索越全面但计算时间越长</small>
                         </div>
                         
                         <div class="form-group">
-                            <label for="generations">优化迭代轮数：</label>
+                            <label for="generations">进化代数：</label>
                             <input type="number" id="generations" value="50" min="10" max="500">
-                            <small class="form-help">算法优化配方的迭代次数，轮数越多结果越精确但可能过拟合</small>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="test-ratio">验证集比例：</label>
-                            <div class="slider-container">
-                                <input type="range" id="test-ratio" min="10" max="50" value="30" class="slider">
-                                <span id="test-ratio-value">30%</span>
-                            </div>
-                            <small class="form-help">用于验证模型性能的数据比例，建议30%</small>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>运算符号选择：</label>
-                            <div class="operator-selection">
-                                <label class="operator-item">
-                                    <input type="checkbox" id="op-add" checked>
-                                    <span>加法 (+)</span>
-                                </label>
-                                <label class="operator-item">
-                                    <input type="checkbox" id="op-sub" checked>
-                                    <span>减法 (-)</span>
-                                </label>
-                                <label class="operator-item">
-                                    <input type="checkbox" id="op-mul" checked>
-                                    <span>乘法 (×)</span>
-                                </label>
-                                <label class="operator-item">
-                                    <input type="checkbox" id="op-div" checked>
-                                    <span>除法 (÷)</span>
-                                </label>
-                                <label class="operator-item">
-                                    <input type="checkbox" id="op-pow">
-                                    <span>幂运算 (^)</span>
-                                </label>
-                                <label class="operator-item">
-                                    <input type="checkbox" id="op-sqrt">
-                                    <span>开方 (√)</span>
-                                </label>
-                            </div>
-                            <small class="form-help">选择算法可以使用的数学运算符号</small>
                         </div>
                         
                         <button class="btn-primary" onclick="startRegression()">开始回归</button>
@@ -160,64 +104,6 @@
                         <div id="regression-results">
                             <p class="placeholder">请先运行分析以查看结果</p>
                         </div>
-                        
-                        <!-- 公式显示区域 -->
-                        <div id="formula-display" class="formula-display" style="display: none;">
-                            <h4>药效预测公式</h4>
-                            <div id="formula-latex" class="formula-latex"></div>
-                            
-                            <!-- 性能指标实时显示 -->
-                            <div class="performance-metrics">
-                                <div class="metric-card">
-                                    <div id="r2-value" class="metric-value">0.000</div>
-                                    <div class="metric-label">决定系数 (R²)</div>
-                                </div>
-                                <div class="metric-card">
-                                    <div id="mse-value" class="metric-value">0.000</div>
-                                    <div class="metric-label">均方误差 (MSE)</div>
-                                </div>
-                                <div class="metric-card">
-                                    <div id="mae-value" class="metric-value">0.000</div>
-                                    <div class="metric-label">平均绝对误差 (MAE)</div>
-                                </div>
-                                <div class="metric-card">
-                                    <div id="rmse-value" class="metric-value">0.000</div>
-                                    <div class="metric-label">均方根误差 (RMSE)</div>
-                                </div>
-                            </div>
-                            
-                            <!-- 公式树和剪枝控制 -->
-                            <div class="formula-tree-container">
-                                <div class="formula-tree-section">
-                                    <div class="formula-tree">
-                                        <h4>公式结构树</h4>
-                                        <div id="formula-tree" class="tree-content">
-                                            <p class="placeholder">公式树将在分析完成后显示</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="pruning-control-section">
-                                    <h4>剪枝控制</h4>
-                                    <div class="pruning-controls">
-                                        <button class="btn-prune" onclick="pruneSelectedNodes()">删除选中节点</button>
-                                        <button class="btn-reset" onclick="resetFormula()">重置公式</button>
-                                        <button class="btn-recalculate" onclick="recalculateRegression()">重新计算</button>
-                                    </div>
-                                    <div class="pruning-info">
-                                        <p><strong>使用说明：</strong></p>
-                                        <ul>
-                                            <li>红色节点：权重低，可考虑删除</li>
-                                            <li>橙色节点：权重较低，可选择性删除</li>
-                                            <li>黄色节点：权重中等，建议保留</li>
-                                            <li>绿色节点：权重高，建议保留</li>
-                                            <li>右键点击节点可查看详细信息和删除选项</li>
-                                            <li>删除节点后点击"重新计算"获得简化公式</li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -226,7 +112,7 @@
             <div id="monte-carlo" class="tab-content">
                 <div class="page-header">
                     <h2>蒙特卡罗配比分析</h2>
-                    <p>基于符号回归模型进行蒙特卡罗模拟，确定最优配比区间</p>
+                    <p>基于回归模型进行随机采样，确定最优配比区间</p>
                 </div>
                 
                 <div class="analysis-container">
@@ -235,13 +121,8 @@
                         <div class="form-group">
                             <label for="mc-model">选择回归模型：</label>
                             <select id="mc-model">
-                                <option value="">请先完成符号回归分析</option>
+                                <option value="">请先完成符号回归</option>
                             </select>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="target-efficacy">目标药效值：</label>
-                            <input type="number" id="target-efficacy" step="0.01" min="0" max="1">
                         </div>
                         
                         <div class="form-group">
@@ -250,8 +131,13 @@
                         </div>
                         
                         <div class="form-group">
+                            <label for="target-efficacy">目标药效：</label>
+                            <input type="number" id="target-efficacy" step="0.01" placeholder="输入目标药效值">
+                        </div>
+                        
+                        <div class="form-group">
                             <label for="tolerance">容差范围：</label>
-                            <input type="number" id="tolerance" value="0.1" step="0.01" min="0.01" max="0.5">
+                            <input type="number" id="tolerance" value="0.1" step="0.01" min="0.01">
                         </div>
                         
                         <button class="btn-primary" onclick="startMonteCarlo()">开始分析</button>
@@ -277,13 +163,13 @@
                     <div class="setting-group">
                         <h3>后端服务</h3>
                         <div class="form-group">
-                            <label for="backendPort">服务端口：</label>
-                            <input type="number" id="backendPort" value="5000" min="1024" max="65535">
+                            <label for="backend-port">服务端口：</label>
+                            <input type="number" id="backend-port" value="5000" min="1024" max="65535">
                         </div>
                         
                         <div class="form-group">
-                            <label for="autoStartBackend">自动启动后端：</label>
-                            <input type="checkbox" id="autoStartBackend" checked>
+                            <label for="auto-start-backend">自动启动后端：</label>
+                            <input type="checkbox" id="auto-start-backend" checked>
                         </div>
                         
                         <button class="btn-secondary" onclick="testBackendConnection()">测试连接</button>
@@ -311,8 +197,8 @@
                     <div class="setting-group">
                         <h3>数据设置</h3>
                         <div class="form-group">
-                            <label for="defaultFormat">默认导出格式：</label>
-                            <select id="defaultFormat">
+                            <label for="default-format">默认导出格式：</label>
+                            <select id="default-format">
                                 <option value="csv">CSV</option>
                                 <option value="json">JSON</option>
                                 <option value="excel">Excel</option>
@@ -320,8 +206,8 @@
                         </div>
                         
                         <div class="form-group">
-                            <label for="autoSave">自动保存：</label>
-                            <input type="checkbox" id="autoSave">
+                            <label for="auto-save">自动保存：</label>
+                            <input type="checkbox" id="auto-save">
                         </div>
                     </div>
                     
@@ -336,16 +222,19 @@
                 <span id="connection-status">后端服务：未连接</span>
             </div>
             <div class="status-right">
-                <span id="status-bar">就绪</span>
+                <span id="current-time"></span>
             </div>
         </footer>
     </div>
 
     <!-- 加载指示器 -->
-    <div id="loading" class="loading-overlay hidden">
+    <div id="loading-overlay" class="loading-overlay hidden">
         <div class="loading-spinner"></div>
-        <p class="loading-text">正在处理...</p>
+        <p id="loading-text">正在处理...</p>
     </div>
+
+    <!-- 通知容器 -->
+    <div id="notification-container" class="notification-container"></div>
 
     <script src="scripts/renderer.js"></script>
 </body>

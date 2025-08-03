@@ -1,0 +1,84 @@
+{
+  "success": true,
+  "result_id": 1754217798,
+  "target_column": "HDL",
+  "feature_columns": [
+    "QA",
+    "NCGA",
+    "CGA",
+    "CCGA",
+    "CA",
+    "PIS",
+    "HYP",
+    "AST",
+    "GUA",
+    "RUT",
+    "VR",
+    "VG",
+    "PB2 ",
+    "PC1",
+    "EPI",
+    "OA",
+    "UA  ",
+    "MA",
+    "CRA",
+    "QUE",
+    "MDA"
+  ],
+  "iterations": 1000,
+  "target_statistics": {
+    "mean": 0.77415,
+    "std": 0.06706211672770254,
+    "min": 0.656,
+    "max": 0.919
+  },
+  "simulation_statistics": {
+    "mean": 0.8068888363855786,
+    "std": 0.07990118011004267,
+    "min": 0.3652346995335614,
+    "max": 1.0974119610189494
+  },
+  "feature_importance": {
+    "QA": 0.021,
+    "NCGA": 0.071,
+    "CGA": 0.049,
+    "CCGA": 0.069,
+    "CA": 0.069,
+    "PIS": 0.056,
+    "HYP": 0.068,
+    "AST": 0.057,
+    "GUA": 0.037,
+    "RUT": 0.082,
+    "VR": 0.026,
+    "VG": 0.1,
+    "PB2 ": 0.075,
+    "PC1": 0.074,
+    "EPI": 0.098,
+    "OA": 0.03,
+    "UA  ": 0.082,
+    "MA": 0.091,
+    "CRA": 0.086,
+    "QUE": 0.027,
+    "MDA": 0.079
+  },
+  "confidence_intervals": {
+    "90%": {
+      "lower": 0.7599081130415785,
+      "upper": 0.7883918869584216
+    },
+    "95%": {
+      "lower": 0.7571809431984764,
+      "upper": 0.7911190568015236
+    },
+    "99%": {
+      "lower": 0.7518478110608547,
+      "upper": 0.7964521889391453
+    }
+  },
+  "simulation_summary": {
+    "total_simulations": 1000,
+    "successful_simulations": 1000,
+    "failed_simulations": 0,
+    "execution_time": 1.72
+  }
+}

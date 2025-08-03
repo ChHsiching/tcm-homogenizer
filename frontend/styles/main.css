@@ -108,16 +108,18 @@ body {
     color: var(--text-primary);
 }
 
-/* 主要内容区域 */
+/* 主内容区域 */
 .main-content {
     flex: 1;
     padding: var(--spacing-xl);
     overflow-y: auto;
+    background-color: var(--bg-primary);
 }
 
+/* 标签页内容 */
 .tab-content {
     display: none;
-    animation: fadeIn 0.3s ease-in-out;
+    animation: fadeIn 0.3s ease;
 }
 
 .tab-content.active {
@@ -129,7 +131,7 @@ body {
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* 欢迎页面 */
+/* 首页样式 */
 .welcome-section {
     text-align: center;
     margin-bottom: var(--spacing-xl);
@@ -152,7 +154,6 @@ body {
     margin: 0 auto;
 }
 
-/* 功能卡片网格 */
 .feature-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -169,7 +170,7 @@ body {
 }
 
 .feature-card:hover {
-    transform: translateY(-2px);
+    transform: translateY(-4px);
     box-shadow: 0 8px 24px var(--shadow-color);
     border-color: var(--accent-primary);
 }
@@ -194,7 +195,7 @@ body {
 }
 
 .page-header h2 {
-    font-size: var(--font-size-xl);
+    font-size: var(--font-size-2xl);
     margin-bottom: var(--spacing-sm);
     color: var(--text-primary);
 }
@@ -204,36 +205,27 @@ body {
     font-size: var(--font-size-md);
 }
 
-/* 分析容器布局 */
+/* 分析容器 */
 .analysis-container {
     display: grid;
-    grid-template-columns: 400px 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: var(--spacing-xl);
-    height: auto;
-    min-height: calc(100vh - 200px);
-    max-width: none;
+    margin-top: var(--spacing-lg);
 }
 
-.input-section {
+.input-section, .result-section {
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
-    padding: var(--spacing-lg);
-    overflow-y: auto;
-    max-height: calc(100vh - 200px);
-    position: sticky;
-    top: 0;
+    padding: var(--spacing-xl);
 }
 
-.result-section {
-    background-color: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-lg);
-    height: auto;
-    min-height: calc(100vh - 200px);
-    display: flex;
-    flex-direction: column;
+.input-section h3, .result-section h3 {
+    font-size: var(--font-size-lg);
+    margin-bottom: var(--spacing-lg);
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: var(--spacing-md);
 }
 
 /* 表单样式 */
@@ -258,7 +250,7 @@ body {
     border-radius: var(--radius-md);
     color: var(--text-primary);
     font-size: var(--font-size-sm);
-    transition: all 0.2s ease;
+    transition: border-color 0.2s ease;
 }
 
 .form-group input:focus,
@@ -274,7 +266,6 @@ body {
     margin-right: var(--spacing-sm);
 }
 
-/* 复选框组样式 */
 .checkbox-group {
     display: flex;
     flex-direction: column;
@@ -287,48 +278,11 @@ body {
     border: 1px solid var(--border-color);
 }
 
-.checkbox-item {
+.checkbox-group label {
     display: flex;
     align-items: center;
-    padding: var(--spacing-xs) var(--spacing-sm);
-    border-radius: var(--radius-sm);
-    transition: background-color 0.2s ease;
-}
-
-.checkbox-item:hover {
-    background-color: var(--bg-secondary);
-}
-
-.checkbox-item input[type="checkbox"] {
-    margin-right: var(--spacing-sm);
-    width: auto;
-}
-
-.checkbox-item label {
-    margin: 0;
+    margin-bottom: 0;
     cursor: pointer;
-    flex: 1;
-    color: var(--text-primary);
-}
-
-/* 全选按钮样式 */
-.select-all-item {
-    background-color: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
-    margin-bottom: var(--spacing-sm);
-    padding: var(--spacing-sm);
-}
-
-.select-all-item label {
-    font-weight: 600;
-    color: var(--accent-primary);
-}
-
-/* 分隔线样式 */
-.checkbox-separator {
-    height: 1px;
-    background-color: var(--border-color);
-    margin: var(--spacing-xs) 0;
 }
 
 /* 按钮样式 */
@@ -406,16 +360,7 @@ body {
     gap: var(--spacing-md);
 }
 
-/* 连接状态样式 */
-.status-connected {
-    color: var(--accent-success);
-}
-
-.status-disconnected {
-    color: var(--accent-error);
-}
-
-/* 加载指示器 */
+/* 加载覆盖层 */
 .loading-overlay {
     position: fixed;
     top: 0;
@@ -428,7 +373,6 @@ body {
     align-items: center;
     justify-content: center;
     z-index: 1000;
-    color: var(--text-primary);
 }
 
 .loading-overlay.hidden {
@@ -450,64 +394,42 @@ body {
     100% { transform: rotate(360deg); }
 }
 
-.loading-text {
-    font-size: var(--font-size-md);
+#loading-text {
     color: var(--text-primary);
+    font-size: var(--font-size-md);
 }
 
-/* 通知样式 */
-.notification {
+/* 通知容器 */
+.notification-container {
     position: fixed;
-    top: 20px;
-    right: 20px;
-    padding: var(--spacing-md) var(--spacing-lg);
-    border-radius: var(--radius-md);
-    color: var(--text-primary);
-    font-size: var(--font-size-sm);
+    top: var(--spacing-lg);
+    right: var(--spacing-lg);
     z-index: 1001;
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: var(--spacing-sm);
-    animation: slideIn 0.3s ease-out;
-    max-width: 400px;
+}
+
+.notification {
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    min-width: 300px;
     box-shadow: 0 4px 12px var(--shadow-color);
-    border-left: 4px solid var(--accent-primary);
+    animation: slideIn 0.3s ease;
 }
 
-.notification-message {
-    flex: 1;
+.notification.success {
+    border-left: 4px solid var(--accent-success);
 }
 
-.notification-close {
-    background: none;
-    border: none;
-    color: inherit;
-    cursor: pointer;
-    font-size: 18px;
-    padding: 0;
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.notification.error {
+    border-left: 4px solid var(--accent-error);
 }
 
-.notification-info {
-    border-left-color: var(--accent-primary);
-}
-
-.notification-success {
-    border-left-color: var(--accent-success);
-}
-
-.notification-warning {
-    border-left-color: var(--accent-warning);
-}
-
-.notification-error {
-    border-left-color: var(--accent-error);
+.notification.warning {
+    border-left: 4px solid var(--accent-warning);
 }
 
 @keyframes slideIn {
@@ -532,7 +454,7 @@ body {
     }
     
     .nav {
-        flex-wrap: wrap;
+        width: 100%;
         justify-content: center;
     }
     
@@ -554,7 +476,7 @@ body {
     }
     
     .page-header h2 {
-        font-size: var(--font-size-lg);
+        font-size: var(--font-size-xl);
     }
 }
 
@@ -564,463 +486,14 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--bg-secondary);
+    background: var(--bg-primary);
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--border-color);
+    background: var(--bg-tertiary);
     border-radius: var(--radius-sm);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--text-muted);
-} 
-
-/* 表单帮助文本 */
-.form-help {
-    display: block;
-    font-size: var(--font-size-xs);
-    color: var(--text-muted);
-    margin-top: var(--spacing-xs);
-    line-height: 1.4;
-}
-
-/* 滑块容器 */
-.slider-container {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
-}
-
-.slider {
-    flex: 1;
-    height: 6px;
-    background: var(--bg-tertiary);
-    border-radius: 3px;
-    outline: none;
-    -webkit-appearance: none;
-}
-
-.slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 20px;
-    height: 20px;
-    background: var(--accent-primary);
-    border-radius: 50%;
-    cursor: pointer;
-}
-
-.slider::-moz-range-thumb {
-    width: 20px;
-    height: 20px;
-    background: var(--accent-primary);
-    border-radius: 50%;
-    cursor: pointer;
-    border: none;
-}
-
-#test-ratio-value {
-    min-width: 40px;
-    text-align: center;
-    font-weight: 600;
-    color: var(--accent-primary);
-}
-
-/* 运算符选择 */
-.operator-selection {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm);
-    background-color: var(--bg-tertiary);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border-color);
-}
-
-.operator-item {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-xs);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-}
-
-.operator-item:hover {
-    background-color: var(--bg-secondary);
-}
-
-.operator-item input[type="checkbox"] {
-    margin: 0;
-}
-
-.operator-item span {
-    font-size: var(--font-size-sm);
-    color: var(--text-primary);
-}
-
-/* 公式显示区域 */
-.formula-display {
-    margin-top: var(--spacing-lg);
-    min-height: 400px;
-    overflow-x: hidden; /* 禁止水平滚动 */
-    overflow-y: auto;
-    max-width: 100%;
-}
-
-.formula-latex {
-    margin-bottom: var(--spacing-lg);
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    max-width: 100%;
-    overflow-x: hidden; /* 禁止水平滚动 */
-}
-
-.formula-latex .MathJax,
-.formula-latex .MathJax_Display {
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    max-width: 100%;
-    overflow-x: hidden; /* 禁止水平滚动 */
-}
-
-.formula-background {
-    padding: 20px;
-    background: #2a2a2a;
-    border-radius: 8px;
-    margin: 10px 0;
-    text-align: center;
-    overflow-x: hidden; /* 禁止水平滚动 */
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    max-width: 100%;
-}
-
-.formula-line {
-    margin: 8px 0;
-    font-size: 16px;
-    line-height: 1.5;
-    color: #4a9eff;
-}
-
-/* 公式树容器 - 独占一行 */
-.formula-tree-container {
-    margin-top: var(--spacing-lg);
-    width: 100%;
-    min-height: 800px; /* 增加最小高度 */
-    overflow-x: hidden; /* 禁止水平滚动 */
-    max-width: 100%;
-}
-
-.formula-tree-section {
-    width: 100%;
-    margin-bottom: var(--spacing-lg);
-    overflow-x: hidden; /* 禁止水平滚动 */
-    max-width: 100%;
-}
-
-.formula-tree {
-    background-color: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-lg);
-    min-height: 700px; /* 增加最小高度 */
-    position: relative;
-    overflow-y: auto;
-    overflow-x: hidden; /* 禁止水平滚动 */
-    max-width: 100%;
-}
-
-/* 剪枝控制区域 - 单独一行 */
-.pruning-control-section {
-    width: 100%;
-    margin-top: var(--spacing-lg);
-    background-color: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-lg);
-    overflow-x: hidden; /* 禁止水平滚动 */
-    max-width: 100%;
-}
-
-/* 树形结构样式 */
-.tree-svg-container {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    min-height: 500px; /* 增加最小高度 */
-}
-
-.tree-nodes-container {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    min-height: 500px; /* 增加最小高度 */
-}
-
-.tree-node {
-    display: block;
-    padding: var(--spacing-md);
-    margin: var(--spacing-xs) 0;
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-sm);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: 2px solid transparent;
-    position: absolute;
-    width: 200px;
-    text-align: center;
-    box-shadow: 0 2px 8px var(--shadow-color);
-}
-
-.tree-node:hover {
-    transform: scale(1.05);
-    box-shadow: 0 4px 16px var(--shadow-color);
-}
-
-.tree-node.selected {
-    border-color: var(--accent-primary);
-    box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.3);
-}
-
-.node-content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--spacing-xs);
-}
-
-.node-coefficient {
-    font-weight: 700;
-    font-size: var(--font-size-md);
-    color: var(--text-primary);
-}
-
-.node-feature {
-    font-weight: 600;
-    font-size: var(--font-size-sm);
-    color: var(--accent-primary);
-}
-
-.node-importance {
-    font-size: var(--font-size-xs);
-    color: var(--text-muted);
-    margin-top: var(--spacing-xs);
-}
-
-/* 权重渐变颜色（红到绿） */
-.tree-node.weight-1 {
-    background-color: rgba(239, 68, 68, 0.2);
-    border-color: #ef4444;
-    color: #dc2626;
-}
-
-.tree-node.weight-2 {
-    background-color: rgba(245, 101, 101, 0.2);
-    border-color: #f56565;
-    color: #dc2626;
-}
-
-.tree-node.weight-3 {
-    background-color: rgba(251, 146, 60, 0.2);
-    border-color: #fb924c;
-    color: #ea580c;
-}
-
-.tree-node.weight-4 {
-    background-color: rgba(251, 191, 36, 0.2);
-    border-color: #fbbf24;
-    color: #d97706;
-}
-
-.tree-node.weight-5 {
-    background-color: rgba(34, 197, 94, 0.2);
-    border-color: #22c55e;
-    color: #16a34a;
-}
-
-.tree-node.weight-6 {
-    background-color: rgba(34, 197, 94, 0.3);
-    border-color: #22c55e;
-    color: #15803d;
-}
-
-.tree-node.weight-7 {
-    background-color: rgba(34, 197, 94, 0.4);
-    border-color: #22c55e;
-    color: #15803d;
-}
-
-.tree-node.weight-8 {
-    background-color: rgba(34, 197, 94, 0.5);
-    border-color: #22c55e;
-    color: #15803d;
-}
-
-.tree-node.weight-9 {
-    background-color: rgba(34, 197, 94, 0.6);
-    border-color: #22c55e;
-    color: #15803d;
-}
-
-/* 性能指标 */
-.performance-metrics {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: var(--spacing-md);
-    margin: var(--spacing-lg) 0;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    max-width: 100%;
-}
-
-.metric-card {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-md);
-    text-align: center;
-    min-width: 120px;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-}
-
-.metric-value {
-    font-size: var(--font-size-xl);
-    font-weight: 700;
-    color: var(--accent-primary);
-    margin-bottom: var(--spacing-xs);
-}
-
-.metric-label {
-    font-size: var(--font-size-sm);
-    color: var(--text-muted);
-}
-
-/* 右键菜单 */
-.context-menu {
-    position: fixed;
-    background-color: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-xs);
-    box-shadow: 0 4px 12px var(--shadow-color);
-    z-index: 1000;
-    min-width: 150px;
-}
-
-.context-menu-item {
-    padding: var(--spacing-sm) var(--spacing-md);
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-    font-size: var(--font-size-sm);
-    color: var(--text-primary);
-    transition: background-color 0.2s ease;
-}
-
-.context-menu-item:hover {
-    background-color: var(--bg-tertiary);
-}
-
-.context-menu-item.danger {
-    color: var(--accent-error);
-}
-
-.context-menu-item.danger:hover {
-    background-color: rgba(248, 113, 113, 0.2);
-}
-
-/* 剪枝控制 */
-.pruning-controls {
-    display: flex;
-    gap: var(--spacing-md);
-    margin-top: var(--spacing-lg);
-    padding: var(--spacing-md);
-    background-color: var(--bg-tertiary);
-    border-radius: var(--radius-md);
-}
-
-.pruning-controls button {
-    padding: var(--spacing-sm) var(--spacing-md);
-    border: none;
-    border-radius: var(--radius-sm);
-    font-size: var(--font-size-sm);
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.pruning-controls .btn-prune {
-    background-color: var(--accent-error);
-    color: var(--text-primary);
-}
-
-.pruning-controls .btn-prune:hover {
-    background-color: #ef4444;
-}
-
-.pruning-controls .btn-reset {
-    background-color: var(--bg-secondary);
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
-}
-
-.pruning-controls .btn-reset:hover {
-    background-color: var(--bg-tertiary);
-}
-
-.pruning-controls .btn-recalculate {
-    background-color: var(--accent-primary);
-    color: var(--text-primary);
-}
-
-.pruning-controls .btn-recalculate:hover {
-    background-color: #3b82f6;
-} 
-
-/* 运算符节点样式 */
-.tree-operator-node {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--spacing-sm);
-    margin: var(--spacing-xs) 0;
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-lg);
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: 3px solid var(--accent-primary);
-    background-color: var(--bg-secondary);
-    color: var(--accent-primary);
-    position: absolute;
-    width: 80px;
-    height: 60px;
-    text-align: center;
-    box-shadow: 0 4px 12px var(--shadow-color);
-}
-
-.tree-operator-node:hover {
-    transform: scale(1.1);
-    box-shadow: 0 6px 20px var(--shadow-color);
-    background-color: var(--accent-primary);
-    color: white;
-}
-
-.operator-content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--spacing-xs);
-}
-
-.operator-symbol {
-    font-size: var(--font-size-xl);
-    font-weight: 900;
-}
-
-.operator-label {
-    font-size: var(--font-size-xs);
-    opacity: 0.8;
+    background: var(--border-color);
 } 
