@@ -64,21 +64,278 @@
         <main class="main-content">
             <!-- 首页 -->
             <div id="home" class="tab-content active">
-                <h2>欢迎使用本草智配</h2>
-                <div class="welcome-content">
-                    <p>本系统提供中药多组分配比分析功能，包括：</p>
-                    <ul>
-                        <li><strong>符号回归分析</strong>：通过遗传算法发现数据中的数学关系</li>
-                        <li><strong>蒙特卡洛采样</strong>：模拟不同配比组合的药效表现</li>
-                        <li><strong>数据管理</strong>：上传、管理和导出分析数据</li>
-                        <li><strong>用户管理</strong>：管理系统用户和权限</li>
-                    </ul>
-                    <div class="status-info">
-                        <p><strong>后端状态</strong>：<span id="connection-status">检查中...</span></p>
-                        <p><strong>当前用户</strong>：<span id="current-user">未登录</span></p>
-                        <p><strong>用户角色</strong>：<span id="user-role">未知</span></p>
+                <!-- 英雄区域 -->
+                <section class="hero-section">
+                    <div class="hero-content">
+                        <div class="hero-text">
+                            <h1 class="hero-title">本草智配</h1>
+                            <p class="hero-subtitle">融合智能算法的中药质量调控系统</p>
+                            <p class="hero-description">
+                                您可以通过交互式平台探索符号回归与蒙特卡洛采样赋能的质控新范式。
+                                本草智配正推动中药质量控制从经验判断向算法驱动的范式跃迁。
+                            </p>
+                            <div class="hero-actions">
+                                <button class="btn-primary btn-hero" onclick="showTab('regression')">
+                                    <span class="btn-icon">🔬</span>
+                                    开始分析
+                                </button>
+                                <button class="btn-secondary btn-hero" onclick="showTab('monte-carlo')">
+                                    <span class="btn-icon">📊</span>
+                                    查看演示
+                                </button>
+                            </div>
+                        </div>
+                        <div class="hero-visual">
+                            <div class="hero-animation">
+                                <div class="molecule-container">
+                                    <div class="molecule">
+                                        <div class="atom" style="--delay: 0s"></div>
+                                        <div class="atom" style="--delay: 0.2s"></div>
+                                        <div class="atom" style="--delay: 0.4s"></div>
+                                        <div class="atom" style="--delay: 0.6s"></div>
+                                        <div class="atom" style="--delay: 0.8s"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                </section>
+
+                <!-- 系统介绍区域 -->
+                <section class="intro-section">
+                    <div class="intro-content">
+                        <h2 class="section-title">什么是本草智配？</h2>
+                        <div class="intro-text">
+                            <p>
+                                本草智配是融合智能算法的中药质量调控系统，您可以通过交互式平台探索符号回归与蒙特卡洛采样赋能的质控新范式。
+                            </p>
+                            <div class="intro-features">
+                                <div class="intro-feature">
+                                    <div class="feature-icon">🧬</div>
+                                    <div class="feature-content">
+                                        <h3>符号回归模块</h3>
+                                        <p>将药材成分与药效关联转化为可读数学表达式，直观揭示"量-效关系"本质；您可以利用剪枝技术，逐步生成从复杂到简单的数学表达式，筛选不同精度下的功效物质群。</p>
+                                    </div>
+                                </div>
+                                <div class="intro-feature">
+                                    <div class="feature-icon">🎲</div>
+                                    <div class="feature-content">
+                                        <h3>蒙特卡洛采样模块</h3>
+                                        <p>实现智能生成万级配比组合，助力锁定最优均化方案。您可以根据质控要求，设定药效阈值并约束成分范围，直接获得符合生产标准的质控规则库。</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 核心功能区域 -->
+                <section class="core-functions-section">
+                    <h2 class="section-title">核心功能</h2>
+                    <div class="functions-grid">
+                        <div class="function-card">
+                            <div class="function-icon">🔬</div>
+                            <h3>符号回归分析</h3>
+                            <p class="function-subtitle">一个以活性为导向的"量-效关系"和功效成分筛选器</p>
+                            <div class="function-description">
+                                <p>系统无需您预设成分权重，您可以根据中药专属的化学轮廓（成分丰度或含量），建立其与生物活性指标的关联，生成可解释的"量-效关系"数学表达式，筛选不同精度下的功效物质群。</p>
+                                <p>根据性能评估结果（平均绝对误差 MAE、均方根误差 RMSE 和决定系数 R²），确定最终的数学表达式和功效物质，保存该方法，并用于后续质量均一化策略。</p>
+                            </div>
+                            <div class="function-tech">
+                                <span class="tech-tag tech-pysr">
+                                    <i class="tech-icon">🧬</i>
+                                    PySR
+                                </span>
+                                <span class="tech-tag tech-genetic">
+                                    <i class="tech-icon">🧬</i>
+                                    遗传算法
+                                </span>
+                                <span class="tech-tag tech-math">
+                                    <i class="tech-icon">📐</i>
+                                    数学建模
+                                </span>
+                            </div>
+                        </div>
+                        <div class="function-card">
+                            <div class="function-icon">🎲</div>
+                            <h3>蒙特卡洛采样</h3>
+                            <p class="function-subtitle">一个可行配比方案的智能生成器</p>
+                            <div class="function-description">
+                                <p>基于符号回归输出的数学描述符，您可以根据质控要求，自由给定药效阈值及成分含量范围。</p>
+                                <p>系统将随机生成大量样本点，从中展示满足约束的可行配比方案，即功效物质具体数值组合。</p>
+                            </div>
+                            <div class="function-tech">
+                                <span class="tech-tag tech-numpy">
+                                    <i class="tech-icon">🔢</i>
+                                    NumPy
+                                </span>
+                                <span class="tech-tag tech-scipy">
+                                    <i class="tech-icon">🔬</i>
+                                    SciPy
+                                </span>
+                                <span class="tech-tag tech-sampling">
+                                    <i class="tech-icon">🎲</i>
+                                    随机采样
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 技术架构区域 -->
+                <section class="architecture-section">
+                    <h2 class="section-title">技术架构</h2>
+                    <div class="architecture-content">
+                        <div class="arch-diagram">
+                            <div class="arch-layer">
+                                <h4>用户界面层</h4>
+                                <div class="arch-components">
+                                    <span class="arch-component tech-electron">
+                                        <img src="assets/electron.svg" alt="Electron" class="tech-icon">
+                                        Electron
+                                    </span>
+                                    <span class="arch-component tech-html">
+                                        <img src="assets/html5.svg" alt="HTML5" class="tech-icon">
+                                        HTML/CSS/JS
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="arch-layer">
+                                <h4>API服务层</h4>
+                                <div class="arch-components">
+                                    <span class="arch-component tech-flask">
+                                        <img src="assets/flask.svg" alt="Flask" class="tech-icon">
+                                        Flask
+                                    </span>
+                                    <span class="arch-component tech-api">
+                                        <img src="assets/restful.svg" alt="RESTful API" class="tech-icon">
+                                        RESTful API
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="arch-layer">
+                                <h4>算法计算层</h4>
+                                <div class="arch-components">
+                                    <span class="arch-component tech-regression">
+                                        <i class="tech-icon">🧬</i>
+                                        符号回归
+                                    </span>
+                                    <span class="arch-component tech-montecarlo">
+                                        <i class="tech-icon">🎲</i>
+                                        蒙特卡洛采样
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="arch-layer">
+                                <h4>数据处理层</h4>
+                                <div class="arch-components">
+                                    <span class="arch-component tech-pandas">
+                                        <img src="assets/pandas.svg" alt="Pandas" class="tech-icon">
+                                        Pandas
+                                    </span>
+                                    <span class="arch-component tech-numpy">
+                                        <img src="assets/Numpy.svg" alt="NumPy" class="tech-icon">
+                                        NumPy
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 工作流程区域 -->
+                <section class="workflow-section">
+                    <h2 class="section-title">系统工作流程</h2>
+                    <div class="workflow-content">
+                        <div class="workflow-diagram">
+                            <img src="assets/flow-diagram.svg" alt="本草智配系统工作流程图" class="flow-diagram-img">
+                        </div>
+                        <div class="workflow-description">
+                            <div class="workflow-step">
+                                <div class="step-number">1</div>
+                                <div class="step-content">
+                                    <h4>数据输入</h4>
+                                    <p>上传中药成分数据，包含各成分的含量信息和对应的药效指标</p>
+                                </div>
+                            </div>
+                            <div class="workflow-step">
+                                <div class="step-number">2</div>
+                                <div class="step-content">
+                                    <h4>符号回归分析</h4>
+                                    <p>通过智能算法建立成分与药效之间的数学关系模型</p>
+                                </div>
+                            </div>
+                            <div class="workflow-step">
+                                <div class="step-number">3</div>
+                                <div class="step-content">
+                                    <h4>蒙特卡洛采样</h4>
+                                    <p>基于数学模型生成大量配比方案，筛选满足要求的可行解</p>
+                                </div>
+                            </div>
+                            <div class="workflow-step">
+                                <div class="step-number">4</div>
+                                <div class="step-content">
+                                    <h4>结果输出</h4>
+                                    <p>获得最优配比方案和质量控制规则，指导实际生产</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 应用场景区域 -->
+                <section class="applications-section">
+                    <h2 class="section-title">应用场景</h2>
+                    <div class="applications-grid">
+                        <div class="application-card">
+                            <div class="app-icon">🏥</div>
+                            <h3>医院药房</h3>
+                            <p>为医院中药房提供科学的配方优化建议，提高治疗效果</p>
+                        </div>
+                        <div class="application-card">
+                            <div class="app-icon">🏭</div>
+                            <h3>制药企业</h3>
+                            <p>辅助中药企业进行产品研发，优化配方比例，提升产品质量</p>
+                        </div>
+                        <div class="application-card">
+                            <div class="app-icon">🎓</div>
+                            <h3>科研院所</h3>
+                            <p>为中医药研究提供数据分析工具，支持学术研究和论文发表</p>
+                        </div>
+                        <div class="application-card">
+                            <div class="app-icon">👨‍⚕️</div>
+                            <h3>中医诊所</h3>
+                            <p>帮助中医师进行个性化配方设计，提高诊疗效果</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 系统状态区域 -->
+                <section class="status-section">
+                    <h2 class="section-title">系统状态</h2>
+                    <div class="status-grid">
+                        <div class="status-card">
+                            <div class="status-icon">🔗</div>
+                            <h4>后端连接</h4>
+                            <p id="connection-status">检查中...</p>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-icon">👤</div>
+                            <h4>当前用户</h4>
+                            <p id="current-user">未登录</p>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-icon">🔑</div>
+                            <h4>用户权限</h4>
+                            <p id="user-role">未知</p>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-icon">⚡</div>
+                            <h4>系统性能</h4>
+                            <p>运行正常</p>
+                        </div>
+                    </div>
+                </section>
             </div>
 
             <!-- 符号回归分析 -->
