@@ -120,3 +120,20 @@ dmypy.json
 *.tar.gz
 *.zip
 *.7z
+
+# Debug and test files
+*.png
+test_*.py
+test_*.js
+*.spec.js
+diagnose_*.js
+test_data.*
+*_cookies.txt
+cookies.txt
+*.log
+test-results/
+
+# Documentation cleanup
+*.md
+!README.md
+!docs/*.md
