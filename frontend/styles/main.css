@@ -752,6 +752,73 @@ body::after {
     font-size: 18px;
 }
 
+/* 复选框样式 - 通用样式 */
+input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-tertiary);
+    cursor: pointer;
+    position: relative;
+    transition: all 0.3s ease;
+    margin-right: 8px;
+    vertical-align: middle;
+    flex-shrink: 0;
+}
+
+input[type="checkbox"]:checked {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+input[type="checkbox"]:checked::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    line-height: 1;
+}
+
+input[type="checkbox"]:hover {
+    border-color: var(--accent-primary);
+    box-shadow: 0 2px 4px rgba(74, 158, 255, 0.2);
+}
+
+input[type="checkbox"]:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.1);
+}
+
+/* 复选框标签样式 - 兼容性更好的方法 */
+.form-group label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    font-size: 14px;
+    color: var(--text-primary);
+    transition: color 0.3s ease;
+    margin-bottom: 5px;
+}
+
+.form-group label:hover {
+    color: var(--accent-primary);
+}
+
+/* 当label包含checkbox时，调整样式 */
+.form-group:has(input[type="checkbox"]) label {
+    margin-bottom: 0;
+}
+
+/* 原有的checkbox-item样式保持不变 */
 .checkbox-group {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -805,6 +872,8 @@ body::after {
 .checkbox-item input[type="checkbox"] {
     width: auto;
     appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
     width: 18px;
     height: 18px;
     border: 2px solid var(--border-color);
@@ -830,6 +899,7 @@ body::after {
     color: white;
     font-size: 12px;
     font-weight: bold;
+    line-height: 1;
 }
 
 .checkbox-item input[type="checkbox"]:hover {
