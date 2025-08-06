@@ -348,6 +348,16 @@ function updateFeatureColumnsCheckboxes(columns) {
             <input type="checkbox" id="feature-${column}" value="${column}" checked>
             <label for="feature-${column}">${column}</label>
         `;
+        
+        // 添加点击事件，让整个区域可点击
+        div.addEventListener('click', function(e) {
+            // 如果点击的不是复选框本身，则切换复选框状态
+            if (e.target.type !== 'checkbox') {
+                const checkbox = this.querySelector('input[type="checkbox"]');
+                checkbox.checked = !checkbox.checked;
+            }
+        });
+        
         container.appendChild(div);
     });
 }
