@@ -42,7 +42,7 @@ def create_app(config=None):
     # 注册蓝图
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(symbolic_regression_bp, url_prefix='/api/regression')
-    app.register_blueprint(monte_carlo_bp, url_prefix='/api/monte-carlo')
+    app.register_blueprint(monte_carlo_bp, url_prefix='/api/monte-carlo-sampling')
     app.register_blueprint(data_bp, url_prefix='/api/data')
     
     # 全局错误处理
@@ -92,7 +92,7 @@ def create_app(config=None):
             'endpoints': {
                 'health': '/api/health',
                 'regression': '/api/regression',
-                'monte_carlo': '/api/monte-carlo',
+                'monte_carlo_sampling': '/api/monte-carlo-sampling',
                 'data': '/api/data'
             }
         })

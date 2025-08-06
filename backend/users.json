@@ -4,7 +4,7 @@
     "password_hash": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
     "role": "admin",
     "created_at": 1754222317.0767937,
-    "last_login": 1754504038.1672642
+    "last_login": 1754505391.0831664
   },
   "testuser2": {
     "username": "testuser2",
@@ -23,7 +23,7 @@
   "ChHsich": {
     "username": "ChHsich",
     "password_hash": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
-    "role": "admin",
+    "role": "user",
     "created_at": 1754463795.760919,
     "last_login": 1754466665.640337
   },

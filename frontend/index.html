@@ -54,7 +54,7 @@
         <nav class="nav-menu">
             <button class="nav-btn active" data-tab="home">首页</button>
             <button class="nav-btn" data-tab="regression">符号回归</button>
-            <button class="nav-btn" data-tab="monte-carlo">蒙特卡罗分析</button>
+            <button class="nav-btn" data-tab="monte-carlo">蒙特卡洛采样</button>
             <button class="nav-btn admin-only" data-tab="data-management">数据管理</button>
             <button class="nav-btn admin-only" data-tab="user-management">用户管理</button>
             <button class="nav-btn" data-tab="settings">设置</button>
@@ -69,7 +69,7 @@
                     <p>本系统提供中药多组分配比分析功能，包括：</p>
                     <ul>
                         <li><strong>符号回归分析</strong>：通过遗传算法发现数据中的数学关系</li>
-                        <li><strong>蒙特卡罗分析</strong>：模拟不同配比组合的药效表现</li>
+                        <li><strong>蒙特卡洛采样</strong>：模拟不同配比组合的药效表现</li>
                         <li><strong>数据管理</strong>：上传、管理和导出分析数据</li>
                         <li><strong>用户管理</strong>：管理系统用户和权限</li>
                     </ul>
@@ -104,11 +104,11 @@
                             </div>
                         </div>
                         <div class="form-group">
-                            <label for="population-size">种群大小</label>
+                            <label for="population-size">配比方案数量</label>
                             <input type="number" id="population-size" value="100" min="10" max="1000">
                         </div>
                         <div class="form-group">
-                            <label for="generations">代数</label>
+                            <label for="generations">优化轮次</label>
                             <input type="number" id="generations" value="50" min="10" max="500">
                         </div>
                         <button id="start-regression" class="btn-primary">开始分析</button>
@@ -122,9 +122,9 @@
                 </div>
             </div>
 
-            <!-- 蒙特卡罗分析 -->
+            <!-- 蒙特卡洛采样 -->
             <div id="monte-carlo" class="tab-content">
-                <h2>蒙特卡罗分析</h2>
+                <h2>蒙特卡洛采样</h2>
                 <div class="analysis-section">
                     <div class="input-section">
                         <h3>分析参数</h3>
@@ -135,7 +135,7 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="mc-iterations">模拟次数</label>
+                            <label for="mc-iterations">采样次数</label>
                             <input type="number" id="mc-iterations" value="1000" min="100" max="10000">
                         </div>
                         <div class="form-group">

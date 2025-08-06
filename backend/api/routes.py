@@ -157,10 +157,10 @@ def get_model(model_id):
             'message': str(e)
         }), 500
 
-# 蒙特卡罗分析路由
+# 蒙特卡洛分析路由
 @monte_carlo_bp.route('/analyze', methods=['POST'])
 def monte_carlo_analyze():
-    """蒙特卡罗配比分析 - 模拟数据"""
+    """蒙特卡洛配比分析 - 模拟数据"""
     try:
         data = request.get_json()
         
@@ -180,8 +180,8 @@ def monte_carlo_analyze():
         tolerance = data.get('tolerance', 0.1)
         component_ranges = data.get('component_ranges', {})
         
-        logger.info(f"开始蒙特卡罗分析，模型ID: {model_id}")
-        logger.info(f"目标药效: {target_efficacy}, 模拟次数: {iterations}")
+        logger.info(f"开始蒙特卡洛分析，模型ID: {model_id}")
+        logger.info(f"目标药效: {target_efficacy}, 采样次数: {iterations}")
         
         # 模拟处理时间
         time.sleep(3)
@@ -222,14 +222,14 @@ def monte_carlo_analyze():
             "analysis_time": round(random.uniform(5.0, 12.0), 1)
         }
         
-        logger.info("蒙特卡罗分析完成")
+        logger.info("蒙特卡洛分析完成")
         return jsonify({
             'success': True,
             'result': result
         })
         
     except Exception as e:
-        logger.error(f"蒙特卡罗分析失败: {str(e)}")
+        logger.error(f"蒙特卡洛分析失败: {str(e)}")
         logger.error(traceback.format_exc())
         return jsonify({
             'error': '分析失败',
@@ -238,7 +238,7 @@ def monte_carlo_analyze():
 
 @monte_carlo_bp.route('/results/<analysis_id>', methods=['GET'])
 def get_monte_carlo_result(analysis_id):
-    """获取蒙特卡罗分析结果 - 模拟数据"""
+    """获取蒙特卡洛分析结果 - 模拟数据"""
     try:
         # 生成模拟结果
         result = {
@@ -271,7 +271,7 @@ def get_monte_carlo_result(analysis_id):
             'result': result
         })
     except Exception as e:
-        logger.error(f"获取蒙特卡罗结果失败: {str(e)}")
+        logger.error(f"获取蒙特卡洛结果失败: {str(e)}")
         return jsonify({
             'error': '获取失败',
             'message': str(e)

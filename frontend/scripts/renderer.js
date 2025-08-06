@@ -498,7 +498,7 @@ function updateRegressionModelList() {
     });
 }
 
-// 开始蒙特卡罗分析
+// 开始蒙特卡洛分析
 async function startMonteCarlo() {
     const modelId = document.getElementById('mc-model').value;
     const iterations = parseInt(document.getElementById('mc-iterations').value);
@@ -515,7 +515,7 @@ async function startMonteCarlo() {
         return;
     }
     
-    showLoading('正在进行蒙特卡罗分析...');
+    showLoading('正在进行蒙特卡洛分析...');
     
     try {
         const result = await performMonteCarloAnalysis({
@@ -526,19 +526,19 @@ async function startMonteCarlo() {
         });
         
         displayMonteCarloResults(result);
-        showNotification('蒙特卡罗分析完成', 'success');
+        showNotification('蒙特卡洛分析完成', 'success');
     } catch (error) {
-        showNotification('蒙特卡罗分析失败: ' + error.message, 'error');
-        console.error('❌ 蒙特卡罗分析错误:', error);
+        showNotification('蒙特卡洛分析失败: ' + error.message, 'error');
+        console.error('❌ 蒙特卡洛分析错误:', error);
     } finally {
         hideLoading();
     }
 }
 
-// 执行蒙特卡罗分析（真实API调用）
+// 执行蒙特卡洛分析（真实API调用）
 async function performMonteCarloAnalysis(params) {
     try {
-        const response = await fetch(`${API_BASE_URL}/api/monte-carlo/analyze`, {
+        const response = await fetch(`${API_BASE_URL}/api/monte-carlo-sampling/analyze`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -564,7 +564,7 @@ async function performMonteCarloAnalysis(params) {
     }
 }
 
-// 显示蒙特卡罗结果
+// 显示蒙特卡洛结果
 function displayMonteCarloResults(result) {
     const container = document.getElementById('monte-carlo-results');
     if (!container) return;
