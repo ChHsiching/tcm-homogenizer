@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1754222959,
+    "username": "user1",
+    "password_hash": "e606e38b0d8c19b24cf0ee3808183162ea7cd63ff7912dbb22b5e803286b4446",
+    "display_name": "测试用户",
+    "role": "user",
+    "created_at": "2025-08-03T20:09:19.931000",
+    "last_login": "2025-08-03T20:10:00.826653"
+  },
+  {
+    "id": 1754223000,
+    "username": "user2",
+    "password_hash": "c670f7b23c1bf997ec890e9d23ea7c016e12b243bdbd151f08baf5f0b86a7c5e",
+    "display_name": "测试用户2",
+    "role": "user",
+    "created_at": "2025-08-03T20:10:00.823163",
+    "last_login": null
+  }
+]

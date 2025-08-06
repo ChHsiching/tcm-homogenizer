@@ -11,7 +11,13 @@
     "build:linux": "electron-builder --linux",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["electron", "tcm", "中药", "配比", "分析"],
+  "keywords": [
+    "electron",
+    "tcm",
+    "中药",
+    "配比",
+    "分析"
+  ],
   "author": "TCM Homogenizer Team",
   "license": "MIT",
   "type": "commonjs",
@@ -35,12 +41,18 @@
       "icon": "assets/icon.ico"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "icon": "assets/icon.png"
     }
   },
   "devDependencies": {
     "electron": "^37.2.4",
     "electron-builder": "^26.0.12"
+  },
+  "dependencies": {
+    "puppeteer": "^24.15.0"
   }
 }

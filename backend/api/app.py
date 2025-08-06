@@ -8,19 +8,30 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import traceback
 from loguru import logger
+import os
 
 from .routes import symbolic_regression_bp, monte_carlo_bp, data_bp
+from .auth import auth_bp
 
 def create_app(config=None):
     """创建Flask应用"""
     app = Flask(__name__)
     
+    # 配置会话密钥
+    app.secret_key = os.environ.get('SECRET_KEY', 'tcm-homogenizer-secret-key')
+    
+    # 配置session
+    app.config['SESSION_COOKIE_SECURE'] = False
+    app.config['SESSION_COOKIE_HTTPONLY'] = False
+    app.config['SESSION_COOKIE_SAMESITE'] = None
+    
     # 配置CORS
     CORS(app, resources={
         r"/api/*": {
-            "origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+            "origins": ["http://localhost:3000", "http://127.0.0.1:3000", "file://"],
             "methods": ["GET", "POST", "PUT", "DELETE"],
-            "allow_headers": ["Content-Type", "Authorization"]
+            "allow_headers": ["Content-Type", "Authorization"],
+            "supports_credentials": True
         }
     })
     
@@ -29,6 +40,7 @@ def create_app(config=None):
         app.config.update(config)
     
     # 注册蓝图
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(symbolic_regression_bp, url_prefix='/api/regression')
     app.register_blueprint(monte_carlo_bp, url_prefix='/api/monte-carlo')
     app.register_blueprint(data_bp, url_prefix='/api/data')

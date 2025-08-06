@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>组件样式测试</title>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <div class="main-container">
+        <header class="header">
+            <div class="header-left">
+                <h1>组件样式测试</h1>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="analysis-section">
+                <div class="input-section">
+                    <h3>美化后的表单组件</h3>
+                    
+                    <!-- 文件输入框 -->
+                    <div class="form-group">
+                        <label for="test-file">选择数据文件</label>
+                        <input type="file" id="test-file" accept=".csv,.xlsx,.xls">
+                    </div>
+                    
+                    <!-- 下拉框 -->
+                    <div class="form-group">
+                        <label for="test-select">目标变量</label>
+                        <select id="test-select">
+                            <option value="">请先上传数据</option>
+                            <option value="hdl">HDL</option>
+                            <option value="ldl">LDL</option>
+                            <option value="tg">TG</option>
+                        </select>
+                    </div>
+                    
+                    <!-- 数字输入框 -->
+                    <div class="form-group">
+                        <label for="test-number">种群大小</label>
+                        <input type="number" id="test-number" value="100" min="10" max="1000">
+                    </div>
+                    
+                    <!-- 复选框组 -->
+                    <div class="form-group">
+                        <label>特征变量</label>
+                        <div class="checkbox-group">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="feature1" value="CA" checked>
+                                <label for="feature1">CA</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="feature2" value="GUA" checked>
+                                <label for="feature2">GUA</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="feature3" value="PIS">
+                                <label for="feature3">PIS</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="feature4" value="HYP" checked>
+                                <label for="feature4">HYP</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="feature5" value="AST">
+                                <label for="feature5">AST</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="feature6" value="RUT" checked>
+                                <label for="feature6">RUT</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="feature7" value="VR">
+                                <label for="feature7">VR</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="feature8" value="VG">
+                                <label for="feature8">VG</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="feature9" value="PB2">
+                                <label for="feature9">PB2</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="feature10" value="PC1" checked>
+                                <label for="feature10">PC1</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="feature11" value="EPI">
+                                <label for="feature11">EPI</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="feature12" value="OA" checked>
+                                <label for="feature12">OA</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 按钮 -->
+                    <button class="btn-primary">开始分析</button>
+                    <button class="btn-secondary">重置</button>
+                    <button class="btn-danger">取消</button>
+                </div>
+                
+                <div class="result-section">
+                    <h3>组件说明</h3>
+                    <div class="results-container">
+                        <h4>美化效果：</h4>
+                        <ul>
+                            <li>✅ 文件输入框：深色主题，悬停效果</li>
+                            <li>✅ 下拉框：自定义箭头，深色背景</li>
+                            <li>✅ 数字输入框：隐藏原生箭头</li>
+                            <li>✅ 复选框：自定义勾选样式</li>
+                            <li>✅ 复选框组：悬停高亮效果</li>
+                            <li>✅ 所有组件：统一的深色主题</li>
+                        </ul>
+                        
+                        <h4>交互特性：</h4>
+                        <ul>
+                            <li>🎯 悬停时边框变色</li>
+                            <li>🎯 聚焦时阴影效果</li>
+                            <li>🎯 平滑的过渡动画</li>
+                            <li>🎯 统一的颜色主题</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="status-bar">
+            <div class="status-left">
+                <span>组件样式测试</span>
+            </div>
+            <div class="status-right">
+                <span id="current-time">2025-08-03 20:40:00</span>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // 更新状态栏时间
+        function updateTime() {
+            const timeElement = document.getElementById('current-time');
+            if (timeElement) {
+                timeElement.textContent = new Date().toLocaleString('zh-CN');
+            }
+        }
+        updateTime();
+        setInterval(updateTime, 1000);
+
+        // 文件选择事件
+        document.getElementById('test-file').addEventListener('change', function(e) {
+            const fileName = e.target.files[0]?.name || '未选择文件';
+            console.log('选择的文件:', fileName);
+        });
+
+        // 下拉框选择事件
+        document.getElementById('test-select').addEventListener('change', function(e) {
+            console.log('选择的目标变量:', e.target.value);
+        });
+
+        // 数字输入框事件
+        document.getElementById('test-number').addEventListener('input', function(e) {
+            console.log('种群大小:', e.target.value);
+        });
+
+        // 复选框事件
+        document.querySelectorAll('.checkbox-item input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', function(e) {
+                console.log('复选框状态变化:', e.target.value, e.target.checked);
+            });
+        });
+    </script>
+</body>
+</html> 

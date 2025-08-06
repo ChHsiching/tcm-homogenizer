@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录功能测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+            padding: 20px;
+        }
+        .test-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #2d2d2d;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #404040;
+        }
+        .test-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #3d3d3d;
+            border-radius: 5px;
+            border: 1px solid #404040;
+        }
+        button {
+            background: #4a9eff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #6bb6ff;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background: #404040;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        input {
+            background: #3d3d3d;
+            color: #ffffff;
+            border: 1px solid #404040;
+            padding: 8px;
+            border-radius: 3px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>登录功能测试</h1>
+        
+        <div class="test-section">
+            <h3>1. 检查管理员状态</h3>
+            <button onclick="checkAdmin()">检查管理员状态</button>
+            <div id="admin-result" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>2. 登录测试</h3>
+            <input type="text" id="username" placeholder="用户名" value="admin">
+            <input type="password" id="password" placeholder="密码" value="admin123">
+            <button onclick="login()">登录</button>
+            <div id="login-result" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>3. 检查认证状态</h3>
+            <button onclick="checkAuth()">检查认证状态</button>
+            <div id="auth-result" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>4. 获取用户列表</h3>
+            <button onclick="getUsers()">获取用户列表</button>
+            <div id="users-result" class="result"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>5. 登出测试</h3>
+            <button onclick="logout()">登出</button>
+            <div id="logout-result" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://127.0.0.1:5000/api/auth';
+        
+        async function checkAdmin() {
+            try {
+                const response = await fetch(`${API_BASE}/check-admin`, {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                document.getElementById('admin-result').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('admin-result').textContent = '错误: ' + error.message;
+            }
+        }
+        
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await response.json();
+                document.getElementById('login-result').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('login-result').textContent = '错误: ' + error.message;
+            }
+        }
+        
+        async function checkAuth() {
+            try {
+                const response = await fetch(`${API_BASE}/check-auth`, {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                document.getElementById('auth-result').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('auth-result').textContent = '错误: ' + error.message;
+            }
+        }
+        
+        async function getUsers() {
+            try {
+                const response = await fetch(`${API_BASE}/users`, {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                document.getElementById('users-result').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('users-result').textContent = '错误: ' + error.message;
+            }
+        }
+        
+        async function logout() {
+            try {
+                const response = await fetch(`${API_BASE}/logout`, {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                document.getElementById('logout-result').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('logout-result').textContent = '错误: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html> 

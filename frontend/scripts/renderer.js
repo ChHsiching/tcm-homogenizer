@@ -22,6 +22,9 @@ document.addEventListener('DOMContentLoaded', function() {
 async function initializeApp() {
     console.log('🚀 初始化中药多组分均化分析客户端...');
     
+    // 初始化认证系统
+    await authManager.initialize();
+    
     // 设置事件监听器
     setupEventListeners();
     
@@ -31,13 +34,21 @@ async function initializeApp() {
     // 更新状态栏
     updateStatusBar();
     
-    // 启动后端服务（如果启用）
-    if (currentSettings.autoStartBackend) {
-        await startBackendService();
-    }
+    // 立即更新连接状态为检查中
+    updateConnectionStatus('检查中...');
+    
+    // 测试后端连接
+    await testBackendConnection();
     
     // 显示欢迎通知
     showNotification('欢迎使用中药多组分均化分析客户端', 'success');
+    
+    // 测试用户管理功能
+    if (authManager) {
+        setTimeout(() => {
+            authManager.testUserManagement();
+        }, 2000);
+    }
     
     console.log('✅ 应用初始化完成');
 }
@@ -57,6 +68,17 @@ function setupEventListeners() {
     const regressionDataInput = document.getElementById('regression-data');
     if (regressionDataInput) {
         regressionDataInput.addEventListener('change', handleFileUpload);
+    }
+    
+    // 开始分析按钮事件
+    const startRegressionBtn = document.getElementById('start-regression');
+    if (startRegressionBtn) {
+        startRegressionBtn.addEventListener('click', startRegression);
+    }
+    
+    const startMonteCarloBtn = document.getElementById('start-monte-carlo');
+    if (startMonteCarloBtn) {
+        startMonteCarloBtn.addEventListener('click', startMonteCarlo);
     }
     
     // 菜单事件监听
@@ -79,11 +101,30 @@ function setupEventListeners() {
 
 // 切换标签页
 function switchTab(tabName) {
-    // 隐藏所有标签页内容
-    const tabContents = document.querySelectorAll('.tab-content');
-    tabContents.forEach(content => {
-        content.classList.remove('active');
-    });
+    // 获取当前激活的标签页
+    const currentActiveTab = document.querySelector('.tab-content.active');
+    const targetTab = document.getElementById(tabName);
+    
+    if (!targetTab) {
+        console.error('❌ 找不到目标标签页:', tabName);
+        return;
+    }
+    
+    // 如果点击的是当前激活的标签页，不做任何操作
+    if (currentActiveTab === targetTab) {
+        return;
+    }
+    
+    // 创建页面切换指示器
+    let transitionIndicator = document.querySelector('.page-transition-indicator');
+    if (!transitionIndicator) {
+        transitionIndicator = document.createElement('div');
+        transitionIndicator.className = 'page-transition-indicator';
+        document.body.appendChild(transitionIndicator);
+    }
+    
+    // 显示页面切换指示器
+    transitionIndicator.classList.add('active');
     
     // 移除所有导航按钮的激活状态
     const navButtons = document.querySelectorAll('.nav-btn');
@@ -91,20 +132,93 @@ function switchTab(tabName) {
         button.classList.remove('active');
     });
     
-    // 显示选中的标签页
-    const targetTab = document.getElementById(tabName);
-    if (targetTab) {
-        targetTab.classList.add('active');
-    }
-    
     // 激活对应的导航按钮
     const targetButton = document.querySelector(`[data-tab="${tabName}"]`);
     if (targetButton) {
         targetButton.classList.add('active');
     }
     
+    // 更丝滑的页面切换动画
+    if (currentActiveTab) {
+        // 为当前页面添加过渡状态
+        currentActiveTab.classList.add('transitioning');
+        
+        // 当前页面淡出 - 使用更长的动画时间
+        currentActiveTab.classList.add('fade-out');
+        
+        // 延迟显示目标页面，确保过渡更丝滑
+        setTimeout(() => {
+            // 隐藏当前页面
+            currentActiveTab.classList.remove('active', 'fade-out', 'transitioning');
+            
+            // 显示目标页面并淡入
+            targetTab.classList.add('active', 'fade-in');
+            
+            // 移除过渡状态
+            targetTab.classList.remove('transitioning');
+            
+            // 移除淡入类，保持激活状态
+            setTimeout(() => {
+                targetTab.classList.remove('fade-in');
+                
+                // 隐藏页面切换指示器
+                transitionIndicator.classList.remove('active');
+                
+                // 延迟移除指示器元素
+                setTimeout(() => {
+                    if (transitionIndicator.parentElement) {
+                        transitionIndicator.remove();
+                    }
+                }, 300);
+                
+            }, 500); // 增加动画时间
+            
+        }, 300); // 增加延迟时间，让过渡更丝滑
+    } else {
+        // 如果没有当前激活的页面，直接显示目标页面
+        targetTab.classList.add('active');
+        
+        // 隐藏页面切换指示器
+        setTimeout(() => {
+            transitionIndicator.classList.remove('active');
+            setTimeout(() => {
+                if (transitionIndicator.parentElement) {
+                    transitionIndicator.remove();
+                }
+            }, 300);
+        }, 200);
+    }
+    
+    // 特殊处理：用户管理页面自动加载用户列表
+    if (tabName === 'user-management') {
+        console.log('🔍 切换到用户管理页面');
+        if (authManager && authManager.currentUser && authManager.currentUser.role === 'admin') {
+            console.log('🔍 用户是管理员，自动加载用户列表');
+            setTimeout(() => {
+                authManager.loadUsers();
+            }, 800); // 延迟到动画完成后执行
+        } else {
+            console.log('🔍 用户不是管理员，显示权限不足');
+            const usersTable = document.getElementById('users-table');
+            if (usersTable) {
+                usersTable.innerHTML = '<p>权限不足，只有管理员可以查看用户列表</p>';
+            }
+        }
+    }
+    
     // 更新状态栏
     updateStatusBar();
+    
+    // 滚动到页面顶部，确保良好的用户体验
+    setTimeout(() => {
+        const mainContent = document.querySelector('.main-content');
+        if (mainContent) {
+            mainContent.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+    }, 100);
 }
 
 // 处理文件上传
@@ -240,10 +354,20 @@ function updateFeatureColumnsCheckboxes(columns) {
 
 // 开始符号回归分析
 async function startRegression() {
+    console.log('🔍 开始符号回归分析...');
+    
     const targetColumn = document.getElementById('target-column').value;
     const featureCheckboxes = document.querySelectorAll('#feature-columns input[type="checkbox"]:checked');
     const populationSize = parseInt(document.getElementById('population-size').value) || 100;
     const generations = parseInt(document.getElementById('generations').value) || 50;
+    
+    console.log('📊 分析参数:', {
+        targetColumn,
+        featureCount: featureCheckboxes.length,
+        populationSize,
+        generations,
+        hasData: !!currentData
+    });
     
     if (!targetColumn) {
         showNotification('请选择目标变量', 'warning');
@@ -528,20 +652,22 @@ async function startBackendService() {
 
 // 测试后端连接
 async function testBackendConnection() {
-    showLoading('正在测试后端连接...');
-    
     try {
         const response = await fetch(`${API_BASE_URL}/api/health`);
         if (response.ok) {
             const data = await response.json();
+            updateConnectionStatus('已连接');
             showNotification(`后端连接正常: ${data.service}`, 'success');
+            return true;
         } else {
+            updateConnectionStatus('连接失败');
             showNotification('后端连接失败', 'error');
+            return false;
         }
     } catch (error) {
+        updateConnectionStatus('连接失败');
         showNotification('后端连接测试失败: ' + error.message, 'error');
-    } finally {
-        hideLoading();
+        return false;
     }
 }
 
@@ -588,8 +714,14 @@ function updateSetting(key, value) {
 // 更新连接状态
 function updateConnectionStatus(status) {
     const element = document.getElementById('connection-status');
+    const footerElement = document.getElementById('connection-status-footer');
+    
     if (element) {
         element.textContent = `后端服务：${status}`;
+    }
+    
+    if (footerElement) {
+        footerElement.textContent = `后端服务：${status}`;
     }
 }
 
@@ -630,20 +762,36 @@ function hideLoading() {
 
 // 显示通知
 function showNotification(message, type = 'info') {
+    const notificationContainer = document.getElementById('notification-container');
+    if (!notificationContainer) {
+        console.error('找不到通知容器');
+        return;
+    }
+    
     const notification = document.createElement('div');
-    notification.className = `notification notification-${type}`;
+    notification.className = `notification ${type}`;
     notification.innerHTML = `
         <span class="notification-message">${message}</span>
         <button class="notification-close" onclick="this.parentElement.remove()">×</button>
     `;
     
-    // 添加到页面
-    document.body.appendChild(notification);
+    // 添加到通知容器
+    notificationContainer.appendChild(notification);
+    
+    // 添加进入动画
+    setTimeout(() => {
+        notification.classList.add('show');
+    }, 10);
     
     // 自动移除
     setTimeout(() => {
         if (notification.parentElement) {
-            notification.remove();
+            notification.classList.remove('show');
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 300);
         }
     }, 5000);
 }

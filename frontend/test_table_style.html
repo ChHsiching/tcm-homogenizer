@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户管理表格样式测试</title>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <div class="main-container">
+        <header class="header">
+            <div class="header-left">
+                <h1>中药多组分均化分析客户端</h1>
+            </div>
+            <div class="header-right">
+                <div class="user-info">
+                    <span>admin (管理员)</span>
+                    <button class="btn-secondary">退出登录</button>
+                </div>
+            </div>
+        </header>
+
+        <nav class="nav-menu">
+            <button class="nav-btn active" data-tab="home">首页</button>
+            <button class="nav-btn" data-tab="regression">符号回归</button>
+            <button class="nav-btn" data-tab="monte-carlo">蒙特卡罗分析</button>
+            <button class="nav-btn admin-only" data-tab="data-management">数据管理</button>
+            <button class="nav-btn admin-only" data-tab="user-management">用户管理</button>
+            <button class="nav-btn" data-tab="settings">设置</button>
+        </nav>
+
+        <main class="main-content">
+            <div id="user-management" class="tab-content active">
+                <h2>用户管理</h2>
+                <div class="user-section">
+                    <div class="user-actions">
+                        <h3>用户操作</h3>
+                        <button id="add-user-btn" class="btn-primary">添加用户</button>
+                        <button id="refresh-users-btn" class="btn-secondary">刷新列表</button>
+                    </div>
+                    <div class="user-list">
+                        <h3>用户列表</h3>
+                        <div id="users-table" class="data-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>用户名</th>
+                                        <th>角色</th>
+                                        <th>创建时间</th>
+                                        <th>最后登录</th>
+                                        <th>状态</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><strong>张三</strong></td>
+                                        <td><span class="role-badge user-role">用户</span></td>
+                                        <td>8/4/2025, 10:36:40 AM</td>
+                                        <td>从未登录</td>
+                                        <td>
+                                            <div class="status-cell">
+                                                <span class="status-indicator inactive"></span>
+                                                <span>离线</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <button class="btn-secondary btn-sm" title="编辑用户">
+                                                <span>编辑</span>
+                                            </button>
+                                            <button class="btn-danger btn-sm" title="删除用户">
+                                                <span>删除</span>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>李四</strong></td>
+                                        <td><span class="role-badge user-role">用户</span></td>
+                                        <td>8/4/2025, 10:38:20 AM</td>
+                                        <td>从未登录</td>
+                                        <td>
+                                            <div class="status-cell">
+                                                <span class="status-indicator inactive"></span>
+                                                <span>离线</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <button class="btn-secondary btn-sm" title="编辑用户">
+                                                <span>编辑</span>
+                                            </button>
+                                            <button class="btn-danger btn-sm" title="删除用户">
+                                                <span>删除</span>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>王五</strong></td>
+                                        <td><span class="role-badge user-role">用户</span></td>
+                                        <td>8/5/2025, 10:23:57 AM</td>
+                                        <td>从未登录</td>
+                                        <td>
+                                            <div class="status-cell">
+                                                <span class="status-indicator inactive"></span>
+                                                <span>离线</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <button class="btn-secondary btn-sm" title="编辑用户">
+                                                <span>编辑</span>
+                                            </button>
+                                            <button class="btn-danger btn-sm" title="删除用户">
+                                                <span>删除</span>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>admin</strong></td>
+                                        <td><span class="role-badge admin-role">管理员</span></td>
+                                        <td>8/3/2025, 9:00:00 AM</td>
+                                        <td>8/5/2025, 10:30:00 AM</td>
+                                        <td>
+                                            <div class="status-cell">
+                                                <span class="status-indicator"></span>
+                                                <span>在线</span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <button class="btn-secondary btn-sm" title="编辑用户">
+                                                <span>编辑</span>
+                                            </button>
+                                            <button class="btn-danger btn-sm" title="删除用户">
+                                                <span>删除</span>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="status-bar">
+            <div class="status-left">
+                <span>后端服务: 已连接</span>
+            </div>
+            <div class="status-right">
+                <span>2025/8/5 10:33:06</span>
+            </div>
+        </footer>
+    </div>
+</body>
+</html> 

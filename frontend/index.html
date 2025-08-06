@@ -3,215 +3,240 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>中药多组分均化分析客户端</title>
+    <title>本草智配</title>
     <link rel="stylesheet" href="styles/main.css">
 </head>
 <body>
-    <div id="app">
+    <!-- 登录界面 -->
+    <div id="login-container" class="login-container">
+        <div class="login-box">
+            <div class="login-logo">
+                <img src="assets/icons/logo.png" alt="本草智配" class="logo-image">
+            </div>
+            <h2>本草智配</h2>
+            <div id="first-run-message" class="first-run-message" style="display: none;">
+                <p>首次启动，请创建管理员账号</p>
+            </div>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="username">用户名</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">密码</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <div class="form-group">
+                    <button type="submit" id="login-btn">登录</button>
+                </div>
+            </form>
+            <div id="login-error" class="error-message" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- 主应用界面 -->
+    <div id="main-container" class="main-container" style="display: none;">
         <!-- 顶部导航栏 -->
         <header class="header">
-            <div class="logo">
-                <h1>中药多组分均化分析</h1>
+            <div class="header-left">
+                <div class="header-logo">
+                    <img src="assets/icons/logo.png" alt="本草智配" class="header-logo-image">
+                </div>
+                <h1>本草智配</h1>
             </div>
-            <nav class="nav">
-                <button class="nav-btn active" data-tab="home">首页</button>
-                <button class="nav-btn" data-tab="regression">符号回归</button>
-                <button class="nav-btn" data-tab="monte-carlo">蒙特卡罗分析</button>
-                <button class="nav-btn" data-tab="settings">设置</button>
-            </nav>
+            <div class="header-right">
+                <span id="user-info" class="user-info"></span>
+                <button id="logout-btn" class="btn-secondary">退出登录</button>
+            </div>
         </header>
+
+        <!-- 导航菜单 -->
+        <nav class="nav-menu">
+            <button class="nav-btn active" data-tab="home">首页</button>
+            <button class="nav-btn" data-tab="regression">符号回归</button>
+            <button class="nav-btn" data-tab="monte-carlo">蒙特卡罗分析</button>
+            <button class="nav-btn admin-only" data-tab="data-management">数据管理</button>
+            <button class="nav-btn admin-only" data-tab="user-management">用户管理</button>
+            <button class="nav-btn" data-tab="settings">设置</button>
+        </nav>
 
         <!-- 主要内容区域 -->
         <main class="main-content">
             <!-- 首页 -->
             <div id="home" class="tab-content active">
-                <div class="welcome-section">
-                    <h2>欢迎使用中药多组分均化分析客户端</h2>
-                    <p>本软件旨在协助药企和科研人员优化中药配方、保证效用一致性</p>
-                </div>
-                
-                <div class="feature-grid">
-                    <div class="feature-card">
-                        <h3>符号回归</h3>
-                        <p>通过遗传编程自动回归出数学表达式，提供可视化的公式树图和拟合曲线</p>
-                        <button class="btn-primary" onclick="switchTab('regression')">开始分析</button>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <h3>蒙特卡罗分析</h3>
-                        <p>基于回归模型和药典标准，通过蒙特卡罗模拟确定药物配比的合理区间</p>
-                        <button class="btn-primary" onclick="switchTab('monte-carlo')">开始分析</button>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <h3>数据管理</h3>
-                        <p>支持多种格式的数据导入导出，方便管理和分析实验数据</p>
-                        <button class="btn-secondary" onclick="importData()">导入数据</button>
-                    </div>
-                    
-                    <div class="feature-card">
-                        <h3>结果导出</h3>
-                        <p>生成详细的分析报告，包含图表、数据和结论，支持多种格式导出</p>
-                        <button class="btn-secondary" onclick="exportResults()">导出结果</button>
+                <h2>欢迎使用本草智配</h2>
+                <div class="welcome-content">
+                    <p>本系统提供中药多组分配比分析功能，包括：</p>
+                    <ul>
+                        <li><strong>符号回归分析</strong>：通过遗传算法发现数据中的数学关系</li>
+                        <li><strong>蒙特卡罗分析</strong>：模拟不同配比组合的药效表现</li>
+                        <li><strong>数据管理</strong>：上传、管理和导出分析数据</li>
+                        <li><strong>用户管理</strong>：管理系统用户和权限</li>
+                    </ul>
+                    <div class="status-info">
+                        <p><strong>后端状态</strong>：<span id="connection-status">检查中...</span></p>
+                        <p><strong>当前用户</strong>：<span id="current-user">未登录</span></p>
+                        <p><strong>用户角色</strong>：<span id="user-role">未知</span></p>
                     </div>
                 </div>
             </div>
 
-            <!-- 符号回归页面 -->
+            <!-- 符号回归分析 -->
             <div id="regression" class="tab-content">
-                <div class="page-header">
-                    <h2>符号回归分析</h2>
-                    <p>通过遗传编程算法自动发现数据中的数学关系</p>
-                </div>
-                
-                <div class="analysis-container">
+                <h2>符号回归分析</h2>
+                <div class="analysis-section">
                     <div class="input-section">
                         <h3>数据输入</h3>
                         <div class="form-group">
-                            <label for="regression-data">选择数据文件：</label>
-                            <input type="file" id="regression-data" accept=".csv,.xlsx,.json">
+                            <label for="regression-data">选择数据文件</label>
+                            <input type="file" id="regression-data" accept=".csv,.xlsx,.xls">
                         </div>
-                        
                         <div class="form-group">
-                            <label for="target-column">目标变量列：</label>
+                            <label for="target-column">目标变量</label>
                             <select id="target-column">
-                                <option value="">请先选择数据文件</option>
+                                <option value="">请先上传数据</option>
                             </select>
                         </div>
-                        
                         <div class="form-group">
-                            <label for="feature-columns">特征变量列：</label>
+                            <label>特征变量</label>
                             <div id="feature-columns" class="checkbox-group">
                                 <!-- 动态生成复选框 -->
                             </div>
                         </div>
-                        
                         <div class="form-group">
-                            <label for="population-size">种群大小：</label>
+                            <label for="population-size">种群大小</label>
                             <input type="number" id="population-size" value="100" min="10" max="1000">
                         </div>
-                        
                         <div class="form-group">
-                            <label for="generations">进化代数：</label>
+                            <label for="generations">代数</label>
                             <input type="number" id="generations" value="50" min="10" max="500">
                         </div>
-                        
-                        <button class="btn-primary" onclick="startRegression()">开始回归</button>
+                        <button id="start-regression" class="btn-primary">开始分析</button>
                     </div>
-                    
                     <div class="result-section">
                         <h3>分析结果</h3>
-                        <div id="regression-results">
-                            <p class="placeholder">请先运行分析以查看结果</p>
+                        <div id="regression-results" class="results-container">
+                            <p>请先上传数据并开始分析</p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 蒙特卡罗分析页面 -->
+            <!-- 蒙特卡罗分析 -->
             <div id="monte-carlo" class="tab-content">
-                <div class="page-header">
-                    <h2>蒙特卡罗配比分析</h2>
-                    <p>基于回归模型进行随机采样，确定最优配比区间</p>
-                </div>
-                
-                <div class="analysis-container">
+                <h2>蒙特卡罗分析</h2>
+                <div class="analysis-section">
                     <div class="input-section">
                         <h3>分析参数</h3>
                         <div class="form-group">
-                            <label for="mc-model">选择回归模型：</label>
+                            <label for="mc-model">选择回归模型</label>
                             <select id="mc-model">
-                                <option value="">请先完成符号回归</option>
+                                <option value="">请先完成符号回归分析</option>
                             </select>
                         </div>
-                        
                         <div class="form-group">
-                            <label for="mc-iterations">模拟次数：</label>
-                            <input type="number" id="mc-iterations" value="10000" min="1000" max="100000">
+                            <label for="mc-iterations">模拟次数</label>
+                            <input type="number" id="mc-iterations" value="1000" min="100" max="10000">
                         </div>
-                        
                         <div class="form-group">
-                            <label for="target-efficacy">目标药效：</label>
-                            <input type="number" id="target-efficacy" step="0.01" placeholder="输入目标药效值">
+                            <label for="target-efficacy">目标药效值</label>
+                            <input type="number" id="target-efficacy" step="0.1" min="0">
                         </div>
-                        
                         <div class="form-group">
-                            <label for="tolerance">容差范围：</label>
+                            <label for="tolerance">容差</label>
                             <input type="number" id="tolerance" value="0.1" step="0.01" min="0.01">
                         </div>
-                        
-                        <button class="btn-primary" onclick="startMonteCarlo()">开始分析</button>
+                        <button id="start-monte-carlo" class="btn-primary">开始分析</button>
                     </div>
-                    
                     <div class="result-section">
                         <h3>分析结果</h3>
-                        <div id="monte-carlo-results">
-                            <p class="placeholder">请先运行分析以查看结果</p>
+                        <div id="monte-carlo-results" class="results-container">
+                            <p>请先选择回归模型并设置参数</p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 设置页面 -->
-            <div id="settings" class="tab-content">
-                <div class="page-header">
-                    <h2>系统设置</h2>
-                    <p>配置应用参数和偏好设置</p>
+            <!-- 数据管理（管理员功能） -->
+            <div id="data-management" class="tab-content">
+                <h2>数据管理</h2>
+                <div class="data-section">
+                    <div class="data-actions">
+                        <h3>数据操作</h3>
+                        <button id="import-data-btn" class="btn-primary">导入数据</button>
+                        <button id="export-data-btn" class="btn-secondary">导出数据</button>
+                        <button id="clear-data-btn" class="btn-danger">清空数据</button>
+                    </div>
+                    <div class="data-preview">
+                        <h3>数据预览</h3>
+                        <div id="data-preview" class="data-table">
+                            <p>暂无数据</p>
+                        </div>
+                    </div>
                 </div>
-                
-                <div class="settings-container">
-                    <div class="setting-group">
-                        <h3>后端服务</h3>
-                        <div class="form-group">
-                            <label for="backend-port">服务端口：</label>
-                            <input type="number" id="backend-port" value="5000" min="1024" max="65535">
+            </div>
+
+            <!-- 用户管理（管理员功能） -->
+            <div id="user-management" class="tab-content">
+                <h2>用户管理</h2>
+                <div class="user-section">
+                    <div class="user-actions">
+                        <h3>用户操作</h3>
+                        <button id="add-user-btn" class="btn-primary">添加用户</button>
+                        <button id="refresh-users-btn" class="btn-secondary">刷新列表</button>
+                    </div>
+                    <div class="user-list">
+                        <h3>用户列表</h3>
+                        <div id="users-table" class="data-table">
+                            <p>加载中...</p>
                         </div>
-                        
-                        <div class="form-group">
-                            <label for="auto-start-backend">自动启动后端：</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 设置 -->
+            <div id="settings" class="tab-content">
+                <h2>系统设置</h2>
+                <div class="settings-section">
+                    <div class="form-group">
+                        <label for="backend-port">后端端口</label>
+                        <input type="number" id="backend-port" value="5000" min="1000" max="9999">
+                    </div>
+                    <div class="form-group">
+                        <label for="auto-start-backend">
                             <input type="checkbox" id="auto-start-backend" checked>
-                        </div>
-                        
-                        <button class="btn-secondary" onclick="testBackendConnection()">测试连接</button>
+                            自动启动后端服务
+                        </label>
                     </div>
-                    
-                    <div class="setting-group">
-                        <h3>界面设置</h3>
-                        <div class="form-group">
-                            <label for="theme">主题：</label>
-                            <select id="theme">
-                                <option value="dark">深色主题</option>
-                                <option value="light">浅色主题</option>
-                            </select>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="language">语言：</label>
-                            <select id="language">
-                                <option value="zh-CN">中文</option>
-                                <option value="en-US">English</option>
-                            </select>
-                        </div>
+                    <div class="form-group">
+                        <label for="theme">主题</label>
+                        <select id="theme">
+                            <option value="dark">深色</option>
+                            <option value="light">浅色</option>
+                        </select>
                     </div>
-                    
-                    <div class="setting-group">
-                        <h3>数据设置</h3>
-                        <div class="form-group">
-                            <label for="default-format">默认导出格式：</label>
-                            <select id="default-format">
-                                <option value="csv">CSV</option>
-                                <option value="json">JSON</option>
-                                <option value="excel">Excel</option>
-                            </select>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="auto-save">自动保存：</label>
+                    <div class="form-group">
+                        <label for="language">语言</label>
+                        <select id="language">
+                            <option value="zh-CN">中文</option>
+                            <option value="en-US">English</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="default-format">默认格式</label>
+                        <select id="default-format">
+                            <option value="csv">CSV</option>
+                            <option value="xlsx">Excel</option>
+                            <option value="json">JSON</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="auto-save">
                             <input type="checkbox" id="auto-save">
-                        </div>
+                            自动保存
+                        </label>
                     </div>
-                    
-                    <button class="btn-primary" onclick="saveSettings()">保存设置</button>
+                    <button id="save-settings" class="btn-primary">保存设置</button>
                 </div>
             </div>
         </main>
@@ -219,23 +244,108 @@
         <!-- 状态栏 -->
         <footer class="status-bar">
             <div class="status-left">
-                <span id="connection-status">后端服务：未连接</span>
+                <span id="connection-status-footer">后端服务：检查中...</span>
             </div>
             <div class="status-right">
-                <span id="current-time"></span>
+                <span id="current-time">2025-08-03 19:00:00</span>
             </div>
         </footer>
     </div>
 
-    <!-- 加载指示器 -->
-    <div id="loading-overlay" class="loading-overlay hidden">
-        <div class="loading-spinner"></div>
-        <p id="loading-text">正在处理...</p>
+    <!-- 加载遮罩 -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p id="loading-text">正在处理...</p>
+        </div>
     </div>
 
     <!-- 通知容器 -->
     <div id="notification-container" class="notification-container"></div>
 
+    <!-- 模态框 -->
+    <div id="modal-overlay" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">标题</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- 模态框内容 -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="modal-cancel">取消</button>
+                <button class="btn-primary" id="modal-confirm">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="scripts/auth.js"></script>
     <script src="scripts/renderer.js"></script>
+    <script>
+        // 调试脚本
+        console.log('主页面脚本加载完成');
+        
+        // 直接测试用户列表加载
+        setTimeout(() => {
+            console.log('开始直接测试用户列表加载');
+            
+            // 直接调用API获取用户列表
+            fetch('http://127.0.0.1:5000/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ username: 'admin', password: 'admin123' })
+            })
+            .then(response => {
+                console.log('登录响应状态:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('登录结果:', data);
+                if (data.success) {
+                    // 登录成功后获取用户列表
+                    return fetch('http://127.0.0.1:5000/api/auth/users', {
+                        method: 'GET',
+                        credentials: 'include'
+                    });
+                } else {
+                    throw new Error('登录失败: ' + data.error);
+                }
+            })
+            .then(response => {
+                console.log('用户列表响应状态:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('用户列表结果:', data);
+                if (data.success) {
+                    // 更新页面显示
+                    const usersTable = document.getElementById('users-table');
+                    if (usersTable) {
+                        let html = '<table><thead><tr><th>用户名</th><th>角色</th><th>创建时间</th><th>最后登录</th></tr></thead><tbody>';
+                        data.users.forEach(user => {
+                            const createdTime = user.created_at ? new Date(user.created_at * 1000).toLocaleString() : '未知';
+                            const lastLogin = user.last_login ? new Date(user.last_login * 1000).toLocaleString() : '从未登录';
+                            html += `<tr><td>${user.username}</td><td>${user.role === 'admin' ? '管理员' : '用户'}</td><td>${createdTime}</td><td>${lastLogin}</td></tr>`;
+                        });
+                        html += '</tbody></table>';
+                        usersTable.innerHTML = html;
+                        console.log('用户列表更新完成');
+                    }
+                } else {
+                    throw new Error('获取用户列表失败: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('API调用失败:', error);
+                // 显示错误信息
+                const usersTable = document.getElementById('users-table');
+                if (usersTable) {
+                    usersTable.innerHTML = '<p>加载失败: ' + error.message + '</p>';
+                }
+            });
+        }, 3000);
+    </script>
 </body>
 </html> 

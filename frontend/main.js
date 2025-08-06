@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, session } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 
@@ -7,6 +7,12 @@ const { spawn } = require('child_process');
 let mainWindow;
 
 function createWindow() {
+  // 配置session以允许跨域请求
+  session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    details.requestHeaders['Origin'] = 'file://';
+    callback({ requestHeaders: details.requestHeaders });
+  });
+
   // 创建浏览器窗口
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -14,7 +20,9 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.js'),
+      webSecurity: false, // 禁用web安全，允许跨域请求
+      allowRunningInsecureContent: true // 允许运行不安全内容
     },
     icon: path.join(__dirname, 'assets/icon.png'), // 可选：应用图标
     title: '中药多组分均化分析客户端',

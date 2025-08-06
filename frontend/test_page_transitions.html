@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>页面切换动画测试</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <style>
+        /* 测试页面特定样式 */
+        .test-container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        
+        .test-nav {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            justify-content: center;
+        }
+        
+        .test-nav-btn {
+            padding: 10px 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .test-nav-btn:hover {
+            background: var(--accent-primary);
+            color: white;
+        }
+        
+        .test-nav-btn.active {
+            background: var(--accent-primary);
+            color: white;
+        }
+        
+        .test-content {
+            background: var(--bg-secondary);
+            padding: 30px;
+            border-radius: 10px;
+            min-height: 400px;
+            margin-bottom: 80px; /* 为状态栏留出空间 */
+        }
+        
+        .test-content h2 {
+            color: var(--text-primary);
+            margin-bottom: 20px;
+        }
+        
+        .test-content p {
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+        
+        .long-content {
+            height: 800px;
+            overflow-y: auto;
+            background: var(--bg-tertiary);
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .long-content p {
+            margin-bottom: 20px;
+            padding: 10px;
+            background: var(--bg-secondary);
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1 style="text-align: center; color: var(--text-primary); margin-bottom: 30px;">
+            页面切换动画测试
+        </h1>
+        
+        <div class="test-nav">
+            <button class="test-nav-btn active" data-tab="page1">页面一</button>
+            <button class="test-nav-btn" data-tab="page2">页面二</button>
+            <button class="test-nav-btn" data-tab="page3">长页面</button>
+            <button class="test-nav-btn" data-tab="page4">页面四</button>
+        </div>
+        
+        <div id="page1" class="tab-content active">
+            <div class="test-content">
+                <h2>页面一 - 基础内容</h2>
+                <p>这是第一个测试页面，包含基础内容。</p>
+                <p>测试页面切换动画的丝滑效果。</p>
+                <p>点击导航按钮可以切换到其他页面。</p>
+                <p>观察页面切换时的过渡动画是否流畅。</p>
+            </div>
+        </div>
+        
+        <div id="page2" class="tab-content">
+            <div class="test-content">
+                <h2>页面二 - 中等内容</h2>
+                <p>这是第二个测试页面，包含中等长度的内容。</p>
+                <p>测试在不同内容长度下的页面切换效果。</p>
+                <p>观察状态栏是否始终保持在页面底部。</p>
+                <p>验证页面切换动画的流畅性。</p>
+                <p>测试导航按钮的悬停和激活状态。</p>
+                <p>确保所有UI元素都正确显示。</p>
+            </div>
+        </div>
+        
+        <div id="page3" class="tab-content">
+            <div class="test-content">
+                <h2>页面三 - 长页面测试</h2>
+                <p>这是一个长页面，用于测试滚动和状态栏固定效果。</p>
+                <p>页面内容很长，需要滚动才能看到底部。</p>
+                <div class="long-content">
+                    <p>这是长页面的第一段内容。测试在长页面中状态栏是否始终保持在底部。</p>
+                    <p>这是长页面的第二段内容。验证页面切换动画在长页面中的表现。</p>
+                    <p>这是长页面的第三段内容。确保滚动时状态栏不会移动。</p>
+                    <p>这是长页面的第四段内容。测试页面切换的流畅性。</p>
+                    <p>这是长页面的第五段内容。观察动画效果是否丝滑。</p>
+                    <p>这是长页面的第六段内容。验证所有UI元素都正确显示。</p>
+                    <p>这是长页面的第七段内容。测试导航按钮的状态变化。</p>
+                    <p>这是长页面的第八段内容。确保页面切换时没有UI错位。</p>
+                    <p>这是长页面的第九段内容。验证状态栏始终在正确位置。</p>
+                    <p>这是长页面的第十段内容。测试页面切换动画的完整性。</p>
+                    <p>这是长页面的第十一段内容。观察动画的时间控制。</p>
+                    <p>这是长页面的第十二段内容。验证页面内容的正确显示。</p>
+                    <p>这是长页面的第十三段内容。测试滚动条的行为。</p>
+                    <p>这是长页面的第十四段内容。确保页面布局的稳定性。</p>
+                    <p>这是长页面的第十五段内容。验证动画的流畅性。</p>
+                    <p>这是长页面的第十六段内容。测试页面切换的响应性。</p>
+                    <p>这是长页面的第十七段内容。观察状态栏的固定效果。</p>
+                    <p>这是长页面的第十八段内容。验证页面切换的完整性。</p>
+                    <p>这是长页面的第十九段内容。测试动画的视觉效果。</p>
+                    <p>这是长页面的第二十段内容。确保所有功能正常工作。</p>
+                </div>
+            </div>
+        </div>
+        
+        <div id="page4" class="tab-content">
+            <div class="test-content">
+                <h2>页面四 - 最终测试</h2>
+                <p>这是最后一个测试页面。</p>
+                <p>验证所有页面切换动画都正常工作。</p>
+                <p>确保状态栏始终保持在页面底部。</p>
+                <p>测试页面切换的流畅性和响应性。</p>
+                <p>验证动画效果符合预期。</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 状态栏 -->
+    <footer class="status-bar">
+        <div class="status-left">
+            <span>测试状态：正常</span>
+        </div>
+        <div class="status-right">
+            <span id="test-time">2025-08-03 19:00:00</span>
+        </div>
+    </footer>
+    
+    <script>
+        // 页面切换逻辑
+        document.addEventListener('DOMContentLoaded', function() {
+            const navButtons = document.querySelectorAll('.test-nav-btn');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            // 更新时间
+            function updateTime() {
+                const timeElement = document.getElementById('test-time');
+                if (timeElement) {
+                    timeElement.textContent = new Date().toLocaleString('zh-CN');
+                }
+            }
+            updateTime();
+            setInterval(updateTime, 1000);
+            
+            // 页面切换函数
+            function switchTestTab(tabName) {
+                const currentActiveTab = document.querySelector('.tab-content.active');
+                const targetTab = document.getElementById(tabName);
+                
+                if (!targetTab || currentActiveTab === targetTab) {
+                    return;
+                }
+                
+                // 创建页面切换指示器
+                let transitionIndicator = document.querySelector('.page-transition-indicator');
+                if (!transitionIndicator) {
+                    transitionIndicator = document.createElement('div');
+                    transitionIndicator.className = 'page-transition-indicator';
+                    document.body.appendChild(transitionIndicator);
+                }
+                
+                // 显示页面切换指示器
+                transitionIndicator.classList.add('active');
+                
+                // 更新导航按钮状态
+                navButtons.forEach(btn => btn.classList.remove('active'));
+                const targetButton = document.querySelector(`[data-tab="${tabName}"]`);
+                if (targetButton) {
+                    targetButton.classList.add('active');
+                }
+                
+                // 页面切换动画
+                if (currentActiveTab) {
+                    currentActiveTab.classList.add('transitioning');
+                    currentActiveTab.classList.add('fade-out');
+                    
+                    setTimeout(() => {
+                        currentActiveTab.classList.remove('active', 'fade-out', 'transitioning');
+                        targetTab.classList.add('active', 'fade-in');
+                        targetTab.classList.remove('transitioning');
+                        
+                        setTimeout(() => {
+                            targetTab.classList.remove('fade-in');
+                            transitionIndicator.classList.remove('active');
+                            
+                            setTimeout(() => {
+                                if (transitionIndicator.parentElement) {
+                                    transitionIndicator.remove();
+                                }
+                            }, 300);
+                        }, 500);
+                    }, 300);
+                } else {
+                    targetTab.classList.add('active');
+                    setTimeout(() => {
+                        transitionIndicator.classList.remove('active');
+                        setTimeout(() => {
+                            if (transitionIndicator.parentElement) {
+                                transitionIndicator.remove();
+                            }
+                        }, 300);
+                    }, 200);
+                }
+                
+                // 滚动到顶部
+                setTimeout(() => {
+                    window.scrollTo({
+                        top: 0,
+                        behavior: 'smooth'
+                    });
+                }, 100);
+            }
+            
+            // 绑定导航按钮事件
+            navButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const tabName = this.getAttribute('data-tab');
+                    switchTestTab(tabName);
+                });
+            });
+        });
+    </script>
+</body>
+</html> 
