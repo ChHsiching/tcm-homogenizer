@@ -757,8 +757,8 @@ input[type="checkbox"] {
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     border: 2px solid var(--border-color);
     border-radius: 4px;
     background: var(--bg-tertiary);
@@ -775,16 +775,17 @@ input[type="checkbox"]:checked {
     border-color: var(--accent-primary);
 }
 
+/* 使用实心填充，更明显的选中状态 */
 input[type="checkbox"]:checked::after {
-    content: '✓';
+    content: '';
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    color: white;
-    font-size: 12px;
-    font-weight: bold;
-    line-height: 1;
+    width: 8px;
+    height: 8px;
+    background: white;
+    border-radius: 2px;
 }
 
 input[type="checkbox"]:hover {
@@ -874,8 +875,8 @@ input[type="checkbox"]:focus {
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     border: 2px solid var(--border-color);
     border-radius: 4px;
     background: var(--bg-tertiary);
@@ -891,15 +892,15 @@ input[type="checkbox"]:focus {
 }
 
 .checkbox-item input[type="checkbox"]:checked::after {
-    content: '✓';
+    content: '';
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    color: white;
-    font-size: 12px;
-    font-weight: bold;
-    line-height: 1;
+    width: 8px;
+    height: 8px;
+    background: white;
+    border-radius: 2px;
 }
 
 .checkbox-item input[type="checkbox"]:hover {
