@@ -1109,7 +1109,6 @@ input[type="checkbox"]:focus {
     padding: 30px;
     border-radius: 10px;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-    max-width: 600px;
     border: 1px solid var(--border-color);
 }
 
@@ -2447,6 +2446,516 @@ input[type="checkbox"]:focus {
     
     .applications-section {
         padding: 40px 20px;
+    }
+}
+
+/* 符号回归页面标题美化样式 */
+.regression-header {
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+    padding: 40px 30px;
+    border-radius: 20px;
+    margin-bottom: 30px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+}
+
+.regression-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+}
+
+.regression-header::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        radial-gradient(circle at 20% 80%, rgba(74, 158, 255, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(118, 75, 162, 0.1) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.regression-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 15px;
+    position: relative;
+    z-index: 1;
+}
+
+.regression-subtitle {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    margin-bottom: 20px;
+    position: relative;
+    z-index: 1;
+}
+
+.regression-description {
+    font-size: 1rem;
+    color: var(--text-primary);
+    line-height: 1.6;
+    max-width: 600px;
+    margin: 0 auto;
+    opacity: 0.9;
+    position: relative;
+    z-index: 1;
+}
+
+.regression-icon {
+    font-size: 3rem;
+    margin-bottom: 20px;
+    display: block;
+    position: relative;
+    z-index: 1;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+}
+
+/* 蒙特卡洛采样页面标题样式 */
+.monte-carlo-header {
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+    padding: 40px 30px;
+    border-radius: 20px;
+    margin-bottom: 30px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+}
+
+.monte-carlo-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(135deg, #6c5ce7 0%, #5f3dc4 100%);
+}
+
+.monte-carlo-header::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        radial-gradient(circle at 20% 80%, rgba(108, 92, 231, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(95, 61, 196, 0.1) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.monte-carlo-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #6c5ce7 0%, #5f3dc4 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 15px;
+    position: relative;
+    z-index: 1;
+}
+
+.monte-carlo-subtitle {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    margin-bottom: 20px;
+    position: relative;
+    z-index: 1;
+}
+
+.monte-carlo-description {
+    font-size: 1rem;
+    color: var(--text-primary);
+    line-height: 1.6;
+    max-width: 600px;
+    margin: 0 auto;
+    opacity: 0.9;
+    position: relative;
+    z-index: 1;
+}
+
+.monte-carlo-icon {
+    font-size: 3rem;
+    margin-bottom: 20px;
+    display: block;
+    position: relative;
+    z-index: 1;
+    animation: dice 3s ease-in-out infinite;
+}
+
+@keyframes dice {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .regression-header,
+    .monte-carlo-header {
+        padding: 30px 20px;
+        margin-bottom: 20px;
+    }
+    
+    .regression-title,
+    .monte-carlo-title {
+        font-size: 2rem;
+    }
+    
+    .regression-subtitle,
+    .monte-carlo-subtitle {
+        font-size: 1rem;
+    }
+    
+    .regression-description,
+    .monte-carlo-description {
+        font-size: 0.9rem;
+    }
+    
+    .regression-icon,
+    .monte-carlo-icon {
+        font-size: 2.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .regression-header,
+    .monte-carlo-header {
+        padding: 25px 15px;
+    }
+    
+    .regression-title,
+    .monte-carlo-title {
+        font-size: 1.8rem;
+    }
+    
+    .regression-subtitle,
+    .monte-carlo-subtitle {
+        font-size: 0.9rem;
+    }
+    
+    .regression-description,
+    .monte-carlo-description {
+        font-size: 0.85rem;
+    }
+    
+    .regression-icon,
+    .monte-carlo-icon {
+        font-size: 2rem;
+    }
+}
+
+/* 管理页面标题美化样式 */
+.admin-header {
+    background: var(--bg-secondary);
+    padding: 25px 30px;
+    border-radius: 15px;
+    margin-bottom: 25px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.admin-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+}
+
+.admin-header::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 60px;
+    height: 100%;
+    background: linear-gradient(90deg, transparent 0%, rgba(74, 158, 255, 0.05) 100%);
+    pointer-events: none;
+}
+
+.admin-icon {
+    font-size: 2.5rem;
+    color: var(--accent-primary);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+}
+
+.admin-title {
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+    position: relative;
+    z-index: 1;
+}
+
+.admin-subtitle {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin: 5px 0 0 0;
+    position: relative;
+    z-index: 1;
+}
+
+/* 设置页面特殊样式 */
+.settings-header {
+    background: var(--bg-secondary);
+    padding: 25px 30px;
+    border-radius: 15px;
+    margin-bottom: 25px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.settings-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+}
+
+.settings-header::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 60px;
+    height: 100%;
+    background: linear-gradient(90deg, transparent 0%, rgba(39, 174, 96, 0.05) 100%);
+    pointer-events: none;
+}
+
+.settings-icon {
+    font-size: 2.5rem;
+    color: #27ae60;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+}
+
+.settings-title {
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+    position: relative;
+    z-index: 1;
+}
+
+.settings-subtitle {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin: 5px 0 0 0;
+    position: relative;
+    z-index: 1;
+}
+
+/* 响应式设计 - 管理页面 */
+@media (max-width: 768px) {
+    .admin-header,
+    .settings-header {
+        padding: 20px 25px;
+        margin-bottom: 20px;
+    }
+    
+    .admin-title,
+    .settings-title {
+        font-size: 1.5rem;
+    }
+    
+    .admin-subtitle,
+    .settings-subtitle {
+        font-size: 0.85rem;
+    }
+    
+    .admin-icon,
+    .settings-icon {
+        font-size: 2rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .admin-header,
+    .settings-header {
+        padding: 15px 20px;
+        flex-direction: column;
+        text-align: center;
+        gap: 15px;
+    }
+    
+    .admin-title,
+    .settings-title {
+        font-size: 1.3rem;
+    }
+    
+    .admin-subtitle,
+    .settings-subtitle {
+        font-size: 0.8rem;
+    }
+    
+    .admin-icon,
+    .settings-icon {
+        font-size: 1.8rem;
+    }
+}
+
+/* 设置页面分组布局 */
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 25px;
+    margin-bottom: 30px;
+    align-items: stretch;
+}
+
+.settings-group {
+    padding: 25px;
+    background: var(--bg-secondary);
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.settings-group:hover {
+    border-color: var(--accent-primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.settings-group-title {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.settings-group-content {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.settings-group-content .form-group {
+    margin-bottom: 0;
+}
+
+/* 设置操作按钮区域 */
+.settings-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    padding: 25px;
+    background: var(--bg-tertiary);
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    margin-top: 30px;
+}
+
+.settings-actions .btn-primary,
+.settings-actions .btn-secondary {
+    padding: 12px 24px;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.settings-actions .btn-primary:hover,
+.settings-actions .btn-secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* 响应式设计 - 设置页面 */
+@media (max-width: 768px) {
+    .settings-group {
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .settings-group-title {
+        font-size: 1.2rem;
+    }
+    
+    .settings-group-content {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .settings-actions {
+        flex-direction: column;
+        gap: 10px;
+        padding: 20px;
+    }
+    
+    .settings-actions .btn-primary,
+    .settings-actions .btn-secondary {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .settings-group {
+        padding: 15px;
+    }
+    
+    .settings-group-title {
+        font-size: 1.1rem;
+    }
+    
+    .settings-actions {
+        padding: 15px;
     }
 } 
 

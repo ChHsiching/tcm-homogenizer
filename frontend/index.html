@@ -340,7 +340,15 @@
 
             <!-- 符号回归分析 -->
             <div id="regression" class="tab-content">
-                <h2>符号回归分析</h2>
+                <div class="regression-header">
+                    <div class="regression-icon">🧬</div>
+                    <h1 class="regression-title">符号回归分析</h1>
+                    <p class="regression-subtitle">智能算法驱动的"量-效关系"建模</p>
+                    <p class="regression-description">
+                        通过符号回归算法，将药材成分与药效关联转化为可读数学表达式，
+                        直观揭示"量-效关系"本质，筛选不同精度下的功效物质群。
+                    </p>
+                </div>
                 <div class="analysis-section">
                     <div class="input-section">
                         <h3>数据输入</h3>
@@ -381,7 +389,15 @@
 
             <!-- 蒙特卡洛采样 -->
             <div id="monte-carlo" class="tab-content">
-                <h2>蒙特卡洛采样</h2>
+                <div class="monte-carlo-header">
+                    <div class="monte-carlo-icon">🎲</div>
+                    <h1 class="monte-carlo-title">蒙特卡洛采样</h1>
+                    <p class="monte-carlo-subtitle">智能生成万级配比组合的采样引擎</p>
+                    <p class="monte-carlo-description">
+                        基于符号回归输出的数学描述符，智能生成大量样本点，
+                        从中筛选满足约束的可行配比方案，助力锁定最优均化方案。
+                    </p>
+                </div>
                 <div class="analysis-section">
                     <div class="input-section">
                         <h3>分析参数</h3>
@@ -416,7 +432,13 @@
 
             <!-- 数据管理（管理员功能） -->
             <div id="data-management" class="tab-content">
-                <h2>数据管理</h2>
+                <div class="admin-header">
+                    <div class="admin-icon">📊</div>
+                    <div>
+                        <h1 class="admin-title">数据管理</h1>
+                        <p class="admin-subtitle">系统数据导入、导出与管理</p>
+                    </div>
+                </div>
                 <div class="data-section">
                     <div class="data-actions">
                         <h3>数据操作</h3>
@@ -435,7 +457,13 @@
 
             <!-- 用户管理（管理员功能） -->
             <div id="user-management" class="tab-content">
-                <h2>用户管理</h2>
+                <div class="admin-header">
+                    <div class="admin-icon">👥</div>
+                    <div>
+                        <h1 class="admin-title">用户管理</h1>
+                        <p class="admin-subtitle">用户账户创建、权限管理</p>
+                    </div>
+                </div>
                 <div class="user-section">
                     <div class="user-actions">
                         <h3>用户操作</h3>
@@ -453,47 +481,203 @@
 
             <!-- 设置 -->
             <div id="settings" class="tab-content">
-                <h2>系统设置</h2>
+                <div class="settings-header">
+                    <div class="settings-icon">⚙️</div>
+                    <div>
+                        <h1 class="settings-title">系统设置</h1>
+                        <p class="settings-subtitle">应用程序配置与个性化</p>
+                    </div>
+                </div>
                 <div class="settings-section">
-                    <div class="form-group">
-                        <label for="backend-port">后端端口</label>
-                        <input type="number" id="backend-port" value="5000" min="1000" max="9999">
+                    <div class="settings-grid">
+                        <!-- 基础设置 -->
+                        <div class="settings-group">
+                        <h3 class="settings-group-title">🔧 基础设置</h3>
+                        <div class="settings-group-content">
+                            <div class="form-group">
+                                <label for="backend-port">后端端口</label>
+                                <input type="number" id="backend-port" value="5000" min="1000" max="9999">
+                            </div>
+                            <div class="form-group">
+                                <label for="auto-start-backend">
+                                    <input type="checkbox" id="auto-start-backend" checked>
+                                    自动启动后端服务
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label for="auto-reconnect">
+                                    <input type="checkbox" id="auto-reconnect" checked>
+                                    自动重连
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label for="connection-timeout">连接超时 (秒)</label>
+                                <input type="number" id="connection-timeout" value="30" min="5" max="300">
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="auto-start-backend">
-                            <input type="checkbox" id="auto-start-backend" checked>
-                            自动启动后端服务
-                        </label>
+
+                    <!-- 界面设置 -->
+                    <div class="settings-group">
+                        <h3 class="settings-group-title">🎨 界面设置</h3>
+                        <div class="settings-group-content">
+                            <div class="form-group">
+                                <label for="theme">主题</label>
+                                <select id="theme">
+                                    <option value="dark">深色主题</option>
+                                    <option value="light">浅色主题</option>
+                                    <option value="auto">跟随系统</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="language">语言</label>
+                                <select id="language">
+                                    <option value="zh-CN">中文简体</option>
+                                    <option value="zh-TW">中文繁体</option>
+                                    <option value="en-US">English</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="font-size">字体大小</label>
+                                <select id="font-size">
+                                    <option value="small">小</option>
+                                    <option value="medium" selected>中</option>
+                                    <option value="large">大</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="animation-speed">动画速度</label>
+                                <select id="animation-speed">
+                                    <option value="fast">快速</option>
+                                    <option value="normal" selected>正常</option>
+                                    <option value="slow">慢速</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="theme">主题</label>
-                        <select id="theme">
-                            <option value="dark">深色</option>
-                            <option value="light">浅色</option>
-                        </select>
+
+                    <!-- 数据设置 -->
+                    <div class="settings-group">
+                        <h3 class="settings-group-title">📊 数据设置</h3>
+                        <div class="settings-group-content">
+                            <div class="form-group">
+                                <label for="default-format">默认格式</label>
+                                <select id="default-format">
+                                    <option value="csv">CSV</option>
+                                    <option value="xlsx">Excel</option>
+                                    <option value="json">JSON</option>
+                                    <option value="txt">TXT</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="auto-save">
+                                    <input type="checkbox" id="auto-save">
+                                    自动保存
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label for="save-interval">保存间隔 (分钟)</label>
+                                <input type="number" id="save-interval" value="5" min="1" max="60">
+                            </div>
+                            <div class="form-group">
+                                <label for="max-file-size">最大文件大小 (MB)</label>
+                                <input type="number" id="max-file-size" value="50" min="1" max="500">
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="language">语言</label>
-                        <select id="language">
-                            <option value="zh-CN">中文</option>
-                            <option value="en-US">English</option>
-                        </select>
+
+                    <!-- 分析设置 -->
+                    <div class="settings-group">
+                        <h3 class="settings-group-title">🔬 分析设置</h3>
+                        <div class="settings-group-content">
+                            <div class="form-group">
+                                <label for="default-population">默认种群大小</label>
+                                <input type="number" id="default-population" value="100" min="10" max="1000">
+                            </div>
+                            <div class="form-group">
+                                <label for="default-generations">默认优化轮次</label>
+                                <input type="number" id="default-generations" value="50" min="10" max="500">
+                            </div>
+                            <div class="form-group">
+                                <label for="default-iterations">默认采样次数</label>
+                                <input type="number" id="default-iterations" value="1000" min="100" max="10000">
+                            </div>
+                            <div class="form-group">
+                                <label for="precision">计算精度</label>
+                                <select id="precision">
+                                    <option value="low">低精度</option>
+                                    <option value="medium" selected>中等精度</option>
+                                    <option value="high">高精度</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="default-format">默认格式</label>
-                        <select id="default-format">
-                            <option value="csv">CSV</option>
-                            <option value="xlsx">Excel</option>
-                            <option value="json">JSON</option>
-                        </select>
+
+                    <!-- 通知设置 -->
+                    <div class="settings-group">
+                        <h3 class="settings-group-title">🔔 通知设置</h3>
+                        <div class="settings-group-content">
+                            <div class="form-group">
+                                <label for="enable-notifications">
+                                    <input type="checkbox" id="enable-notifications" checked>
+                                    启用通知
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label for="notification-sound">
+                                    <input type="checkbox" id="notification-sound" checked>
+                                    通知声音
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label for="notification-duration">通知显示时间 (秒)</label>
+                                <input type="number" id="notification-duration" value="5" min="1" max="30">
+                            </div>
+                            <div class="form-group">
+                                <label for="notification-position">通知位置</label>
+                                <select id="notification-position">
+                                    <option value="top-right" selected>右上角</option>
+                                    <option value="top-left">左上角</option>
+                                    <option value="bottom-right">右下角</option>
+                                    <option value="bottom-left">左下角</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="auto-save">
-                            <input type="checkbox" id="auto-save">
-                            自动保存
-                        </label>
+
+                    <!-- 安全设置 -->
+                    <div class="settings-group">
+                        <h3 class="settings-group-title">🔒 安全设置</h3>
+                        <div class="settings-group-content">
+                            <div class="form-group">
+                                <label for="session-timeout">会话超时 (分钟)</label>
+                                <input type="number" id="session-timeout" value="30" min="5" max="480">
+                            </div>
+                            <div class="form-group">
+                                <label for="password-expiry">密码过期 (天)</label>
+                                <input type="number" id="password-expiry" value="90" min="30" max="365">
+                            </div>
+                            <div class="form-group">
+                                <label for="login-attempts">最大登录尝试次数</label>
+                                <input type="number" id="login-attempts" value="5" min="3" max="10">
+                            </div>
+                            <div class="form-group">
+                                <label for="enable-logging">
+                                    <input type="checkbox" id="enable-logging" checked>
+                                    启用操作日志
+                                </label>
+                            </div>
+                        </div>
                     </div>
-                    <button id="save-settings" class="btn-primary">保存设置</button>
+                </div>
+
+                <!-- 设置操作按钮 -->
+                <div class="settings-actions">
+                        <button id="save-settings" class="btn-primary">💾 保存设置</button>
+                        <button id="reset-settings" class="btn-secondary">🔄 重置默认</button>
+                        <button id="export-settings" class="btn-secondary">📤 导出配置</button>
+                        <button id="import-settings" class="btn-secondary">📥 导入配置</button>
+                    </div>
                 </div>
             </div>
         </main>
