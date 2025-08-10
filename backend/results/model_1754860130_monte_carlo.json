@@ -1,0 +1,393 @@
+{
+  "analysis_id": "mc_1754860591",
+  "iterations": 1000,
+  "target_efficacy": 22,
+  "tolerance": 0.1,
+  "valid_samples": 152,
+  "success_rate": 0.152,
+  "analysis_time": 10.3,
+  "top10": [
+    {
+      "rank": 1,
+      "efficacy": 21.974,
+      "components": [
+        {
+          "name": "QA",
+          "value": 0.73
+        },
+        {
+          "name": "NCGA",
+          "value": 0.56
+        },
+        {
+          "name": "CGA",
+          "value": 0.52
+        },
+        {
+          "name": "CCGA",
+          "value": 0.4
+        },
+        {
+          "name": "CA",
+          "value": 0.64
+        },
+        {
+          "name": "PIS",
+          "value": 0.59
+        },
+        {
+          "name": "HYP",
+          "value": 0.98
+        },
+        {
+          "name": "AST",
+          "value": 0.57
+        }
+      ]
+    },
+    {
+      "rank": 2,
+      "efficacy": 22.059,
+      "components": [
+        {
+          "name": "QA",
+          "value": 0.02
+        },
+        {
+          "name": "NCGA",
+          "value": 0.52
+        },
+        {
+          "name": "CGA",
+          "value": 0.23
+        },
+        {
+          "name": "CCGA",
+          "value": 0.48
+        },
+        {
+          "name": "CA",
+          "value": 0.4
+        },
+        {
+          "name": "PIS",
+          "value": 0.27
+        },
+        {
+          "name": "HYP",
+          "value": 0.37
+        },
+        {
+          "name": "AST",
+          "value": 0.11
+        }
+      ]
+    },
+    {
+      "rank": 3,
+      "efficacy": 22.035,
+      "components": [
+        {
+          "name": "QA",
+          "value": 0.12
+        },
+        {
+          "name": "NCGA",
+          "value": 0.23
+        },
+        {
+          "name": "CGA",
+          "value": 0.11
+        },
+        {
+          "name": "CCGA",
+          "value": 0.33
+        },
+        {
+          "name": "CA",
+          "value": 0.0
+        },
+        {
+          "name": "PIS",
+          "value": 0.08
+        },
+        {
+          "name": "HYP",
+          "value": 0.94
+        },
+        {
+          "name": "AST",
+          "value": 0.42
+        }
+      ]
+    },
+    {
+      "rank": 4,
+      "efficacy": 21.943,
+      "components": [
+        {
+          "name": "QA",
+          "value": 0.66
+        },
+        {
+          "name": "NCGA",
+          "value": 0.46
+        },
+        {
+          "name": "CGA",
+          "value": 0.71
+        },
+        {
+          "name": "CCGA",
+          "value": 0.37
+        },
+        {
+          "name": "CA",
+          "value": 0.96
+        },
+        {
+          "name": "PIS",
+          "value": 0.86
+        },
+        {
+          "name": "HYP",
+          "value": 0.88
+        },
+        {
+          "name": "AST",
+          "value": 0.31
+        }
+      ]
+    },
+    {
+      "rank": 5,
+      "efficacy": 21.956,
+      "components": [
+        {
+          "name": "QA",
+          "value": 0.34
+        },
+        {
+          "name": "NCGA",
+          "value": 0.03
+        },
+        {
+          "name": "CGA",
+          "value": 0.46
+        },
+        {
+          "name": "CCGA",
+          "value": 0.26
+        },
+        {
+          "name": "CA",
+          "value": 0.32
+        },
+        {
+          "name": "PIS",
+          "value": 0.89
+        },
+        {
+          "name": "HYP",
+          "value": 0.05
+        },
+        {
+          "name": "AST",
+          "value": 0.3
+        }
+      ]
+    },
+    {
+      "rank": 6,
+      "efficacy": 21.984,
+      "components": [
+        {
+          "name": "QA",
+          "value": 0.83
+        },
+        {
+          "name": "NCGA",
+          "value": 0.08
+        },
+        {
+          "name": "CGA",
+          "value": 0.11
+        },
+        {
+          "name": "CCGA",
+          "value": 0.45
+        },
+        {
+          "name": "CA",
+          "value": 0.85
+        },
+        {
+          "name": "PIS",
+          "value": 0.38
+        },
+        {
+          "name": "HYP",
+          "value": 0.25
+        },
+        {
+          "name": "AST",
+          "value": 0.84
+        }
+      ]
+    },
+    {
+      "rank": 7,
+      "efficacy": 21.925,
+      "components": [
+        {
+          "name": "QA",
+          "value": 0.48
+        },
+        {
+          "name": "NCGA",
+          "value": 0.96
+        },
+        {
+          "name": "CGA",
+          "value": 0.46
+        },
+        {
+          "name": "CCGA",
+          "value": 0.2
+        },
+        {
+          "name": "CA",
+          "value": 0.33
+        },
+        {
+          "name": "PIS",
+          "value": 0.24
+        },
+        {
+          "name": "HYP",
+          "value": 0.03
+        },
+        {
+          "name": "AST",
+          "value": 0.75
+        }
+      ]
+    },
+    {
+      "rank": 8,
+      "efficacy": 21.825,
+      "components": [
+        {
+          "name": "QA",
+          "value": 0.82
+        },
+        {
+          "name": "NCGA",
+          "value": 0.74
+        },
+        {
+          "name": "CGA",
+          "value": 0.05
+        },
+        {
+          "name": "CCGA",
+          "value": 0.76
+        },
+        {
+          "name": "CA",
+          "value": 0.44
+        },
+        {
+          "name": "PIS",
+          "value": 0.79
+        },
+        {
+          "name": "HYP",
+          "value": 0.52
+        },
+        {
+          "name": "AST",
+          "value": 0.51
+        }
+      ]
+    },
+    {
+      "rank": 9,
+      "efficacy": 21.835,
+      "components": [
+        {
+          "name": "QA",
+          "value": 0.85
+        },
+        {
+          "name": "NCGA",
+          "value": 0.1
+        },
+        {
+          "name": "CGA",
+          "value": 0.46
+        },
+        {
+          "name": "CCGA",
+          "value": 0.01
+        },
+        {
+          "name": "CA",
+          "value": 0.55
+        },
+        {
+          "name": "PIS",
+          "value": 0.03
+        },
+        {
+          "name": "HYP",
+          "value": 0.68
+        },
+        {
+          "name": "AST",
+          "value": 0.36
+        }
+      ]
+    },
+    {
+      "rank": 10,
+      "efficacy": 21.742,
+      "components": [
+        {
+          "name": "QA",
+          "value": 0.12
+        },
+        {
+          "name": "NCGA",
+          "value": 0.92
+        },
+        {
+          "name": "CGA",
+          "value": 0.34
+        },
+        {
+          "name": "CCGA",
+          "value": 0.43
+        },
+        {
+          "name": "CA",
+          "value": 0.79
+        },
+        {
+          "name": "PIS",
+          "value": 0.06
+        },
+        {
+          "name": "HYP",
+          "value": 0.79
+        },
+        {
+          "name": "AST",
+          "value": 0.9
+        }
+      ]
+    }
+  ],
+  "component_ranges": {},
+  "target_name": "HDL"
+}

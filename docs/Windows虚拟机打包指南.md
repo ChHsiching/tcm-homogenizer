@@ -525,7 +525,7 @@ function createMenu() {
           }
         },
         {
-          label: '蒙特卡罗分析',
+          label: '蒙特卡洛采样分析',
           click: () => {
             mainWindow.webContents.send('menu-monte-carlo');
           }

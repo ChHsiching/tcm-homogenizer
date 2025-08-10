@@ -19,6 +19,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 文件操作
   openFile: () => ipcRenderer.invoke('dialog:openFile'),
   saveFile: () => ipcRenderer.invoke('dialog:saveFile'),
+  saveZipFile: (defaultFileName, arrayBuffer) => {
+    try {
+      const buf = Buffer.from(new Uint8Array(arrayBuffer));
+      return ipcRenderer.invoke('save-zip-file', { defaultFileName, buffer: buf });
+    } catch (e) {
+      return Promise.resolve({ success: false, error: e?.message || String(e) });
+    }
+  },
   
   // 通知
   showNotification: (title, body) => ipcRenderer.invoke('notification:show', title, body),

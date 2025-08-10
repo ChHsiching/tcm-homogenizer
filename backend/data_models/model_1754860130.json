@@ -1,0 +1,65 @@
+{
+  "id": "model_1754860130",
+  "name": "HDL分析模型_model_1754860130",
+  "description": "基于Leaf50HDL.csv数据，使用QA、NCGA、CGA等21个成分预测HDL的符号回归模型",
+  "analysis_type": "符号回归",
+  "target_column": "HDL",
+  "feature_columns": [
+    "QA",
+    "NCGA",
+    "CGA",
+    "CCGA",
+    "CA",
+    "PIS",
+    "HYP",
+    "AST",
+    "GUA",
+    "RUT",
+    "VR",
+    "VG",
+    "PB2",
+    "PC1",
+    "EPI",
+    "OA",
+    "UA",
+    "MA",
+    "CRA",
+    "QUE",
+    "MDA"
+  ],
+  "data_source": "Leaf50HDL.csv",
+  "created_at": 1754860130.9839847,
+  "updated_at": 1754860591.6555934,
+  "status": "active",
+  "analysis_params": {
+    "population_size": 100,
+    "generations": 50,
+    "max_tree_depth": 35,
+    "max_tree_length": 35,
+    "symbolic_expression_grammar": [
+      "addition",
+      "subtraction",
+      "multiplication",
+      "division"
+    ],
+    "train_ratio": 80,
+    "set_seed_randomly": false,
+    "seed": 42,
+    "seed_mode": "固定"
+  },
+  "data_files": {
+    "csv_data": "model_1754860130_data.csv",
+    "regression_model": "model_1754860130_regression.json",
+    "monte_carlo_results": "model_1754860130_monte_carlo.json"
+  },
+  "metadata": {
+    "data_rows": 60,
+    "has_csv_data": true,
+    "has_regression_model": true,
+    "has_monte_carlo_results": true,
+    "feature_count": 21,
+    "model_complexity": 3,
+    "r2_score": 0.766,
+    "mse_score": 0.099
+  }
+}

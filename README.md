@@ -1,14 +1,15 @@
-# 中药配比客户端
+# 中药多组分均化分析系统
 
-一个基于Web技术的中药配比客户端软件，采用前后端分离架构，支持用户管理、中药配比计算等功能。
+一个基于Web技术的中药多组分均化分析系统，采用前后端分离架构，支持用户管理、符号回归分析、蒙特卡洛采样等功能。
 
 ## 功能特性
 
 - 🔐 **用户管理**: 完整的用户注册、登录、编辑功能
-- 🏥 **中药配比**: 智能中药配方计算和优化
+- 🧬 **符号回归**: 智能中药成分关系分析
+- 🎲 **蒙特卡洛采样**: 中药成分配比优化推荐
+- 📊 **数据管理**: 完整的数据模型管理系统
 - 🎨 **现代化UI**: 响应式设计，流畅的页面切换动画
 - 📱 **多平台支持**: Web版本和Electron桌面客户端
-- 🧪 **测试完善**: 端到端测试和自动化测试流程
 
 ## 技术栈
 
@@ -39,7 +40,7 @@ cd backend && pip install -r requirements.txt
 
 ```bash
 # 启动后端服务
-cd backend && python app.py
+cd backend && python main.py
 
 # 启动前端服务
 cd frontend && python -m http.server 3000
@@ -57,18 +58,51 @@ cd frontend && python -m http.server 3000
 
 ```
 tcm-homogenizer/
-├── frontend/          # 前端代码
-│   ├── index.html     # 主页面
-│   ├── assets/        # 静态资源
-│   └── styles/        # 样式文件
-├── backend/           # 后端代码
-│   ├── app.py         # Flask应用
-│   └── models/        # 数据模型
-├── scripts/           # 启动脚本
-├── docs/              # 项目文档
-│   ├── 开发日志.md    # 开发记录
-│   └── 开发指南.md    # 开发指南
-└── README.md          # 项目说明
+├── frontend/                    # 前端代码
+│   ├── index.html              # 主页面
+│   ├── assets/                 # 静态资源
+│   │   ├── icons/             # 图标文件
+│   │   ├── libs/              # 第三方库
+│   │   └── *.svg              # SVG图标
+│   ├── styles/                 # 样式文件
+│   ├── scripts/                # 前端脚本
+│   └── data/                   # 前端数据
+├── backend/                     # 后端代码
+│   ├── main.py                 # Flask应用入口
+│   ├── api/                    # API接口
+│   │   ├── app.py             # Flask应用配置
+│   │   ├── auth.py            # 认证模块
+│   │   └── routes.py          # 路由定义
+│   ├── algorithms/             # 算法模块
+│   │   ├── monte_carlo.py     # 蒙特卡洛算法
+│   │   └── symbolic_regression.py # 符号回归算法
+│   ├── data_models/            # 数据模型元数据
+│   ├── csv_data/               # CSV数据文件
+│   ├── models/                 # 回归模型文件
+│   ├── results/                # 分析结果文件
+│   ├── uploads/                # 上传文件目录
+│   └── utils/                  # 工具模块
+├── scripts/                     # 启动脚本
+│   ├── start-dev.sh           # 开发环境启动
+│   ├── stop-dev.sh            # 停止开发环境
+│   └── status.sh              # 服务状态检查
+├── docs/                        # 项目文档
+│   ├── summaries/              # 功能实现总结
+│   │   ├── 滚动条修复总结.md
+│   │   ├── 完整数据显示功能实现总结.md
+│   │   ├── CSV功能实现总结.md
+│   │   ├── 模型显示改进总结.md
+│   │   ├── 数据管理系统规范总结.md
+│   │   └── 数据管理功能实现总结.md
+│   ├── 开发指南.md             # 开发指南
+│   ├── 开发进度总结.md         # 开发进度
+│   ├── Windows虚拟机打包指南.md # Windows打包指南
+│   ├── 项目初始化总结.md       # 项目初始化
+│   ├── 首页设计总结.md         # 首页设计
+│   └── 开发日志.md             # 开发记录
+├── .gitignore                   # Git忽略文件
+├── package.json                 # Node.js配置
+└── README.md                    # 项目说明
 ```
 
 ## 开发指南
@@ -78,6 +112,17 @@ tcm-homogenizer/
 ## 开发日志
 
 项目开发历程和技术难点请参考 [docs/开发日志.md](docs/开发日志.md)
+
+## 功能实现总结
+
+项目功能实现总结文档位于 [docs/summaries/](docs/summaries/) 目录：
+
+- [滚动条修复总结](docs/summaries/滚动条修复总结.md)
+- [完整数据显示功能实现总结](docs/summaries/完整数据显示功能实现总结.md)
+- [CSV功能实现总结](docs/summaries/CSV功能实现总结.md)
+- [模型显示改进总结](docs/summaries/模型显示改进总结.md)
+- [数据管理系统规范总结](docs/summaries/数据管理系统规范总结.md)
+- [数据管理功能实现总结](docs/summaries/数据管理功能实现总结.md)
 
 ## 测试
 
@@ -98,28 +143,10 @@ python -m pytest tests/
 使用Electron打包为桌面应用：
 
 ```bash
-cd frontend && npm run build
+# 打包Electron应用
+npm run build
 ```
-
-## 贡献指南
-
-1. Fork 项目
-2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 打开 Pull Request
 
 ## 许可证
 
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
-
-## 联系方式
-
-如有问题或建议，请通过以下方式联系：
-
-- 提交 Issue
-- 发送邮件至项目维护者
-
----
-
-*最后更新: 2024年* 
+本项目采用 MIT 许可证，详见 [LICENSE](LICENSE) 文件。 

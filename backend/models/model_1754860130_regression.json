@@ -1,0 +1,400 @@
+{
+  "id": "model_1754860130",
+  "expression": "QA * 0.5 + NCGA * 0.4 + CGA * 0.3 + 0.1",
+  "target_variable": "HDL",
+  "constants": {
+    "c_0": 9.7905,
+    "c_1": 2.8,
+    "c_2": 1.139,
+    "c_3": 3.6923
+  },
+  "r2": 0.766,
+  "mse": 0.099,
+  "feature_importance": [
+    {
+      "feature": "QA",
+      "importance": 0.8
+    },
+    {
+      "feature": "NCGA",
+      "importance": 0.6
+    },
+    {
+      "feature": "CGA",
+      "importance": 0.4
+    },
+    {
+      "feature": "CCGA",
+      "importance": 0.2
+    },
+    {
+      "feature": "CA",
+      "importance": 0.1
+    },
+    {
+      "feature": "PIS",
+      "importance": 0.1
+    },
+    {
+      "feature": "HYP",
+      "importance": 0.1
+    },
+    {
+      "feature": "AST",
+      "importance": 0.1
+    },
+    {
+      "feature": "GUA",
+      "importance": 0.1
+    },
+    {
+      "feature": "RUT",
+      "importance": 0.1
+    },
+    {
+      "feature": "VR",
+      "importance": 0.1
+    },
+    {
+      "feature": "VG",
+      "importance": 0.1
+    },
+    {
+      "feature": "PB2",
+      "importance": 0.1
+    },
+    {
+      "feature": "PC1",
+      "importance": 0.1
+    },
+    {
+      "feature": "EPI",
+      "importance": 0.1
+    },
+    {
+      "feature": "OA",
+      "importance": 0.1
+    },
+    {
+      "feature": "UA",
+      "importance": 0.1
+    },
+    {
+      "feature": "MA",
+      "importance": 0.1
+    },
+    {
+      "feature": "CRA",
+      "importance": 0.1
+    },
+    {
+      "feature": "QUE",
+      "importance": 0.1
+    },
+    {
+      "feature": "MDA",
+      "importance": 0.1
+    }
+  ],
+  "predictions": [
+    {
+      "actual": 0.611,
+      "predicted": 0.695
+    },
+    {
+      "actual": 0.568,
+      "predicted": 0.283
+    },
+    {
+      "actual": 0.562,
+      "predicted": 0.427
+    },
+    {
+      "actual": 0.704,
+      "predicted": 0.538
+    },
+    {
+      "actual": 0.576,
+      "predicted": 0.718
+    },
+    {
+      "actual": 0.604,
+      "predicted": 0.71
+    },
+    {
+      "actual": 0.545,
+      "predicted": 0.78
+    },
+    {
+      "actual": 0.522,
+      "predicted": 0.274
+    },
+    {
+      "actual": 0.521,
+      "predicted": 0.474
+    },
+    {
+      "actual": 0.507,
+      "predicted": 0.225
+    },
+    {
+      "actual": 0.596,
+      "predicted": 0.427
+    },
+    {
+      "actual": 0.575,
+      "predicted": 0.578
+    },
+    {
+      "actual": 0.515,
+      "predicted": 0.231
+    },
+    {
+      "actual": 0.874,
+      "predicted": 0.693
+    },
+    {
+      "actual": 0.882,
+      "predicted": 0.972
+    },
+    {
+      "actual": 0.886,
+      "predicted": 0.913
+    },
+    {
+      "actual": 1.061,
+      "predicted": 0.893
+    },
+    {
+      "actual": 0.809,
+      "predicted": 0.863
+    },
+    {
+      "actual": 0.796,
+      "predicted": 0.982
+    },
+    {
+      "actual": 1.003,
+      "predicted": 0.707
+    },
+    {
+      "actual": 0.611,
+      "predicted": 0.794
+    },
+    {
+      "actual": 0.568,
+      "predicted": 0.687
+    },
+    {
+      "actual": 0.562,
+      "predicted": 0.466
+    },
+    {
+      "actual": 0.704,
+      "predicted": 0.497
+    },
+    {
+      "actual": 0.576,
+      "predicted": 0.85
+    },
+    {
+      "actual": 0.604,
+      "predicted": 0.506
+    },
+    {
+      "actual": 0.545,
+      "predicted": 0.301
+    },
+    {
+      "actual": 0.522,
+      "predicted": 0.28
+    },
+    {
+      "actual": 0.521,
+      "predicted": 0.729
+    },
+    {
+      "actual": 0.507,
+      "predicted": 0.569
+    },
+    {
+      "actual": 0.596,
+      "predicted": 0.78
+    },
+    {
+      "actual": 0.575,
+      "predicted": 0.713
+    },
+    {
+      "actual": 0.515,
+      "predicted": 0.537
+    },
+    {
+      "actual": 0.874,
+      "predicted": 1.158
+    },
+    {
+      "actual": 0.882,
+      "predicted": 0.809
+    },
+    {
+      "actual": 0.886,
+      "predicted": 0.917
+    },
+    {
+      "actual": 1.061,
+      "predicted": 1.259
+    },
+    {
+      "actual": 0.809,
+      "predicted": 0.88
+    },
+    {
+      "actual": 0.796,
+      "predicted": 1.013
+    },
+    {
+      "actual": 1.003,
+      "predicted": 1.049
+    },
+    {
+      "actual": 0.611,
+      "predicted": 0.734
+    },
+    {
+      "actual": 0.568,
+      "predicted": 0.295
+    },
+    {
+      "actual": 0.562,
+      "predicted": 0.399
+    },
+    {
+      "actual": 0.704,
+      "predicted": 0.578
+    },
+    {
+      "actual": 0.576,
+      "predicted": 0.324
+    },
+    {
+      "actual": 0.604,
+      "predicted": 0.444
+    },
+    {
+      "actual": 0.545,
+      "predicted": 0.306
+    },
+    {
+      "actual": 0.522,
+      "predicted": 0.389
+    },
+    {
+      "actual": 0.521,
+      "predicted": 0.602
+    },
+    {
+      "actual": 0.507,
+      "predicted": 0.426
+    },
+    {
+      "actual": 0.596,
+      "predicted": 0.518
+    },
+    {
+      "actual": 0.575,
+      "predicted": 0.401
+    },
+    {
+      "actual": 0.515,
+      "predicted": 0.375
+    },
+    {
+      "actual": 0.874,
+      "predicted": 1.136
+    },
+    {
+      "actual": 0.882,
+      "predicted": 0.971
+    },
+    {
+      "actual": 0.886,
+      "predicted": 0.951
+    },
+    {
+      "actual": 1.061,
+      "predicted": 0.864
+    },
+    {
+      "actual": 0.809,
+      "predicted": 0.946
+    },
+    {
+      "actual": 0.796,
+      "predicted": 0.594
+    },
+    {
+      "actual": 1.003,
+      "predicted": 0.931
+    }
+  ],
+  "training_time": 5.8,
+  "model_complexity": 3,
+  "detailed_metrics": {
+    "average_relative_error_test": 16.43,
+    "average_relative_error_training": 13.98,
+    "mean_absolute_error_test": 0.219,
+    "mean_absolute_error_training": 0.129,
+    "mean_squared_error_test": 0.134,
+    "mean_squared_error_training": 0.097,
+    "model_depth": 7,
+    "model_length": 33,
+    "normalized_mean_squared_error_test": 0.183,
+    "normalized_mean_squared_error_training": 0.091,
+    "pearson_r_test": 0.935,
+    "pearson_r_training": 0.911,
+    "root_mean_squared_error_test": 0.524,
+    "root_mean_squared_error_training": 0.348
+  },
+  "target_column": "HDL",
+  "feature_columns": [
+    "QA",
+    "NCGA",
+    "CGA",
+    "CCGA",
+    "CA",
+    "PIS",
+    "HYP",
+    "AST",
+    "GUA",
+    "RUT",
+    "VR",
+    "VG",
+    "PB2",
+    "PC1",
+    "EPI",
+    "OA",
+    "UA",
+    "MA",
+    "CRA",
+    "QUE",
+    "MDA"
+  ],
+  "analysis_params": {
+    "population_size": 100,
+    "generations": 50,
+    "max_tree_depth": 35,
+    "max_tree_length": 35,
+    "symbolic_expression_grammar": [
+      "addition",
+      "subtraction",
+      "multiplication",
+      "division"
+    ],
+    "train_ratio": 80,
+    "set_seed_randomly": false,
+    "seed": 42,
+    "seed_mode": "固定"
+  },
+  "created_at": 1754860130.9839609
+}

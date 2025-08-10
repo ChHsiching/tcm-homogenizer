@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-蒙特卡洛分析算法模块
+蒙特卡洛采样分析算法模块
 """
 
 import numpy as np
@@ -14,7 +14,7 @@ import time
 from .symbolic_regression import SymbolicRegression
 
 class MonteCarloAnalysis:
-    """蒙特卡洛配比分析算法实现"""
+    """蒙特卡洛采样配比分析算法实现"""
     
     def __init__(self):
         self.results = {}
@@ -26,7 +26,7 @@ class MonteCarloAnalysis:
     def analyze(self, model_id: str, target_efficacy: float, iterations: int = 10000,
                 tolerance: float = 0.1, component_ranges: Optional[Dict[str, List[float]]] = None) -> Dict[str, Any]:
         """
-        执行蒙特卡洛配比分析
+        执行蒙特卡洛采样配比分析
         
         Args:
             model_id: 回归模型ID
@@ -39,7 +39,7 @@ class MonteCarloAnalysis:
             分析结果字典
         """
         try:
-            logger.info(f"开始蒙特卡洛分析，模型ID: {model_id}")
+            logger.info(f"开始蒙特卡洛采样分析，模型ID: {model_id}")
             logger.info(f"目标药效: {target_efficacy}, 采样次数: {iterations}")
             
             # 获取回归模型
@@ -55,19 +55,19 @@ class MonteCarloAnalysis:
             # 保存结果
             analysis_id = self._save_result(result)
             
-            logger.info(f"蒙特卡洛分析完成，分析ID: {analysis_id}")
+            logger.info(f"蒙特卡洛采样分析完成，分析ID: {analysis_id}")
             return result
             
         except Exception as e:
-            logger.error(f"蒙特卡洛分析失败: {str(e)}")
+            logger.error(f"蒙特卡洛采样分析失败: {str(e)}")
             raise
     
     def _perform_monte_carlo_simulation(self, model: Dict[str, Any], target_efficacy: float,
                                       iterations: int, tolerance: float,
                                       component_ranges: Optional[Dict[str, List[float]]] = None) -> Dict[str, Any]:
-        """执行蒙特卡洛模拟"""
+        """执行蒙特卡洛采样模拟"""
         try:
-            logger.info("开始执行蒙特卡洛模拟...")
+            logger.info("开始执行蒙特卡洛采样模拟...")
             
             # 模拟计算时间
             time.sleep(3)
@@ -144,11 +144,11 @@ class MonteCarloAnalysis:
                 'timestamp': time.time()
             }
             
-            logger.info(f"蒙特卡洛模拟完成，有效样本数: {valid_count}, 有效率: {valid_rate:.2%}")
+            logger.info(f"蒙特卡洛采样模拟完成，有效样本数: {valid_count}, 有效率: {valid_rate:.2%}")
             return result
             
         except Exception as e:
-            logger.error(f"蒙特卡洛模拟执行失败: {str(e)}")
+            logger.error(f"蒙特卡洛采样模拟执行失败: {str(e)}")
             raise
     
     def _predict_efficacy(self, sample: Dict[str, float], model: Dict[str, Any]) -> float:

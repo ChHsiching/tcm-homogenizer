@@ -23,7 +23,7 @@ class SymbolicRegression:
     
     def analyze(self, data: Dict[str, Any], target_column: str, 
                 feature_columns: List[str], population_size: int = 100, 
-                generations: int = 50) -> Dict[str, Any]:
+                generations: int = 50, set_seed_randomly: bool = False) -> Dict[str, Any]:
         """
         执行符号回归分析
         
@@ -40,6 +40,14 @@ class SymbolicRegression:
         try:
             logger.info(f"开始符号回归分析，目标变量: {target_column}")
             logger.info(f"特征变量: {feature_columns}")
+            logger.info(f"随机种子随机化: {set_seed_randomly}")
+            
+            # 设置随机种子
+            if not set_seed_randomly:
+                np.random.seed(42)  # 固定种子，确保结果可重复
+                logger.info("使用固定随机种子: 42")
+            else:
+                logger.info("使用随机种子，结果不可重复")
             
             # 数据预处理
             X, y = self._prepare_data(data, target_column, feature_columns)

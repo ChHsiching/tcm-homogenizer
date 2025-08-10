@@ -1,0 +1,1837 @@
+// 全局变量
+let currentData = null;
+let regressionModels = [];
+let currentRegressionResult = null;
+let currentSettings = {
+    backendPort: 5000,
+    autoStartBackend: true,
+    theme: 'dark',
+    language: 'zh-CN',
+    defaultFormat: 'csv',
+    autoSave: false
+};
+
+// API基础URL
+const API_BASE_URL = 'http://127.0.0.1:5000';
+
+// 全局函数：显示指定标签页（用于首页按钮点击）
+function showTab(tabName) {
+    console.log(`🔄 切换到标签页: ${tabName}`);
+    switchTab(tabName);
+}
+
+// DOM 加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    initializeApp();
+});
+
+// 应用初始化
+async function initializeApp() {
+    console.log('🚀 初始化中药多组分均化分析客户端...');
+    
+    // 初始化认证系统
+    await authManager.initialize();
+    
+    // 设置事件监听器
+    setupEventListeners();
+    
+    // 设置数据管理事件监听器
+    setupDataManagementListeners();
+    
+    // 加载设置
+    loadSettings();
+    
+    // 更新状态栏
+    updateStatusBar();
+    
+    // 立即更新连接状态为检查中
+    updateConnectionStatus('检查中...');
+    
+    // 测试后端连接
+    await testBackendConnection();
+    
+    // 显示欢迎通知
+    showNotification('欢迎使用中药多组分均化分析客户端', 'success');
+    
+    // 测试用户管理功能
+    if (authManager) {
+        setTimeout(() => {
+            authManager.testUserManagement();
+        }, 2000);
+    }
+    
+    console.log('✅ 应用初始化完成');
+}
+
+// 设置事件监听器
+function setupEventListeners() {
+    // 导航按钮事件
+    const navButtons = document.querySelectorAll('.nav-btn');
+    navButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const tabName = this.getAttribute('data-tab');
+            switchTab(tabName);
+        });
+    });
+    
+    // 文件输入事件
+    const regressionDataInput = document.getElementById('regression-data');
+    if (regressionDataInput) {
+        regressionDataInput.addEventListener('change', handleFileUpload);
+    }
+    
+    // 开始分析按钮事件
+    const startRegressionBtn = document.getElementById('start-regression');
+    if (startRegressionBtn) {
+        startRegressionBtn.addEventListener('click', startRegression);
+    }
+    
+    // 导出模型按钮事件
+    const exportModelBtn = document.getElementById('export-model');
+    if (exportModelBtn) {
+        exportModelBtn.addEventListener('click', exportModel);
+    }
+    
+    const startMonteCarloBtn = document.getElementById('start-monte-carlo');
+    if (startMonteCarloBtn) {
+        startMonteCarloBtn.addEventListener('click', startMonteCarlo);
+    }
+    
+    // 菜单事件监听
+    if (window.electronAPI) {
+        window.electronAPI.onMenuImportData(() => importData());
+        window.electronAPI.onMenuExportResults(() => exportResults());
+        window.electronAPI.onMenuSymbolicRegression(() => switchTab('regression'));
+        window.electronAPI.onMenuMonteCarlo(() => switchTab('monte-carlo'));
+        window.electronAPI.onMenuAbout(() => showAboutDialog());
+    }
+    
+    // 设置变更事件
+    const settingInputs = document.querySelectorAll('#settings input, #settings select');
+    settingInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            updateSetting(this.id, this.value || this.checked);
+        });
+    });
+}
+
+// 切换标签页
+function switchTab(tabName) {
+    // 获取当前激活的标签页
+    const currentActiveTab = document.querySelector('.tab-content.active');
+    const targetTab = document.getElementById(tabName);
+    
+    if (!targetTab) {
+        console.error('❌ 找不到目标标签页:', tabName);
+        return;
+    }
+    
+    // 如果点击的是当前激活的标签页，不做任何操作
+    if (currentActiveTab === targetTab) {
+        return;
+    }
+    
+    // 创建页面切换指示器
+    let transitionIndicator = document.querySelector('.page-transition-indicator');
+    if (!transitionIndicator) {
+        transitionIndicator = document.createElement('div');
+        transitionIndicator.className = 'page-transition-indicator';
+        document.body.appendChild(transitionIndicator);
+    }
+    
+    // 显示页面切换指示器
+    transitionIndicator.classList.add('active');
+    
+    // 移除所有导航按钮的激活状态
+    const navButtons = document.querySelectorAll('.nav-btn');
+    navButtons.forEach(button => {
+        button.classList.remove('active');
+    });
+    
+    // 激活对应的导航按钮
+    const targetButton = document.querySelector(`[data-tab="${tabName}"]`);
+    if (targetButton) {
+        targetButton.classList.add('active');
+    }
+    
+    // 更丝滑的页面切换动画
+    if (currentActiveTab) {
+        // 为当前页面添加过渡状态
+        currentActiveTab.classList.add('transitioning');
+        
+        // 当前页面淡出 - 使用更长的动画时间
+        currentActiveTab.classList.add('fade-out');
+        
+        // 延迟显示目标页面，确保过渡更丝滑
+        setTimeout(() => {
+            // 隐藏当前页面
+            currentActiveTab.classList.remove('active', 'fade-out', 'transitioning');
+            
+            // 显示目标页面并淡入
+            targetTab.classList.add('active', 'fade-in');
+            
+            // 移除过渡状态
+            targetTab.classList.remove('transitioning');
+            
+            // 移除淡入类，保持激活状态
+            setTimeout(() => {
+                targetTab.classList.remove('fade-in');
+                
+                // 隐藏页面切换指示器
+                transitionIndicator.classList.remove('active');
+                
+                // 延迟移除指示器元素
+                setTimeout(() => {
+                    if (transitionIndicator.parentElement) {
+                        transitionIndicator.remove();
+                    }
+                }, 300);
+                
+            }, 500); // 增加动画时间
+            
+        }, 300); // 增加延迟时间，让过渡更丝滑
+    } else {
+        // 如果没有当前激活的页面，直接显示目标页面
+        targetTab.classList.add('active');
+        
+        // 隐藏页面切换指示器
+        setTimeout(() => {
+            transitionIndicator.classList.remove('active');
+            setTimeout(() => {
+                if (transitionIndicator.parentElement) {
+                    transitionIndicator.remove();
+                }
+            }, 300);
+        }, 200);
+    }
+    
+    // 特殊处理：用户管理页面自动加载用户列表
+    if (tabName === 'user-management') {
+        console.log('🔍 切换到用户管理页面');
+        if (authManager && authManager.currentUser && authManager.currentUser.role === 'admin') {
+            console.log('🔍 用户是管理员，自动加载用户列表');
+            setTimeout(() => {
+                authManager.loadUsers();
+            }, 800); // 延迟到动画完成后执行
+        } else {
+            console.log('🔍 用户不是管理员，显示权限不足');
+            const usersTable = document.getElementById('users-table');
+            if (usersTable) {
+                usersTable.innerHTML = '<p>权限不足，只有管理员可以查看用户列表</p>';
+            }
+        }
+    }
+    
+    // 特殊处理：数据管理页面自动加载数据模型列表
+    if (tabName === 'data-management') {
+        console.log('🔍 切换到数据管理页面');
+        if (authManager && authManager.currentUser && authManager.currentUser.role === 'admin') {
+            console.log('🔍 用户是管理员，自动加载数据模型列表');
+            setTimeout(() => {
+                loadDataModels();
+            }, 800); // 延迟到动画完成后执行
+        } else {
+            console.log('🔍 用户不是管理员，显示权限不足');
+            const dataPreview = document.getElementById('data-preview');
+            if (dataPreview) {
+                dataPreview.innerHTML = '<p>权限不足，只有管理员可以查看数据模型</p>';
+            }
+        }
+    }
+    
+    // 特殊处理：蒙特卡洛采样页面自动加载数据模型列表
+    if (tabName === 'monte-carlo') {
+        console.log('🔍 切换到蒙特卡洛采样页面');
+        setTimeout(() => {
+            loadDataModelsForMonteCarlo();
+        }, 800); // 延迟到动画完成后执行
+    }
+    
+    // 更新状态栏
+    updateStatusBar();
+    
+    // 滚动到页面顶部，确保良好的用户体验
+    setTimeout(() => {
+        const mainContent = document.querySelector('.main-content');
+        if (mainContent) {
+            mainContent.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+    }, 100);
+}
+
+// 处理文件上传
+async function handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    showLoading('正在上传文件...');
+    
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await fetch(`${API_BASE_URL}/api/data/upload`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || '文件上传失败');
+        }
+        
+        // 使用API返回的数据
+        currentData = {
+            data: result.result.data_preview,
+            headers: result.result.columns_list,
+            rows: result.result.rows,
+            columns: result.result.columns,
+            filename: result.result.filename
+        };
+        
+        // 更新目标列选择
+        updateTargetColumnSelect(result.result.columns_list);
+        
+        // 更新特征列复选框
+        updateFeatureColumnsCheckboxes(result.result.columns_list);
+
+        // 渲染预览表格
+        renderRegressionPreviewTable(currentData.headers, currentData.data);
+        
+        showNotification('文件上传成功', 'success');
+    } catch (error) {
+        showNotification('文件上传失败: ' + error.message, 'error');
+        console.error('❌ 文件上传错误:', error);
+    } finally {
+        hideLoading();
+    }
+}
+
+// 解析文件
+async function parseFile(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            try {
+                const content = e.target.result;
+                const data = parseCSV(content);
+                resolve(data);
+            } catch (error) {
+                reject(error);
+            }
+        };
+        
+        reader.onerror = function() {
+            reject(new Error('文件读取失败'));
+        };
+        
+        reader.readAsText(file);
+    });
+}
+
+// 解析CSV内容
+function parseCSV(content) {
+    const lines = content.trim().split('\n');
+    const headers = lines[0].split(',').map(h => h.trim());
+    const data = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',');
+        const row = {};
+        
+        headers.forEach((header, index) => {
+            const value = values[index] ? values[index].trim() : '';
+            row[header] = isNaN(value) ? value : parseFloat(value);
+        });
+        
+        data.push(row);
+    }
+    
+    return {
+        data: data,
+        headers: headers,
+        rows: data.length,
+        columns: headers.length
+    };
+}
+
+// 更新目标列选择
+function updateTargetColumnSelect(columns) {
+    const select = document.getElementById('target-column');
+    if (!select) return;
+    
+    select.innerHTML = '<option value="">请选择目标变量</option>';
+    columns.forEach(column => {
+        const option = document.createElement('option');
+        option.value = column;
+        option.textContent = column;
+        select.appendChild(option);
+    });
+}
+
+// 更新特征列复选框
+function updateFeatureColumnsCheckboxes(columns) {
+    const container = document.getElementById('feature-columns');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    columns.forEach(column => {
+        const div = document.createElement('div');
+        div.className = 'checkbox-item';
+        div.innerHTML = `
+            <input type="checkbox" id="feature-${column}" value="${column}" checked>
+            <label for="feature-${column}">${column}</label>
+        `;
+        
+        // 添加点击事件，让整个区域可点击
+        div.addEventListener('click', function(e) {
+            // 如果点击的不是复选框本身，则切换复选框状态
+            if (e.target.type !== 'checkbox') {
+                const checkbox = this.querySelector('input[type="checkbox"]');
+                checkbox.checked = !checkbox.checked;
+            }
+        });
+        
+        container.appendChild(div);
+    });
+}
+
+// 渲染数据预览表格
+function renderRegressionPreviewTable(headers, rows) {
+    const host = document.getElementById('regression-data-preview');
+    if (!host) return;
+    if (!headers || !rows || rows.length === 0) {
+        host.innerHTML = '<p>暂无数据</p>';
+        return;
+    }
+    const previewRows = rows.slice(0, 8);
+    const thead = `<thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>`;
+    const tbody = `<tbody>${previewRows.map(r=>`<tr>${headers.map(h=>`<td>${r[h] ?? ''}</td>`).join('')}</tr>`).join('')}</tbody>`;
+    host.innerHTML = `<div class="data-table"><table>${thead}${tbody}</table></div>`;
+}
+
+// 训练/测试滑块联动
+document.addEventListener('input', (e) => {
+    if (e.target && e.target.id === 'train-ratio') {
+        const train = Number(e.target.value);
+        const test = 100 - train;
+        const trainLabel = document.getElementById('train-ratio-label');
+        const testLabel = document.getElementById('test-ratio-label');
+        if (trainLabel) trainLabel.textContent = `${train}%`;
+        if (testLabel) testLabel.textContent = `${test}%`;
+    }
+});
+
+// 开始符号回归分析
+async function startRegression() {
+    console.log('🔍 开始符号回归分析...');
+    
+    const targetColumn = document.getElementById('target-column').value;
+    const featureCheckboxes = document.querySelectorAll('#feature-columns input[type="checkbox"]:checked');
+    const populationSize = parseInt(document.getElementById('population-size').value) || 100;
+    const generations = parseInt(document.getElementById('generations').value) || 50;
+    
+    console.log('📊 分析参数:', {
+        targetColumn,
+        featureCount: featureCheckboxes.length,
+        populationSize,
+        generations,
+        hasData: !!currentData
+    });
+    
+    if (!targetColumn) {
+        showNotification('请选择目标变量', 'warning');
+        return;
+    }
+    
+    if (featureCheckboxes.length === 0) {
+        showNotification('请选择至少一个特征变量', 'warning');
+        return;
+    }
+    
+    if (!currentData) {
+        showNotification('请先上传数据', 'warning');
+        return;
+    }
+    
+    const featureColumns = Array.from(featureCheckboxes).map(cb => cb.value);
+    
+    showLoading('正在进行符号回归分析...');
+    
+    try {
+        const result = await performSymbolicRegression({
+            data: currentData.data,
+            target_column: targetColumn,
+            feature_columns: featureColumns,
+            population_size: populationSize,
+            generations: generations,
+            data_source: currentData.filename || "数据源"
+        });
+        
+        // 保存当前回归结果
+        currentRegressionResult = result;
+        
+        // 保存模型到列表
+        regressionModels.push(result);
+        updateRegressionModelList();
+        
+        displayRegressionResults(result);
+        showNotification('符号回归分析完成', 'success');
+        
+        // 如果返回了数据模型ID，显示提示
+        if (result.data_model_id) {
+            showNotification(`数据模型已自动创建: ${result.data_model_id}`, 'info');
+        }
+    } catch (error) {
+        showNotification('符号回归分析失败: ' + error.message, 'error');
+        console.error('❌ 符号回归分析错误:', error);
+    } finally {
+        hideLoading();
+    }
+}
+
+// 执行符号回归（真实API调用）
+async function performSymbolicRegression(params) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/regression/analyze`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(params)
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || 'API调用失败');
+        }
+        
+        return result.result;
+    } catch (error) {
+        console.error('API调用失败:', error);
+        throw error;
+    }
+}
+
+// 显示回归结果
+function displayRegressionResults(result) {
+    const container = document.getElementById('regression-results');
+    if (!container) return;
+    
+    // 解析表达式，提取目标变量、特征变量和常数
+    const expression = result.expression || '';
+    const targetVariable = result.target_variable || 'Y';
+    const constants = result.constants || {};
+    
+    // 生成LaTeX公式（会更新constants对象）
+    const latexFormula = generateLatexFormula(expression, targetVariable, constants);
+    
+    container.innerHTML = `
+        <div class="result-item">
+            <h4>回归表达式</h4>
+            <div class="regression-formula-container">
+                <div class="regression-formula">
+                    $${latexFormula}$
+                </div>
+                ${Object.keys(constants).length > 0 ? `
+                <div class="regression-constants">
+                    <h5>常数定义</h5>
+                    <div class="constant-list">
+                        ${Object.entries(constants).map(([key, value]) => 
+                            `<div class="constant-item">$${key} = ${value}$$</div>`
+                        ).join('')}
+                    </div>
+                </div>
+                ` : ''}
+            </div>
+        </div>
+        
+        <div class="result-item">
+            <h4>模型性能</h4>
+            <div class="performance-metrics">
+                <div class="performance-metric">
+                    <div class="metric-label">决定系数</div>
+                    <div class="metric-value">${result.r2.toFixed(3)}</div>
+                    <div class="metric-unit">R²</div>
+                </div>
+                <div class="performance-metric">
+                    <div class="metric-label">均方误差</div>
+                    <div class="metric-value">${result.mse.toFixed(3)}</div>
+                    <div class="metric-unit">MSE</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="result-item">
+            <h4>特征重要性</h4>
+            <div class="feature-importance">
+                ${result.feature_importance.map(f => `
+                    <div class="feature-importance-item">
+                        <div class="feature-name">${f.feature}</div>
+                        <div class="importance-bar">
+                            <div class="importance-fill" style="width: ${f.importance * 100}%"></div>
+                        </div>
+                        <div class="importance-value">${f.importance.toFixed(3)}</div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+        
+        <div class="result-item">
+            <h4>预测结果</h4>
+            <p>样本数量: ${result.predictions.length}</p>
+            <button class="btn-secondary" onclick="visualizeResults(${result.id})">查看图表</button>
+        </div>
+    `;
+    
+    // 重新渲染MathJax
+    if (window.MathJax && window.MathJax.typesetPromise) {
+        console.log('开始渲染MathJax公式:', latexFormula);
+        MathJax.typesetPromise([container]).then(() => {
+            console.log('MathJax渲染完成');
+        }).catch((err) => console.error('MathJax渲染错误:', err));
+    } else {
+        // 如果MathJax还没加载完成，等待加载
+        console.log('MathJax未加载，等待加载...');
+        const checkMathJax = () => {
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                console.log('MathJax已加载，开始渲染:', latexFormula);
+                MathJax.typesetPromise([container]).then(() => {
+                    console.log('MathJax渲染完成');
+                }).catch((err) => console.error('MathJax渲染错误:', err));
+            } else {
+                setTimeout(checkMathJax, 100);
+            }
+        };
+        checkMathJax();
+    }
+    
+    // 启用导出模型按钮
+    const exportModelBtn = document.getElementById('export-model');
+    if (exportModelBtn) {
+        exportModelBtn.disabled = false;
+    }
+}
+
+// 生成LaTeX公式的函数
+function generateLatexFormula(expression, targetVariable, constants) {
+    if (!expression) return `${targetVariable} = 0`;
+    
+    // 将表达式中的数字替换为c下标格式
+    let processedExpression = expression;
+    
+    // 提取所有数字（包括小数），但排除变量名中的数字
+    const numberPattern = /(?<![a-zA-Z_])\b-?\d+\.?\d*\b/g;
+    const numbers = expression.match(numberPattern) || [];
+    
+    // 为每个数字创建常数定义，避免重复
+    const constantMap = {};
+    const usedNumbers = new Set();
+    
+    numbers.forEach((num) => {
+        if (!usedNumbers.has(num)) {
+            const index = Object.keys(constantMap).length;
+            const constantName = `c_{${index}}`;
+            constantMap[constantName] = parseFloat(num);
+            usedNumbers.add(num);
+            
+            // 替换所有相同的数字
+            const regex = new RegExp(`\\b${num.replace(/\./g, '\\.')}\\b`, 'g');
+            processedExpression = processedExpression.replace(regex, constantName);
+        }
+    });
+    
+    // 清空传入的constants对象，然后使用新生成的常数
+    Object.keys(constants).forEach(key => delete constants[key]);
+    Object.assign(constants, constantMap);
+    
+    // 转换为LaTeX格式
+    let latex = processedExpression
+        .replace(/\*/g, '\\cdot ')
+        .replace(/\//g, '\\frac{')
+        .replace(/\^/g, '^')
+        .replace(/\(/g, '\\left(')
+        .replace(/\)/g, '\\right)');
+    
+    // 处理分数
+    if (latex.includes('\\frac{')) {
+        latex = latex.replace(/\\frac\{([^}]+)\}\/([^\\s]+)/g, '\\frac{$1}{$2}');
+    }
+    
+    return `${targetVariable} = ${latex}`;
+}
+
+// 导出模型功能
+async function exportModel() {
+    try {
+        // 获取当前分析的数据文件名
+        const dataFileInput = document.getElementById('regression-data');
+        const targetColumn = document.getElementById('target-column').value;
+        
+        if (!dataFileInput.files[0] || !targetColumn) {
+            showNotification('请先完成符号回归分析', 'warning');
+            return;
+        }
+        
+        const dataFileName = dataFileInput.files[0].name.replace('.csv', '');
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        
+        // 获取特征变量
+        const featureCheckboxes = document.querySelectorAll('#feature-columns input[type="checkbox"]:checked');
+        const featureColumns = Array.from(featureCheckboxes).map(cb => cb.value);
+        
+        // 生成有区分度的文件名
+        let featuresSummary = '';
+        if (featureColumns.length <= 3) {
+            featuresSummary = featureColumns.join('_');
+        } else {
+            featuresSummary = `${featureColumns[0]}_${featureColumns[1]}_${featureColumns[2]}+${featureColumns.length-3}个`;
+        }
+        
+        // 生成文件名：符号回归_药效_特征摘要_数据源_时间戳.json
+        const modelFileName = `符号回归_${targetColumn}_${featuresSummary}_${dataFileName}_${timestamp}.json`;
+        
+        // 获取最新的回归结果
+        const resultsContainer = document.getElementById('regression-results');
+        if (!resultsContainer || resultsContainer.children.length === 0) {
+            showNotification('没有可导出的模型数据', 'warning');
+            return;
+        }
+        
+        // 构建模型数据
+        const modelData = {
+            data_file: dataFileName,
+            target_column: targetColumn,
+            export_time: new Date().toISOString(),
+            model_info: {
+                expression: currentRegressionResult?.expression || '',
+                r2: currentRegressionResult?.r2 || 0,
+                mse: currentRegressionResult?.mse || 0,
+                feature_importance: currentRegressionResult?.feature_importance || []
+            }
+        };
+        
+        // 创建下载链接
+        const dataStr = JSON.stringify(modelData, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(dataBlob);
+        
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = modelFileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        showNotification(`模型已导出: ${modelFileName}`, 'success');
+        
+    } catch (error) {
+        console.error('导出模型失败:', error);
+        showNotification('导出模型失败: ' + error.message, 'error');
+    }
+}
+
+// 更新回归模型列表
+function updateRegressionModelList() {
+    const select = document.getElementById('mc-model');
+    if (!select) return;
+    
+    select.innerHTML = '<option value="">请选择回归模型</option>';
+    regressionModels.forEach(model => {
+        const option = document.createElement('option');
+        option.value = model.id;
+        option.textContent = `模型 ${model.id} (R²=${model.r2.toFixed(3)})`;
+        select.appendChild(option);
+    });
+}
+
+// 开始蒙特卡洛采样分析
+async function startMonteCarlo() {
+    const dataModelId = document.getElementById('mc-data-model').value;
+    const iterations = parseInt(document.getElementById('mc-iterations').value);
+    const targetEfficacy = parseFloat(document.getElementById('target-efficacy').value);
+    const tolerance = parseFloat(document.getElementById('tolerance').value);
+    
+    if (!dataModelId) {
+        showNotification('请选择数据模型', 'warning');
+        return;
+    }
+    
+    if (!targetEfficacy) {
+        showNotification('请输入目标药效值', 'warning');
+        return;
+    }
+    
+    showLoading('正在进行蒙特卡洛采样分析...');
+    
+    try {
+        const result = await performMonteCarloAnalysis({
+            model_id: dataModelId,
+            iterations,
+            target_efficacy: targetEfficacy,
+            tolerance
+        });
+        
+        displayMonteCarloResults(result);
+        showNotification('蒙特卡洛采样分析完成', 'success');
+        
+        // 如果返回了数据模型ID，显示提示
+        if (result.data_model_id) {
+            showNotification(`数据模型已更新: ${result.data_model_id}`, 'info');
+        }
+        
+        // 重新加载数据模型列表
+        setTimeout(() => {
+            loadDataModels();
+        }, 1000);
+    } catch (error) {
+        showNotification('蒙特卡洛采样分析失败: ' + error.message, 'error');
+        console.error('❌ 蒙特卡洛采样分析错误:', error);
+    } finally {
+        hideLoading();
+    }
+}
+
+// 执行蒙特卡洛采样分析（真实API调用）
+async function performMonteCarloAnalysis(params) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/monte-carlo-sampling/analyze`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(params)
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || 'API调用失败');
+        }
+        
+        return result.result;
+    } catch (error) {
+        console.error('API调用失败:', error);
+        throw error;
+    }
+}
+
+// 显示蒙特卡洛采样结果
+function displayMonteCarloResults(result) {
+    const container = document.getElementById('monte-carlo-results');
+    if (!container) return;
+    
+    container.innerHTML = `
+        <div class="result-item">
+            <h4>分析参数</h4>
+            <p>模拟次数: ${result.iterations}</p>
+            <p>目标药效: ${result.target_efficacy}</p>
+            <p>容差: ${result.tolerance}</p>
+        </div>
+        
+        <div class="result-item">
+            <h4>分析结果</h4>
+            <p>有效样本数: ${result.valid_samples}</p>
+            <p>成功率: ${(result.success_rate * 100).toFixed(1)}%</p>
+            <p>分析时间: ${result.analysis_time}秒</p>
+        </div>
+        
+        <div class="result-item">
+            <h4>最优配比范围</h4>
+            <ul>
+                ${result.optimal_ranges.map(r => 
+                    `<li>${r.component}: ${r.min.toFixed(2)} - ${r.max.toFixed(2)} (均值: ${r.mean.toFixed(2)})</li>`
+                ).join('')}
+            </ul>
+        </div>
+        
+        <div class="result-item">
+            <h4>操作</h4>
+            <button class="btn-secondary" onclick="exportMonteCarloResults(${result.iterations})">导出结果</button>
+        </div>
+    `;
+}
+
+// 导入数据
+async function importData() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv,.xlsx,.xls';
+    
+    input.onchange = async function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            try {
+                const data = await parseFile(file);
+                currentData = data;
+                updateTargetColumnSelect(Object.keys(data.data[0]));
+                updateFeatureColumnsCheckboxes(Object.keys(data.data[0]));
+                showNotification('数据导入成功', 'success');
+            } catch (error) {
+                showNotification('数据导入失败: ' + error.message, 'error');
+            }
+        }
+    };
+    
+    input.click();
+}
+
+// 导出结果
+async function exportResults() {
+    if (regressionModels.length === 0) {
+        showNotification('没有可导出的结果', 'warning');
+        return;
+    }
+    
+    const dataStr = JSON.stringify(regressionModels, null, 2);
+    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+    
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = `regression_results_${Date.now()}.json`;
+    link.click();
+    
+    showNotification('结果导出成功', 'success');
+}
+
+// 启动后端服务
+async function startBackendService() {
+    try {
+        // 检查后端健康状态
+        const healthResponse = await fetch(`${API_BASE_URL}/api/health`);
+        if (healthResponse.ok) {
+            updateConnectionStatus('已连接');
+            showNotification('后端服务已连接', 'success');
+        } else {
+            updateConnectionStatus('连接失败');
+            showNotification('后端服务连接失败', 'error');
+        }
+    } catch (error) {
+        updateConnectionStatus('连接失败');
+        showNotification('后端服务连接失败: ' + error.message, 'error');
+    }
+}
+
+// 测试后端连接
+async function testBackendConnection() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/health`);
+        if (response.ok) {
+            const data = await response.json();
+            updateConnectionStatus('已连接');
+            showNotification(`后端连接正常: ${data.service}`, 'success');
+            return true;
+        } else {
+            updateConnectionStatus('连接失败');
+            showNotification('后端连接失败', 'error');
+            return false;
+        }
+    } catch (error) {
+        updateConnectionStatus('连接失败');
+        showNotification('后端连接测试失败: ' + error.message, 'error');
+        return false;
+    }
+}
+
+// 保存设置
+async function saveSettings() {
+    try {
+        // 这里应该保存到本地存储或配置文件
+        localStorage.setItem('tcm-settings', JSON.stringify(currentSettings));
+        showNotification('设置保存成功', 'success');
+    } catch (error) {
+        showNotification('设置保存失败: ' + error.message, 'error');
+    }
+}
+
+// 加载设置
+function loadSettings() {
+    try {
+        const saved = localStorage.getItem('tcm-settings');
+        if (saved) {
+            currentSettings = { ...currentSettings, ...JSON.parse(saved) };
+        }
+        
+        // 应用设置到界面
+        Object.keys(currentSettings).forEach(key => {
+            const element = document.getElementById(key);
+            if (element) {
+                if (element.type === 'checkbox') {
+                    element.checked = currentSettings[key];
+                } else {
+                    element.value = currentSettings[key];
+                }
+            }
+        });
+    } catch (error) {
+        console.error('加载设置失败:', error);
+    }
+}
+
+// 更新设置
+function updateSetting(key, value) {
+    currentSettings[key] = value;
+}
+
+// 更新连接状态
+function updateConnectionStatus(status) {
+    const element = document.getElementById('connection-status');
+    const footerElement = document.getElementById('connection-status-footer');
+    
+    if (element) {
+        element.textContent = `后端服务：${status}`;
+    }
+    
+    if (footerElement) {
+        footerElement.textContent = `后端服务：${status}`;
+    }
+}
+
+// 更新状态栏
+function updateStatusBar() {
+    const timeElement = document.getElementById('current-time');
+    if (timeElement) {
+        const updateTime = () => {
+            const now = new Date();
+            timeElement.textContent = now.toLocaleString('zh-CN');
+        };
+        updateTime();
+        setInterval(updateTime, 1000);
+    }
+}
+
+// 显示加载状态
+function showLoading(text = '正在处理...') {
+    const overlay = document.getElementById('loading-overlay');
+    const textElement = document.getElementById('loading-text');
+    
+    if (overlay) {
+        overlay.style.display = 'flex';
+    }
+    
+    if (textElement) {
+        textElement.textContent = text;
+    }
+}
+
+// 隐藏加载状态
+function hideLoading() {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) {
+        overlay.style.display = 'none';
+    }
+}
+
+// 显示通知
+function showNotification(message, type = 'info') {
+    const notificationContainer = document.getElementById('notification-container');
+    if (!notificationContainer) {
+        console.error('找不到通知容器');
+        return;
+    }
+    
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.innerHTML = `
+        <span class="notification-message">${message}</span>
+        <button class="notification-close" onclick="this.parentElement.remove()">×</button>
+    `;
+    
+    // 添加到通知容器
+    notificationContainer.appendChild(notification);
+    
+    // 添加进入动画
+    setTimeout(() => {
+        notification.classList.add('show');
+    }, 10);
+    
+    // 自动移除
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.classList.remove('show');
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 300);
+        }
+    }, 5000);
+}
+
+// 显示关于对话框
+function showAboutDialog() {
+    alert('中药多组分均化分析客户端 v1.0.0\n\n基于Electron + Flask的跨平台桌面应用');
+}
+
+// 可视化结果
+function visualizeResults(modelId) {
+    showNotification('图表功能开发中...', 'info');
+}
+
+// 导出蒙特卡洛采样结果
+function exportMonteCarloResults(iterations) {
+    showNotification('导出功能开发中...', 'info');
+}
+
+// 数据管理相关函数
+async function loadDataModels() {
+    console.log('📊 加载数据模型列表...');
+    const dataPreview = document.getElementById('data-preview');
+    
+    if (!dataPreview) {
+        console.error('找不到数据预览容器');
+        return;
+    }
+    
+    try {
+        showLoading('正在加载数据模型...');
+        
+        const response = await fetch(`${API_BASE_URL}/api/data-models/models`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Username': authManager.currentUser.username
+            }
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || '加载数据模型失败');
+        }
+        
+        displayDataModels(result.models);
+        showNotification(`成功加载 ${result.models.length} 个数据模型`, 'success');
+        
+    } catch (error) {
+        console.error('❌ 加载数据模型失败:', error);
+        showNotification('加载数据模型失败: ' + error.message, 'error');
+        dataPreview.innerHTML = `<p>加载失败: ${error.message}</p>`;
+    } finally {
+        hideLoading();
+    }
+}
+
+function displayDataModels(models) {
+    const dataPreview = document.getElementById('data-preview');
+    
+    if (!dataPreview) {
+        console.error('找不到数据预览容器');
+        return;
+    }
+    
+    if (!models || models.length === 0) {
+        dataPreview.innerHTML = '<p>暂无数据模型</p>';
+        return;
+    }
+    
+    // 创建表格
+    const table = document.createElement('table');
+    table.innerHTML = `
+        <thead>
+            <tr>
+                <th>模型名称</th>
+                <th>模型描述</th>
+                <th>创建时间</th>
+                <th>文件状态</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    `;
+    
+    const tbody = table.querySelector('tbody');
+    
+    models.forEach(model => {
+        const row = document.createElement('tr');
+        const createdDate = new Date(model.created_at * 1000).toLocaleString('zh-CN');
+        
+        // 生成文件状态显示
+        const fileStatus = generateFileStatus(model.metadata);
+        
+        row.innerHTML = `
+            <td><strong>${model.name}</strong></td>
+            <td>${model.description || '暂无描述'}</td>
+            <td>${createdDate}</td>
+            <td>${fileStatus}</td>
+            <td>
+                <button class="btn-sm btn-primary" onclick="viewDataModel('${model.id}')">查看</button>
+                <button class="btn-sm btn-danger" onclick="deleteDataModel('${model.id}')">删除</button>
+            </td>
+        `;
+        
+        tbody.appendChild(row);
+    });
+    
+    dataPreview.innerHTML = '';
+    dataPreview.appendChild(table);
+}
+
+function generateFileStatus(metadata) {
+    if (!metadata) return '<span class="status-unknown">未知</span>';
+    
+    const status = [];
+    
+    if (metadata.has_csv_data) {
+        status.push('<span class="status-ok">📊 CSV</span>');
+    } else {
+        status.push('<span class="status-missing">❌ CSV</span>');
+    }
+    
+    if (metadata.has_regression_model) {
+        status.push('<span class="status-ok">📈 回归</span>');
+    } else {
+        status.push('<span class="status-missing">❌ 回归</span>');
+    }
+    
+    if (metadata.has_monte_carlo_results) {
+        status.push('<span class="status-ok">🎲 蒙特卡洛</span>');
+    } else {
+        status.push('<span class="status-missing">❌ 蒙特卡洛</span>');
+    }
+    
+    return status.join(' ');
+}
+
+// 为蒙特卡洛采样加载数据模型列表
+async function loadDataModelsForMonteCarlo() {
+    console.log('📊 为蒙特卡洛采样加载数据模型列表...');
+    const dataModelSelect = document.getElementById('mc-data-model');
+    
+    if (!dataModelSelect) {
+        console.error('找不到数据模型选择框');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/data-models/models`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Username': authManager.currentUser.username
+            }
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || '加载数据模型失败');
+        }
+        
+        // 过滤出有符号回归模型的数据模型
+        const modelsWithRegression = result.models.filter(model => 
+            model.metadata && model.metadata.has_regression_model
+        );
+        
+        // 更新选择框
+        dataModelSelect.innerHTML = '<option value="">请选择数据模型</option>';
+        modelsWithRegression.forEach(model => {
+            const option = document.createElement('option');
+            option.value = model.id;
+            option.textContent = `${model.name} (${model.target_column})`;
+            dataModelSelect.appendChild(option);
+        });
+        
+        console.log(`✅ 加载了 ${modelsWithRegression.length} 个可用的数据模型`);
+        
+    } catch (error) {
+        console.error('❌ 加载数据模型失败:', error);
+        showNotification('加载数据模型失败: ' + error.message, 'error');
+        dataModelSelect.innerHTML = '<option value="">加载失败</option>';
+    }
+}
+
+async function viewDataModel(modelId) {
+    console.log(`📊 查看数据模型: ${modelId}`);
+    
+    try {
+        showLoading('正在加载模型详情...');
+        
+        const response = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Username': authManager.currentUser.username
+            }
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || '加载模型详情失败');
+        }
+        
+        showDataModelDetails(result.model);
+        
+    } catch (error) {
+        console.error('❌ 查看数据模型失败:', error);
+        showNotification('查看数据模型失败: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+function showDataModelDetails(model) {
+    // 创建模态框显示模型详情（美化版，仅作用于本弹窗）
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    const featureTags = (model.feature_columns && model.feature_columns.length)
+        ? model.feature_columns.map(col => `<span class="tag">${col}</span>`).join('')
+        : '<span class="text-muted">无</span>';
+    const csvStatus = model.metadata && model.metadata.has_csv_data ? '<span class="status-ok">📊 CSV</span>' : '<span class="status-missing">❌ CSV</span>';
+    const regStatus = model.metadata && model.metadata.has_regression_model ? '<span class="status-ok">📈 回归</span>' : '<span class="status-missing">❌ 回归</span>';
+    const mcStatus = model.metadata && model.metadata.has_monte_carlo_results ? '<span class="status-ok">🎲 蒙特卡洛</span>' : '<span class="status-missing">❌ 蒙特卡洛</span>';
+    
+    modal.innerHTML = `
+        <div class="modal-content model-details">
+            <div class="modal-header">
+                <h3>数据模型详情</h3>
+                <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+            </div>
+            <div class="modal-body">
+                <section class="details-section">
+                    <div class="section-title">基本信息</div>
+                    <div class="info-grid">
+                        <div class="info-item"><div class="info-label">名称</div><div class="info-value">${model.name}</div></div>
+                        <div class="info-item"><div class="info-label">目标变量</div><div class="info-value">${model.target_column || '-'}</div></div>
+                        <div class="info-item info-span-2"><div class="info-label">描述</div><div class="info-value">${model.description || '-'}</div></div>
+                        <div class="info-item info-span-2"><div class="info-label">特征变量</div><div class="info-value tag-list">${featureTags}</div></div>
+                        <div class="info-item"><div class="info-label">创建时间</div><div class="info-value">${model.created_at ? new Date(model.created_at * 1000).toLocaleString('zh-CN') : '-'}</div></div>
+                        <div class="info-item"><div class="info-label">状态</div><div class="info-value">${model.status === 'active' ? '活跃' : '非活跃'}</div></div>
+                    </div>
+                </section>
+                
+                <section class="details-section">
+                    <div class="section-title">文件状态</div>
+                    <div class="status-chips">
+                        ${csvStatus} ${regStatus} ${mcStatus}
+                    </div>
+                    <div class="file-actions">
+                        ${model.metadata && model.metadata.has_csv_data 
+                            ? `<button class="btn-sm btn-primary" onclick="viewDataModelFile('${model.id}', 'csv_data')">查看CSV数据</button>` 
+                            : '<span class="text-muted">CSV数据文件不存在</span>'}
+                        ${model.metadata && model.metadata.has_regression_model 
+                            ? `<button class="btn-sm btn-primary" onclick="viewDataModelFile('${model.id}', 'regression_model')">查看回归模型</button>` 
+                            : '<span class="text-muted">回归模型文件不存在</span>'}
+                        ${model.metadata && model.metadata.has_monte_carlo_results 
+                            ? `<button class="btn-sm btn-primary" onclick="viewDataModelFile('${model.id}', 'monte_carlo_results')">查看蒙特卡洛结果</button>` 
+                            : '<span class="text-muted">蒙特卡洛结果文件不存在</span>'}
+                    </div>
+                </section>
+                
+                <section class="details-section advanced-info">
+                    <div class="section-title-row">
+                        <div class="section-title">高级信息</div>
+                        <button class="btn-secondary btn-compact section-collapse-btn" data-collapsed="true">展开</button>
+                    </div>
+                    <div class="advanced-content" style="display:none;">
+                        <div class="info-grid">
+                            ${model.data_source ? `<div class="info-item"><div class="info-label">数据来源</div><div class="info-value">${model.data_source}</div></div>` : ''}
+                            ${model.analysis_type ? `<div class="info-item"><div class="info-label">分析类型</div><div class="info-value">${model.analysis_type}</div></div>` : ''}
+                            ${model.created_by ? `<div class="info-item"><div class="info-label">创建人</div><div class="info-value">${model.created_by}</div></div>` : ''}
+                            ${model.updated_at ? `<div class="info-item"><div class="info-label">更新时间</div><div class="info-value">${new Date(model.updated_at * 1000).toLocaleString('zh-CN')}</div></div>` : ''}
+                            ${model.data_files && model.data_files.csv_data ? `<div class="info-item info-span-2"><div class="info-label">CSV文件</div><div class="info-value">${model.data_files.csv_data}</div></div>` : ''}
+                            ${model.data_files && model.data_files.regression_model ? `<div class="info-item info-span-2"><div class="info-label">回归模型文件</div><div class="info-value">${model.data_files.regression_model}</div></div>` : ''}
+                            ${model.data_files && model.data_files.monte_carlo_results ? `<div class="info-item info-span-2"><div class="info-label">蒙特卡洛结果文件</div><div class="info-value">${model.data_files.monte_carlo_results}</div></div>` : ''}
+                        </div>
+                        <div class="raw-toggle">
+                            <button class="btn-secondary btn-compact raw-json-toggle" data-mode="hidden">显示原始数据</button>
+                            <button class="btn-secondary btn-compact copy-json-btn">复制JSON</button>
+                        </div>
+                        <div class="meta-box raw-json" style="display:none;"><pre>${JSON.stringify({
+                            id: model.id,
+                            data_source: model.data_source,
+                            analysis_type: model.analysis_type,
+                            created_by: model.created_by,
+                            created_at: model.created_at,
+                            updated_at: model.updated_at,
+                            data_files: model.data_files || {},
+                            metadata: model.metadata || {}
+                        }, null, 2)}</pre></div>
+                    </div>
+                </section>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="this.closest('.modal-overlay').remove()">关闭</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // 高级信息折叠/展开与原始JSON切换
+    const collapseBtn = modal.querySelector('.section-collapse-btn');
+    const advContent = modal.querySelector('.advanced-content');
+    const rawToggleBtn = modal.querySelector('.raw-json-toggle');
+    const rawBox = modal.querySelector('.raw-json');
+    const copyBtn = modal.querySelector('.copy-json-btn');
+    
+    collapseBtn?.addEventListener('click', () => {
+        const collapsed = collapseBtn.getAttribute('data-collapsed') === 'true';
+        if (collapsed) {
+            advContent.style.display = '';
+            collapseBtn.textContent = '收起';
+            collapseBtn.setAttribute('data-collapsed', 'false');
+        } else {
+            advContent.style.display = 'none';
+            collapseBtn.textContent = '展开';
+            collapseBtn.setAttribute('data-collapsed', 'true');
+        }
+    });
+    
+    rawToggleBtn?.addEventListener('click', () => {
+        const mode = rawToggleBtn.getAttribute('data-mode') || 'hidden';
+        if (mode === 'hidden') {
+            rawBox.style.display = '';
+            rawToggleBtn.textContent = '隐藏原始数据';
+            rawToggleBtn.setAttribute('data-mode', 'shown');
+        } else {
+            rawBox.style.display = 'none';
+            rawToggleBtn.textContent = '显示原始数据';
+            rawToggleBtn.setAttribute('data-mode', 'hidden');
+        }
+    });
+    
+    copyBtn?.addEventListener('click', async () => {
+        try {
+            const text = rawBox?.innerText || '';
+            if (navigator.clipboard && text) {
+                await navigator.clipboard.writeText(text);
+                showNotification('已复制到剪贴板', 'success');
+            } else {
+                throw new Error('Clipboard API 不可用');
+            }
+        } catch (e) {
+            showNotification('复制失败，请手动选择文本复制', 'warning');
+        }
+    });
+}
+
+async function deleteDataModel(modelId) {
+    console.log(`🗑️ 删除数据模型: ${modelId}`);
+    
+    // 使用统一的主题化确认弹窗
+    if (!(await authManager.showConfirmDialog('确定要删除这个数据模型吗？此操作不可撤销。'))) {
+        return;
+    }
+    
+    try {
+        showLoading('正在删除数据模型...');
+        
+        const response = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Username': authManager.currentUser.username
+            }
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || '删除数据模型失败');
+        }
+        
+        showNotification('数据模型删除成功', 'success');
+        
+        // 重新加载数据模型列表
+        setTimeout(() => {
+            loadDataModels();
+        }, 500);
+        
+    } catch (error) {
+        console.error('❌ 删除数据模型失败:', error);
+        showNotification('删除数据模型失败: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// 查看数据模型文件
+async function viewDataModelFile(modelId, fileType) {
+    console.log(`📄 查看数据模型文件: ${modelId}, 类型: ${fileType}`);
+    
+    try {
+        showLoading('正在加载文件内容...');
+        
+        const response = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}/files/${fileType}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Username': authManager.currentUser.username
+            }
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || '加载文件失败');
+        }
+        
+        showFileContent(result.content, result.filename, fileType);
+        
+    } catch (error) {
+        console.error('❌ 查看数据模型文件失败:', error);
+        showNotification('查看文件失败: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// 显示文件内容（支持"美化视图/原始内容"切换）
+function showFileContent(content, filename, fileType) {
+    const fileTypeNames = {
+        'csv_data': 'CSV数据文件',
+        'regression_model': '符号回归模型',
+        'monte_carlo_results': '蒙特卡洛分析结果'
+    };
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>${fileTypeNames[fileType] || '文件内容'}</h3>
+                <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="file-info">
+                    <p><strong>文件名:</strong> ${filename}</p>
+                    <p><strong>文件类型:</strong> ${fileTypeNames[fileType] || '-'}</p>
+                </div>
+                <div class="view-toggle">
+                    <button class="btn-secondary toggle-view-btn" data-mode="beautified">切换为原始内容</button>
+                </div>
+                <div class="beautified-view"></div>
+                <div class="file-content raw-view" style="display:none;">
+                    <pre>${content}</pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="this.closest('.modal-overlay').remove()">关闭</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // 渲染美化视图
+    try {
+        renderBeautifiedFileContent(modal.querySelector('.beautified-view'), content, filename, fileType);
+    } catch (e) {
+        // 解析失败则默认显示原始内容
+        const toggleBtn = modal.querySelector('.toggle-view-btn');
+        const beautified = modal.querySelector('.beautified-view');
+        const raw = modal.querySelector('.raw-view');
+        if (beautified) beautified.style.display = 'none';
+        if (raw) raw.style.display = '';
+        if (toggleBtn) toggleBtn.textContent = '切换为概览视图';
+        if (toggleBtn) toggleBtn.dataset.mode = 'raw';
+    }
+
+    // 切换按钮事件
+    const toggleBtn = modal.querySelector('.toggle-view-btn');
+    toggleBtn?.addEventListener('click', () => {
+        const mode = toggleBtn.dataset.mode || 'beautified';
+        const beautified = modal.querySelector('.beautified-view');
+        const raw = modal.querySelector('.raw-view');
+        if (mode === 'beautified') {
+            // 切换到原始
+            if (beautified) beautified.style.display = 'none';
+            if (raw) raw.style.display = '';
+            toggleBtn.textContent = '切换为概览视图';
+            toggleBtn.dataset.mode = 'raw';
+        } else {
+            // 切换到美化
+            if (beautified && beautified.children.length === 0) {
+                // 再次渲染兜底
+                try { renderBeautifiedFileContent(beautified, content, filename, fileType); } catch (_) {}
+            }
+            if (beautified) beautified.style.display = '';
+            if (raw) raw.style.display = 'none';
+            toggleBtn.textContent = '切换为原始内容';
+            toggleBtn.dataset.mode = 'beautified';
+        }
+    });
+}
+
+// 渲染美化视图
+function renderBeautifiedFileContent(container, content, filename, fileType) {
+    if (!container) return;
+    if (fileType === 'csv_data') {
+        // CSV 美化：展示基础统计与前若干行预览
+        const parsed = parseCSV(content || '');
+        const headers = parsed.headers || [];
+        const rows = parsed.data || [];
+        const previewRows = rows.slice(0, 10);
+        const html = `
+            <div class="beautified-csv">
+                <div class="metric-cards">
+                    <div class="metric-card"><div class="metric-label">文件名</div><div class="metric-value">${filename || '-'}</div></div>
+                    <div class="metric-card"><div class="metric-label">行数</div><div class="metric-value">${parsed.rows || 0}</div></div>
+                    <div class="metric-card"><div class="metric-label">列数</div><div class="metric-value">${parsed.columns || 0}</div></div>
+                </div>
+                <div class="csv-table-container">
+                    <table class="csv-table">
+                        <thead>
+                            <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
+                        </thead>
+                        <tbody>
+                            ${previewRows.map(row => `<tr>${headers.map(h => `<td>${row[h] ?? ''}</td>`).join('')}</tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                ${rows.length > previewRows.length ? `<div class="csv-more">仅展示前 ${previewRows.length} 行，共 ${rows.length} 行</div>` : ''}
+            </div>
+        `;
+        container.innerHTML = html;
+        return;
+    }
+
+    if (fileType === 'regression_model') {
+        const json = JSON.parse(content || '{}');
+        const featureImportance = Array.isArray(json.feature_importance) ? json.feature_importance.slice() : [];
+        featureImportance.sort((a, b) => (b.importance || 0) - (a.importance || 0));
+        const html = `
+            <div class="beautified-json">
+                <div class="metric-cards">
+                    <div class="metric-card"><div class="metric-label">目标变量</div><div class="metric-value">${json.target_column || '-'}</div></div>
+                    <div class="metric-card"><div class="metric-label">R²</div><div class="metric-value">${json.r2 ?? '-'}</div></div>
+                    <div class="metric-card"><div class="metric-label">MSE</div><div class="metric-value">${json.mse ?? '-'}</div></div>
+                    <div class="metric-card"><div class="metric-label">复杂度</div><div class="metric-value">${json.model_complexity ?? '-'}</div></div>
+                </div>
+                ${json.expression ? `<div class="expression-box"><div class="expression-label">模型表达式</div><div class="expression-value">${json.expression}</div></div>` : ''}
+                ${featureImportance.length ? `
+                <div class="section-subtitle">特征重要性</div>
+                <div class="importance-table">
+                    ${featureImportance.map(item => `
+                        <div class="importance-row">
+                            <div class="imp-name">${item.feature}</div>
+                            <div class="imp-bar"><span style="width:${Math.min(100, Math.round((item.importance || 0) * 100))}%"></span></div>
+                            <div class="imp-value">${(item.importance ?? 0).toFixed(3)}</div>
+                        </div>
+                    `).join('')}
+                </div>` : ''}
+            </div>
+        `;
+        container.innerHTML = html;
+        return;
+    }
+
+    if (fileType === 'monte_carlo_results') {
+        // 既支持 JSON，也支持 .txt 文本报告
+        let json = null;
+        try { json = JSON.parse(content || '{}'); } catch (_) { json = null; }
+
+        if (json && (json.target_statistics || json.feature_importance || json.simulations)) {
+            const stats = json.target_statistics || {};
+            const cis = json.confidence_intervals || {};
+            const fi = Array.isArray(json.feature_importance) ? json.feature_importance.slice() : [];
+            fi.sort((a, b) => (b.importance || 0) - (a.importance || 0));
+            const top = fi.slice(0, 10);
+            const sims = Array.isArray(json.simulations) ? json.simulations : [];
+            const html = `
+                <div class="beautified-json">
+                    <div class="metric-cards">
+                        <div class="metric-card"><div class="metric-label">均值</div><div class="metric-value">${fmtNum(stats.mean)}</div></div>
+                        <div class="metric-card"><div class="metric-label">标准差</div><div class="metric-value">${fmtNum(stats.std)}</div></div>
+                        <div class="metric-card"><div class="metric-label">最小值</div><div class="metric-value">${fmtNum(stats.min)}</div></div>
+                        <div class="metric-card"><div class="metric-label">最大值</div><div class="metric-value">${fmtNum(stats.max)}</div></div>
+                    </div>
+                    <div class="section-subtitle">置信区间</div>
+                    <div class="ci-grid">
+                        ${Object.keys(cis).map(k => {
+                            const c = cis[k] || {}; return `<div class=\"ci-item\"><div class=\"ci-label\">${k.toUpperCase()}</div><div class=\"ci-value\">${fmtNum(c.lower)} ~ ${fmtNum(c.upper)}</div></div>`;
+                        }).join('')}
+                    </div>
+                    ${top.length ? `
+                    <div class="section-subtitle">特征重要性（Top ${top.length}）</div>
+                    <div class="importance-table">
+                        ${top.map(item => `
+                            <div class="importance-row">
+                                <div class="imp-name">${item.feature}</div>
+                                <div class="imp-bar"><span style="width:${Math.min(100, Math.round((item.importance || 0) * 100))}%"></span></div>
+                                <div class="imp-value">${(item.importance ?? 0).toFixed(3)}</div>
+                            </div>
+                        `).join('')}
+                    </div>` : ''}
+                    ${sims.length ? `
+                    <div class="section-subtitle">模拟样本（前5条）</div>
+                    <div class="csv-table-container">
+                        <table class="csv-table">
+                            <thead><tr><th>#</th><th>特征维度</th><th>目标值</th></tr></thead>
+                            <tbody>
+                                ${sims.slice(0, 5).map(s => `<tr><td>${s.iteration ?? '-'}</td><td>${Array.isArray(s.features) ? s.features.length : '-'}</td><td>${fmtNum(s.target)}</td></tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </div>` : ''}
+                </div>
+            `;
+            container.innerHTML = html;
+            return;
+        }
+
+        // 文本报告解析
+        const parsed = parseMonteCarloText(content || '');
+        if (parsed) {
+            const html = `
+                <div class="beautified-json">
+                    <div class="metric-cards">
+                        ${parsed.target !== undefined ? `<div class=\"metric-card\"><div class=\"metric-label\">目标药效</div><div class=\"metric-value\">${parsed.target}</div></div>` : ''}
+                        ${parsed.samples !== undefined ? `<div class=\"metric-card\"><div class=\"metric-label\">采样次数</div><div class=\"metric-value\">${parsed.samples}</div></div>` : ''}
+                        ${parsed.valid !== undefined ? `<div class=\"metric-card\"><div class=\"metric-label\">有效样本</div><div class=\"metric-value\">${parsed.valid}</div></div>` : ''}
+                        ${parsed.successRate !== undefined ? `<div class=\"metric-card\"><div class=\"metric-label\">成功率</div><div class=\"metric-value\">${parsed.successRate}%</div></div>` : ''}
+                    </div>
+                    ${parsed.recommendations && parsed.recommendations.length ? `
+                    <div class="section-subtitle">推荐方案（前${Math.min(10, parsed.recommendations.length)}条）</div>
+                    <div class="csv-table-container">
+                        <table class="csv-table">
+                            <thead><tr><th>#</th><th>预期药效</th><th>配比方案</th></tr></thead>
+                            <tbody>
+                                ${parsed.recommendations.slice(0, 10).map((r, idx) => `<tr><td>${idx + 1}</td><td>${r.effect}</td><td>${r.recipe}</td></tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </div>` : ''}
+                </div>
+            `;
+            container.innerHTML = html;
+            return;
+        }
+
+        // 若无法解析，则抛出以触发原始内容回退
+        throw new Error('Unsupported monte carlo text format');
+    }
+
+    // 默认：没有美化
+    container.innerHTML = `<div class="text-muted">该文件类型暂不支持美化视图，可切换查看原始内容</div>`;
+}
+
+function fmtNum(v) {
+    if (typeof v !== 'number') return '-';
+    const s = Math.abs(v) >= 1000 ? v.toFixed(0) : Math.abs(v) >= 1 ? v.toFixed(3) : v.toPrecision(3);
+    return s;
+}
+
+// 解析蒙特卡洛 .txt 文本报告，返回简要结构
+function parseMonteCarloText(text) {
+    if (!text || typeof text !== 'string') return null;
+    const clean = text.replace(/\r/g, '');
+    const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return null;
+
+    const result = {};
+    // 目标药效、采样次数、有效样本、成功率
+    const targetMatch = clean.match(/目标药效[:：]\s*([\d.]+)/);
+    if (targetMatch) result.target = Number(targetMatch[1]);
+    const samplesMatch = clean.match(/采样次数[:：]\s*([\d,]+)/);
+    if (samplesMatch) result.samples = Number(samplesMatch[1].replace(/,/g, ''));
+    const validMatch = clean.match(/有效样本[:：]\s*([\d,]+)/);
+    if (validMatch) result.valid = Number(validMatch[1].replace(/,/g, ''));
+    const successMatch = clean.match(/成功率[:：]\s*([\d.]+)%/);
+    if (successMatch) result.successRate = Number(successMatch[1]);
+
+    // 推荐方案（"推荐方案 1: ...，预期药效: 22.5"风格）
+    const recs = [];
+    const recRe = /推荐方案\s*\d+\s*[:：]\s*([^，,]+(?:[，,].*?)?)\s*[，,]\s*预期药效[:：]\s*([\d.]+)/g;
+    let m;
+    while ((m = recRe.exec(clean)) !== null) {
+        const recipe = (m[1] || '').trim();
+        const effect = Number(m[2]);
+        if (recipe) recs.push({ recipe, effect });
+    }
+    if (recs.length) result.recommendations = recs;
+
+    // 如果至少解析出一项关键数据，则认为有效
+    if (result.target !== undefined || result.samples !== undefined || (result.recommendations && result.recommendations.length)) {
+        return result;
+    }
+    return null;
+}
+
+// 数据管理页面事件监听器
+function setupDataManagementListeners() {
+    const importDataBtn = document.getElementById('import-data-btn');
+    const exportDataBtn = document.getElementById('export-data-btn');
+    const clearDataBtn = document.getElementById('clear-data-btn');
+    
+    if (importDataBtn) {
+        importDataBtn.addEventListener('click', () => {
+            showNotification('导入功能开发中...', 'info');
+        });
+    }
+    
+    if (exportDataBtn) {
+        exportDataBtn.addEventListener('click', () => {
+            showNotification('导出功能开发中...', 'info');
+        });
+    }
+    
+    if (clearDataBtn) {
+        clearDataBtn.addEventListener('click', () => {
+            if (confirm('确定要清空所有数据模型吗？此操作不可撤销。')) {
+                showNotification('清空功能开发中...', 'info');
+            }
+        });
+    }
+}
+
+// 全局函数（供HTML调用）
+window.switchTab = switchTab;
+window.startRegression = startRegression;
+window.startMonteCarlo = startMonteCarlo;
+window.importData = importData;
+window.exportResults = exportResults;
+window.testBackendConnection = testBackendConnection;
+window.saveSettings = saveSettings;
+window.loadDataModels = loadDataModels;
+window.viewDataModel = viewDataModel;
+window.deleteDataModel = deleteDataModel; 
+window.viewDataModelFile = viewDataModelFile;
