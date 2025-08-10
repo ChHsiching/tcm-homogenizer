@@ -1,6 +1,140 @@
+// 导出蒙特卡洛 Top10 为CSV（前端导出，不入库）
+function exportMonteCarloTop10Csv() {
+    try {
+        const res = currentMonteCarloResult;
+        if (!res || !Array.isArray(res.top10) || res.top10.length === 0) {
+            showNotification('暂无可导出的结果，请先完成分析', 'warning');
+            return;
+        }
+        const targetName = (window.__mcTargetName__ || '目标');
+        // 收集所有出现的变量名，保持列稳定
+        const varSet = new Set();
+        res.top10.forEach(item => (item.components || []).forEach(c => varSet.add(c.name)));
+        const vars = Array.from(varSet);
+        // CSV 头
+        const headers = ['Rank', `${targetName}`].concat(vars);
+        const rows = [headers.join(',')];
+        // 每行按变量名顺序取值，无则留空
+        res.top10.forEach(item => {
+            const map = Object.create(null);
+            (item.components || []).forEach(c => { map[c.name] = c.value; });
+            const line = [item.rank ?? '', item.efficacy ?? ''].concat(vars.map(v => (map[v] ?? '')));
+            rows.push(line.join(','));
+        });
+        const csv = rows.join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+        const fileName = `monte_carlo_top10_${ts}.csv`;
+        if (window.electronAPI && window.electronAPI.saveZipFile) {
+            // 复用保存API，尽量触发系统文件对话框
+            blob.arrayBuffer().then(buf => window.electronAPI.saveZipFile(fileName, buf));
+        } else {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        showNotification('CSV 导出成功', 'success');
+    } catch (e) {
+        console.error('导出CSV失败:', e);
+        showNotification('导出失败: ' + e.message, 'error');
+    }
+}
+// 变量范围配置弹窗
+async function openRangeConfigDialog() {
+    try {
+        // 获取所选数据模型，拉取 data_model.json
+        const dataModelId = document.getElementById('mc-data-model').value;
+        if (!dataModelId) {
+            showNotification('请先选择数据模型', 'warning');
+            return;
+        }
+        const resp = await fetch(`${API_BASE_URL}/api/data-models/models/${dataModelId}`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const { success, model } = await resp.json();
+        if (!success) throw new Error('无法获取模型信息');
+        const features = model.feature_columns || [];
+
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        const modalOverlay = document.getElementById('modal-overlay');
+        const confirmBtn = document.getElementById('modal-confirm');
+        const cancelBtn = document.getElementById('modal-cancel');
+        if (modalTitle) modalTitle.textContent = '设置变量范围';
+        if (modalBody) {
+            const ranges = (window.__mcRanges__ && typeof window.__mcRanges__ === 'object') ? window.__mcRanges__ : {};
+            const vars = (features.length ? features : ['变量1','变量2']);
+            const header = `
+                <div class="range-row" style="font-weight:600;">
+                    <div></div>
+                    <div style="color: var(--text-secondary)">最小值</div>
+                    <div style="color: var(--text-secondary)">最大值</div>
+                </div>`;
+            const rows = vars.map(name => {
+                const prev = ranges[name] || {};
+                const minVal = (prev.min !== undefined && prev.min !== null) ? String(prev.min) : '';
+                const maxVal = (prev.max !== undefined && prev.max !== null) ? String(prev.max) : '';
+                const cnName = (typeof getComponentChineseName === 'function') ? getComponentChineseName(name) : name;
+                return `
+                    <div class="range-row">
+                        <div class="var-name"><span class="primary">${name}</span><span class="secondary">${cnName}</span></div>
+                        <input type="number" step="0.01" placeholder="0" data-var="${name}" data-type="min" value="${minVal}">
+                        <input type="number" step="0.01" placeholder="+∞" data-var="${name}" data-type="max" value="${maxVal}">
+                    </div>
+                `;
+            }).join('');
+            modalBody.innerHTML = `<div>${header}${rows}</div>`;
+        }
+        if (modalOverlay) {
+            modalOverlay.style.display = 'flex';
+        // 右上角叉号关闭（取消）
+        const closeBtn = document.querySelector('.modal-close');
+        if (closeBtn) closeBtn.onclick = () => authManager.hideModal();
+            if (confirmBtn) {
+                confirmBtn.onclick = () => {
+                    const inputs = modalBody.querySelectorAll('input[data-var]');
+                    const ranges = {};
+                    inputs.forEach(inp => {
+                        const varName = inp.getAttribute('data-var');
+                        const t = inp.getAttribute('data-type');
+                        ranges[varName] = ranges[varName] || { min: 0, max: null };
+                        const v = inp.value.trim();
+                        if (t === 'min') {
+                            ranges[varName].min = (v === '') ? 0 : Number(v);
+                        } else {
+                            ranges[varName].max = (v === '') ? null : Number(v);
+                        }
+                    });
+                    // 与模型ID绑定存储，避免换模型时串扰
+                    window.__mcRanges__ = window.__mcRanges__ || {};
+                    window.__mcRanges__.__model__ = dataModelId;
+                    Object.keys(ranges).forEach(k => {
+                        window.__mcRanges__[k] = ranges[k];
+                    });
+                    authManager.hideModal();
+                    showNotification('变量范围已设置', 'success');
+                };
+            }
+            if (cancelBtn) {
+                cancelBtn.onclick = () => {
+                    authManager.hideModal();
+                };
+            }
+        }
+    } catch (e) {
+        console.error('打开范围配置失败:', e);
+        showNotification('打开范围配置失败: ' + e.message, 'error');
+    }
+}
 // 全局变量
 let currentData = null;
 let regressionModels = [];
+let currentRegressionResult = null;
+let currentMonteCarloResult = null; // 最近一次蒙特卡洛分析结果（用于导出）
 let currentSettings = {
     backendPort: 5000,
     autoStartBackend: true,
@@ -12,6 +146,12 @@ let currentSettings = {
 
 // API基础URL
 const API_BASE_URL = 'http://127.0.0.1:5000';
+
+// 全局函数：显示指定标签页（用于首页按钮点击）
+function showTab(tabName) {
+    console.log(`🔄 切换到标签页: ${tabName}`);
+    switchTab(tabName);
+}
 
 // DOM 加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
@@ -27,6 +167,9 @@ async function initializeApp() {
     
     // 设置事件监听器
     setupEventListeners();
+    
+    // 设置数据管理事件监听器
+    setupDataManagementListeners();
     
     // 加载设置
     loadSettings();
@@ -63,6 +206,14 @@ function setupEventListeners() {
             switchTab(tabName);
         });
     });
+    // 下拉菜单项事件
+    const dropdownItems = document.querySelectorAll('.dropdown-item');
+    dropdownItems.forEach(item => {
+        item.addEventListener('click', function() {
+            const tabName = this.getAttribute('data-tab');
+            switchTab(tabName);
+        });
+    });
     
     // 文件输入事件
     const regressionDataInput = document.getElementById('regression-data');
@@ -76,10 +227,24 @@ function setupEventListeners() {
         startRegressionBtn.addEventListener('click', startRegression);
     }
     
+    // 导出模型按钮事件
+    const exportModelBtn = document.getElementById('export-model');
+    if (exportModelBtn) {
+        exportModelBtn.addEventListener('click', exportModel);
+    }
+    
     const startMonteCarloBtn = document.getElementById('start-monte-carlo');
     if (startMonteCarloBtn) {
         startMonteCarloBtn.addEventListener('click', startMonteCarlo);
     }
+    // 变量范围配置按钮
+    const openRangeBtn = document.getElementById('open-range-config');
+    if (openRangeBtn) {
+        openRangeBtn.addEventListener('click', openRangeConfigDialog);
+    }
+    
+    // 表达式语法选择checkbox事件处理
+    setupGrammarCheckboxEvents();
     
     // 菜单事件监听
     if (window.electronAPI) {
@@ -97,6 +262,9 @@ function setupEventListeners() {
             updateSetting(this.id, this.value || this.checked);
         });
     });
+
+    // 随机种子相关事件
+    setupSeedControls();
 }
 
 // 切换标签页
@@ -132,8 +300,12 @@ function switchTab(tabName) {
         button.classList.remove('active');
     });
     
-    // 激活对应的导航按钮
-    const targetButton = document.querySelector(`[data-tab="${tabName}"]`);
+    // 激活对应的导航按钮（表达式树属于符号回归的二级页，仍高亮主按钮）
+    let navHighlightTabName = tabName;
+    if (tabName === 'expression-tree') {
+        navHighlightTabName = 'regression';
+    }
+    const targetButton = document.querySelector(`.nav-btn[data-tab="${navHighlightTabName}"]`);
     if (targetButton) {
         targetButton.classList.add('active');
     }
@@ -171,6 +343,13 @@ function switchTab(tabName) {
                     }
                 }, 300);
                 
+                // 在页面切换完成后重新设置checkbox事件
+                if (tabName === 'regression') {
+                    setupGrammarCheckboxEvents();
+                    // 切换到符号回归页时同步种子可用状态
+                    setupSeedControls();
+                }
+                
             }, 500); // 增加动画时间
             
         }, 300); // 增加延迟时间，让过渡更丝滑
@@ -206,6 +385,31 @@ function switchTab(tabName) {
         }
     }
     
+    // 特殊处理：数据管理页面自动加载数据模型列表
+    if (tabName === 'data-management') {
+        console.log('🔍 切换到数据管理页面');
+        if (authManager && authManager.currentUser && authManager.currentUser.role === 'admin') {
+            console.log('🔍 用户是管理员，自动加载数据模型列表');
+            setTimeout(() => {
+                loadDataModels();
+            }, 800); // 延迟到动画完成后执行
+        } else {
+            console.log('🔍 用户不是管理员，显示权限不足');
+            const dataPreview = document.getElementById('data-preview');
+            if (dataPreview) {
+                dataPreview.innerHTML = '<p>权限不足，只有管理员可以查看数据模型</p>';
+            }
+        }
+    }
+    
+    // 特殊处理：蒙特卡洛采样页面自动加载数据模型列表
+    if (tabName === 'monte-carlo') {
+        console.log('🔍 切换到蒙特卡洛采样页面');
+        setTimeout(() => {
+            loadDataModelsForMonteCarlo();
+        }, 800); // 延迟到动画完成后执行
+    }
+    
     // 更新状态栏
     updateStatusBar();
     
@@ -219,6 +423,61 @@ function switchTab(tabName) {
             });
         }
     }, 100);
+}
+
+// 生成Python可存储的随机整数（32位有符号范围内）
+function generateRandomSeed() {
+    const min = 1; // 避免0
+    const max = 2147483647; // 2^31 - 1
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+// 根据模式更新Seed输入框状态，并提供重新生成逻辑
+function setupSeedControls() {
+    const modeSelect = document.getElementById('set-seed-randomly');
+    const seedInput = document.getElementById('seed');
+    const regenBtn = document.getElementById('regenerate-seed');
+
+    if (!modeSelect || !seedInput) return;
+
+    const applyState = () => {
+        const isRandom = modeSelect.value === 'true';
+        if (isRandom) {
+            // 随机模式：生成随机种子；输入框不变灰但不可编辑；刷新按钮启用
+            const newSeed = generateRandomSeed();
+            seedInput.value = String(newSeed);
+            seedInput.readOnly = true;
+            seedInput.classList.add('readonly-not-allowed');
+            if (regenBtn) regenBtn.disabled = false;
+        } else {
+            // 固定模式：可编辑，并自动重置为42；刷新按钮禁用且灰色
+            seedInput.readOnly = false;
+            seedInput.classList.remove('readonly-not-allowed');
+            seedInput.value = '42';
+            if (regenBtn) regenBtn.disabled = true;
+        }
+    };
+
+    // 初始应用一次
+    applyState();
+
+    // 监听模式切换（避免重复绑定）
+    if (modeSelect.dataset.seedBound !== '1') {
+        modeSelect.addEventListener('change', applyState);
+        modeSelect.dataset.seedBound = '1';
+    }
+
+    // 监听重新生成
+    if (regenBtn) {
+        if (regenBtn.dataset.seedBound !== '1') {
+            regenBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const newSeed = generateRandomSeed();
+                seedInput.value = String(newSeed);
+            });
+            regenBtn.dataset.seedBound = '1';
+        }
+    }
 }
 
 // 处理文件上传
@@ -250,11 +509,12 @@ async function handleFileUpload(event) {
         
         // 使用API返回的数据
         currentData = {
-            data: result.result.data_preview,
+            data: result.result.full_data || result.result.data_preview,
             headers: result.result.columns_list,
             rows: result.result.rows,
             columns: result.result.columns,
-            filename: result.result.filename
+            filename: result.result.filename,
+            server_csv_filename: result.result.server_csv_filename
         };
         
         // 更新目标列选择
@@ -262,6 +522,9 @@ async function handleFileUpload(event) {
         
         // 更新特征列复选框
         updateFeatureColumnsCheckboxes(result.result.columns_list);
+
+        // 渲染预览表格
+        renderRegressionPreviewTable(currentData.headers, currentData.data);
         
         showNotification('文件上传成功', 'success');
     } catch (error) {
@@ -295,19 +558,59 @@ async function parseFile(file) {
     });
 }
 
+// 解析CSV行，处理引号内的逗号
+function parseCSVLine(line) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        
+        if (char === '"') {
+            inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+            result.push(current);
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+    
+    result.push(current);
+    return result;
+}
+
 // 解析CSV内容
 function parseCSV(content) {
     const lines = content.trim().split('\n');
-    const headers = lines[0].split(',').map(h => h.trim());
+    if (lines.length === 0) {
+        throw new Error('CSV文件为空');
+    }
+    
+    // 解析表头
+    const headerLine = lines[0];
+    const headers = parseCSVLine(headerLine).map(h => h.trim());
+    
+    if (headers.length === 0) {
+        throw new Error('CSV文件没有有效的表头');
+    }
+    
     const data = [];
     
+    // 解析数据行
     for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',');
+        const line = lines[i].trim();
+        if (line === '') continue; // 跳过空行
+        
+        const values = parseCSVLine(line);
         const row = {};
         
         headers.forEach((header, index) => {
             const value = values[index] ? values[index].trim() : '';
-            row[header] = isNaN(value) ? value : parseFloat(value);
+            // 尝试转换为数字，如果失败则保持字符串
+            const numValue = parseFloat(value);
+            row[header] = isNaN(numValue) ? value : numValue;
         });
         
         data.push(row);
@@ -332,6 +635,23 @@ function updateTargetColumnSelect(columns) {
         option.value = column;
         option.textContent = column;
         select.appendChild(option);
+    });
+}
+
+// 设置表达式语法选择checkbox事件
+function setupGrammarCheckboxEvents() {
+    const grammarCheckboxes = document.querySelectorAll('input[id^="grammar-"]');
+    grammarCheckboxes.forEach(checkbox => {
+        const checkboxItem = checkbox.closest('.checkbox-item');
+        if (checkboxItem) {
+            checkboxItem.addEventListener('click', function(e) {
+                // 如果点击的不是复选框本身，则切换复选框状态
+                if (e.target.type !== 'checkbox') {
+                    const checkbox = this.querySelector('input[type="checkbox"]');
+                    checkbox.checked = !checkbox.checked;
+                }
+            });
+        }
     });
 }
 
@@ -362,6 +682,143 @@ function updateFeatureColumnsCheckboxes(columns) {
     });
 }
 
+// 生成带行列号的表格HTML
+function generateTableWithCoordinates(headers, rows, title = '') {
+    if (!headers || !rows || rows.length === 0) {
+        return '<p>暂无数据</p>';
+    }
+    
+    // 生成行号
+    const rowNumbers = rows.map((_, index) => `<div class="row-number" data-row="${index + 1}">${index + 1}</div>`).join('');
+    
+    // 生成列号
+    const columnNumbers = headers.map((_, index) => `<div class="column-number" data-col="${String.fromCharCode(65 + index)}">${String.fromCharCode(65 + index)}</div>`).join('');
+    
+    // 生成表格内容
+    const thead = `<thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>`;
+    const tbody = `<tbody>${rows.map(r=>`<tr>${headers.map(h=>`<td>${r[h] ?? ''}</td>`).join('')}</tr>`).join('')}</tbody>`;
+    
+    let html = `<div class="table-with-coordinates">`;
+    if (title) {
+        html += `<h4>${title}</h4>`;
+    }
+    html += `<div class="table-wrapper">`;
+    html += `<div class="corner-cell"></div>`;
+    html += `<div class="row-numbers">${rowNumbers}</div>`;
+    html += `<div class="column-numbers">${columnNumbers}</div>`;
+    html += `<div class="table-content">`;
+    html += `<table>${thead}${tbody}</table>`;
+    html += `</div>`;
+    html += `</div>`;
+    html += `</div>`;
+    
+    return html;
+}
+
+// 对齐行列号到表格单元格
+function alignCoordinatesToTable(container) {
+    if (!container) return;
+    
+    const table = container.querySelector('.table-content table');
+    const rowNumbers = container.querySelectorAll('.row-number');
+    const columnNumbers = container.querySelectorAll('.column-number');
+    
+    if (!table || rowNumbers.length === 0 || columnNumbers.length === 0) return;
+    
+            // 对齐行号
+        const tableRows = table.querySelectorAll('tbody tr');
+        const rowHeightOffset = tableRows[0] ? tableRows[0].getBoundingClientRect().height : 32;
+        tableRows.forEach((row, index) => {
+            if (rowNumbers[index]) {
+                const rowRect = row.getBoundingClientRect();
+                const rowNumber = rowNumbers[index];
+                const containerRect = container.getBoundingClientRect();
+                const tableContent = container.querySelector('.table-content');
+                const tableContentRect = tableContent.getBoundingClientRect();
+                
+                // 计算行号应该的位置，居中对齐到单元格中心
+                // 需要考虑表格内容的偏移量
+                const top = rowRect.top - tableContentRect.top + (rowRect.height / 2) - 16 + rowHeightOffset; // 整体向下偏移一个单元格高度
+                rowNumber.style.top = `${top}px`;
+                
+                console.log(`行号 ${index + 1}: top = ${top}px, row height = ${rowRect.height}px`);
+            }
+        });
+        
+                    // 对齐列号
+            const tableHeaders = table.querySelectorAll('thead th');
+            tableHeaders.forEach((header, index) => {
+                if (columnNumbers[index]) {
+                    const headerRect = header.getBoundingClientRect();
+                    const columnNumber = columnNumbers[index];
+                    const containerRect = container.getBoundingClientRect();
+                    const tableContent = container.querySelector('.table-content');
+                    const tableContentRect = tableContent.getBoundingClientRect();
+                    
+                    // 计算列号应该的位置，居中对齐到单元格中心
+                    // 需要考虑表格内容的偏移量，以及行号列的宽度
+                    // 由于表格内容有30px的左边距，列号需要相应调整
+                    const left = headerRect.left - tableContentRect.left + (headerRect.width / 2) - 40 + 30; // 40px是列号宽度的一半，+30px是表格内容的左边距
+                    columnNumber.style.left = `${left}px`;
+                    
+                    console.log(`列号 ${String.fromCharCode(65 + index)}: left = ${left}px, width = ${headerRect.width}px, header left = ${headerRect.left}, tableContent left = ${tableContentRect.left}`);
+                }
+            });
+}
+
+// 渲染数据预览表格
+function renderRegressionPreviewTable(headers, rows) {
+    const host = document.getElementById('regression-data-preview');
+    if (!host) return;
+    if (!headers || !rows || rows.length === 0) {
+        host.innerHTML = '<p>暂无数据</p>';
+        return;
+    }
+    
+    const html = generateTableWithCoordinates(headers, rows, `数据预览 (共${rows.length}行数据)`);
+    host.innerHTML = html;
+    
+    // 等待DOM渲染完成后对齐行列号
+    setTimeout(() => {
+        const container = host.querySelector('.table-with-coordinates');
+        if (container) {
+            alignCoordinatesToTable(container);
+        }
+    }, 100);
+}
+
+// 隐藏数据预览
+function hideDataPreview() {
+    const host = document.getElementById('regression-data-preview');
+    if (!host) return;
+    
+    host.innerHTML = `
+        <div class="data-preview-collapsed">
+            <p>数据预览已隐藏</p>
+            <button class="btn btn-secondary" onclick="showDataPreview()">重新展开数据预览</button>
+        </div>
+    `;
+}
+
+// 显示数据预览
+function showDataPreview() {
+    if (!currentData) return;
+    
+    renderRegressionPreviewTable(currentData.headers, currentData.data);
+}
+
+// 训练/测试滑块联动
+document.addEventListener('input', (e) => {
+    if (e.target && e.target.id === 'train-ratio') {
+        const train = Number(e.target.value);
+        const test = 100 - train;
+        const trainLabel = document.getElementById('train-ratio-label');
+        const testLabel = document.getElementById('test-ratio-label');
+        if (trainLabel) trainLabel.textContent = `${train}%`;
+        if (testLabel) testLabel.textContent = `${test}%`;
+    }
+});
+
 // 开始符号回归分析
 async function startRegression() {
     console.log('🔍 开始符号回归分析...');
@@ -370,12 +827,26 @@ async function startRegression() {
     const featureCheckboxes = document.querySelectorAll('#feature-columns input[type="checkbox"]:checked');
     const populationSize = parseInt(document.getElementById('population-size').value) || 100;
     const generations = parseInt(document.getElementById('generations').value) || 50;
+    const maxTreeDepth = parseInt(document.getElementById('max-tree-depth').value) || 35;
+    const maxTreeLength = parseInt(document.getElementById('max-tree-length').value) || 35;
+    
+    // 收集语法选择参数
+    const grammarCheckboxes = document.querySelectorAll('input[id^="grammar-"]:checked');
+    const selectedGrammar = Array.from(grammarCheckboxes).map(cb => cb.value);
+    
+    // 收集训练集占比和随机种子参数
+    const trainRatio = parseInt(document.getElementById('train-ratio').value) || 80;
+    const setSeedRandomly = document.getElementById('set-seed-randomly').value === 'true';
+    const seedValue = parseInt(document.getElementById('seed')?.value) || 42;
     
     console.log('📊 分析参数:', {
         targetColumn,
         featureCount: featureCheckboxes.length,
         populationSize,
         generations,
+        maxTreeDepth,
+        maxTreeLength,
+        selectedGrammar,
         hasData: !!currentData
     });
     
@@ -404,15 +875,33 @@ async function startRegression() {
             target_column: targetColumn,
             feature_columns: featureColumns,
             population_size: populationSize,
-            generations: generations
+            generations: generations,
+            max_tree_depth: maxTreeDepth,
+            max_tree_length: maxTreeLength,
+            symbolic_expression_grammar: selectedGrammar,
+            train_ratio: trainRatio,
+            set_seed_randomly: setSeedRandomly,
+            seed: seedValue,
+            data_source: currentData.filename || "数据源",
+            server_csv_filename: currentData.server_csv_filename || null
         });
+        
+        // 保存当前回归结果
+        currentRegressionResult = result;
         
         // 保存模型到列表
         regressionModels.push(result);
         updateRegressionModelList();
         
+        // 隐藏数据预览，显示分析结果
+        hideDataPreview();
         displayRegressionResults(result);
         showNotification('符号回归分析完成', 'success');
+        
+        // 如果返回了数据模型ID，显示提示
+        if (result.data_model_id) {
+            showNotification(`数据模型已自动创建: ${result.data_model_id}`, 'info');
+        }
     } catch (error) {
         showNotification('符号回归分析失败: ' + error.message, 'error');
         console.error('❌ 符号回归分析错误:', error);
@@ -455,58 +944,375 @@ function displayRegressionResults(result) {
     const container = document.getElementById('regression-results');
     if (!container) return;
     
+    // 解析表达式，提取目标变量、特征变量和常数
+    const expression = result.expression || '';
+    const targetVariable = result.target_variable || 'Y';
+    const constants = result.constants || {};
+    
+    // 生成LaTeX公式（会更新constants对象）
+    const latexFormula = generateLatexFormula(expression, targetVariable, constants);
+    
     container.innerHTML = `
         <div class="result-item">
             <h4>回归表达式</h4>
-            <p class="expression">${result.expression}</p>
+            <div class="regression-formula-container">
+                <div class="regression-formula">
+                    $${latexFormula}$
+                </div>
+                ${Object.keys(constants).length > 0 ? `
+                <div class="regression-constants">
+                    <h5>常数定义</h5>
+                    <div class="constant-list">
+                        ${Object.entries(constants).map(([key, value]) => 
+                            `<div class="constant-item">$${key} = ${value}$</div>`
+                        ).join('')}
+                    </div>
+                </div>
+                ` : ''}
+            </div>
+                <div class="result-actions" style="margin-top: 10px;">
+                    <button class="btn-secondary" id="edit-model-btn" onclick="switchTab('expression-tree')">修改模型</button>
+                    <button class="btn-secondary" id="export-model-db-btn" onclick="exportRegressionModelDb()" style="margin-left: 8px;">导出模型</button>
+                </div>
         </div>
         
         <div class="result-item">
             <h4>模型性能</h4>
-            <p>R² = ${result.r2.toFixed(3)}</p>
-            <p>MSE = ${result.mse.toFixed(3)}</p>
+            <div class="performance-metrics">
+                <div class="performance-metric">
+                    <div class="metric-label">决定系数 R²</div>
+                    <div class="metric-value">${result.r2.toFixed(3)}</div>
+                    <div class="metric-unit">Coefficient of Determination</div>
+                </div>
+                <div class="performance-metric">
+                    <div class="metric-label">均方误差 MSE</div>
+                    <div class="metric-value">${result.mse.toFixed(3)}</div>
+                    <div class="metric-unit">Mean Squared Error</div>
+                </div>
+            </div>
+            
+            ${result.detailed_metrics ? `
+            <div class="detailed-metrics">
+                <h5>详细指标</h5>
+                <div class="metrics-grid">
+                    <div class="metric-section">
+                        <h6>误差指标</h6>
+                        <div class="metric-list">
+                            <div class="metric-item">
+                                <div class="metric-name-container">
+                                    <span class="metric-name-cn">平均相对误差</span>
+                                    <span class="metric-name-en">Average relative error</span>
+                                    <span class="metric-dataset">(测试)</span>
+                                </div>
+                                <span class="metric-value">${result.detailed_metrics.average_relative_error_test}%</span>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-name-container">
+                                    <span class="metric-name-cn">平均相对误差</span>
+                                    <span class="metric-name-en">Average relative error</span>
+                                    <span class="metric-dataset">(训练)</span>
+                                </div>
+                                <span class="metric-value">${result.detailed_metrics.average_relative_error_training}%</span>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-name-container">
+                                    <span class="metric-name-cn">平均绝对误差</span>
+                                    <span class="metric-name-en">Mean absolute error</span>
+                                    <span class="metric-dataset">(测试)</span>
+                                </div>
+                                <span class="metric-value">${result.detailed_metrics.mean_absolute_error_test}</span>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-name-container">
+                                    <span class="metric-name-cn">平均绝对误差</span>
+                                    <span class="metric-name-en">Mean absolute error</span>
+                                    <span class="metric-dataset">(训练)</span>
+                                </div>
+                                <span class="metric-value">${result.detailed_metrics.mean_absolute_error_training}</span>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-name-container">
+                                    <span class="metric-name-cn">均方误差</span>
+                                    <span class="metric-name-en">Mean squared error</span>
+                                    <span class="metric-dataset">(测试)</span>
+                                </div>
+                                <span class="metric-value">${result.detailed_metrics.mean_squared_error_test}</span>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-name-container">
+                                    <span class="metric-name-cn">均方误差</span>
+                                    <span class="metric-name-en">Mean squared error</span>
+                                    <span class="metric-dataset">(训练)</span>
+                                </div>
+                                <span class="metric-value">${result.detailed_metrics.mean_squared_error_training}</span>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-name-container">
+                                    <span class="metric-name-cn">归一化均方误差</span>
+                                    <span class="metric-name-en">Normalized MSE</span>
+                                    <span class="metric-dataset">(测试)</span>
+                                </div>
+                                <span class="metric-value">${result.detailed_metrics.normalized_mean_squared_error_test}</span>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-name-container">
+                                    <span class="metric-name-cn">归一化均方误差</span>
+                                    <span class="metric-name-en">Normalized MSE</span>
+                                    <span class="metric-dataset">(训练)</span>
+                                </div>
+                                <span class="metric-value">${result.detailed_metrics.normalized_mean_squared_error_training}</span>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-name-container">
+                                    <span class="metric-name-cn">均方根误差</span>
+                                    <span class="metric-name-en">Root MSE</span>
+                                    <span class="metric-dataset">(测试)</span>
+                                </div>
+                                <span class="metric-value">${result.detailed_metrics.root_mean_squared_error_test}</span>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-name-container">
+                                    <span class="metric-name-cn">均方根误差</span>
+                                    <span class="metric-name-en">Root MSE</span>
+                                    <span class="metric-dataset">(训练)</span>
+                                </div>
+                                <span class="metric-value">${result.detailed_metrics.root_mean_squared_error_training}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-section">
+                        <h6>相关性指标</h6>
+                        <div class="metric-list">
+                            <div class="metric-item">
+                                <div class="metric-name-container">
+                                    <span class="metric-name-cn">皮尔逊相关系数</span>
+                                    <span class="metric-name-en">Pearson's R</span>
+                                    <span class="metric-dataset">(测试)</span>
+                                </div>
+                                <span class="metric-value">${result.detailed_metrics.pearson_r_test}</span>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-name-container">
+                                    <span class="metric-name-cn">皮尔逊相关系数</span>
+                                    <span class="metric-name-en">Pearson's R</span>
+                                    <span class="metric-dataset">(训练)</span>
+                                </div>
+                                <span class="metric-value">${result.detailed_metrics.pearson_r_training}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-section">
+                        <h6>模型结构</h6>
+                        <div class="metric-list">
+                            <div class="metric-item">
+                                <div class="metric-name-container">
+                                    <span class="metric-name-cn">模型深度</span>
+                                    <span class="metric-name-en">Model Depth</span>
+                                </div>
+                                <span class="metric-value">${result.detailed_metrics.model_depth}</span>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-name-container">
+                                    <span class="metric-name-cn">模型长度</span>
+                                    <span class="metric-name-en">Model Length</span>
+                                </div>
+                                <span class="metric-value">${result.detailed_metrics.model_length}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            ` : ''}
         </div>
         
         <div class="result-item">
-            <h4>特征重要性</h4>
-            <ul>
-                ${result.feature_importance.map(f => 
-                    `<li>${f.feature}: ${f.importance.toFixed(3)}</li>`
-                ).join('')}
-            </ul>
+            <h4>特征权重</h4>
+            <div class="feature-importance">
+                ${result.feature_importance.map(f => `
+                    <div class="feature-importance-item">
+                        <div class="feature-name-container">
+                            <div class="feature-name-en">${f.feature}</div>
+                            <div class="feature-name-cn">${getComponentChineseName(f.feature)}</div>
+                        </div>
+                        <div class="importance-bar">
+                            <div class="importance-fill" style="width: ${f.importance * 100}%"></div>
+                        </div>
+                        <div class="importance-value">${f.importance.toFixed(3)}</div>
+                    </div>
+                `).join('')}
+            </div>
         </div>
         
-        <div class="result-item">
-            <h4>预测结果</h4>
-            <p>样本数量: ${result.predictions.length}</p>
-            <button class="btn-secondary" onclick="visualizeResults(${result.id})">查看图表</button>
-        </div>
+        
     `;
+    
+    // 重新渲染MathJax
+    if (window.MathJax && window.MathJax.typesetPromise) {
+        console.log('开始渲染MathJax公式:', latexFormula);
+        MathJax.typesetPromise([container]).then(() => {
+            console.log('MathJax渲染完成');
+        }).catch((err) => console.error('MathJax渲染错误:', err));
+    } else {
+        // 如果MathJax还没加载完成，等待加载
+        console.log('MathJax未加载，等待加载...');
+        const checkMathJax = () => {
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                console.log('MathJax已加载，开始渲染:', latexFormula);
+                MathJax.typesetPromise([container]).then(() => {
+                    console.log('MathJax渲染完成');
+                }).catch((err) => console.error('MathJax渲染错误:', err));
+            } else {
+                setTimeout(checkMathJax, 100);
+            }
+        };
+        checkMathJax();
+    }
+    
+    // 启用导出模型按钮
+    const exportModelBtn = document.getElementById('export-model');
+    if (exportModelBtn) {
+        exportModelBtn.disabled = false;
+    }
+}
+
+// 从数据库/文件系统导出最新创建的数据模型对应的回归模型文件
+async function exportRegressionModelDb() {
+    try {
+        // 优先使用后端返回的数据模型ID
+        const modelId = currentRegressionResult?.data_model_id;
+        if (!modelId) {
+            showNotification('未找到数据模型ID，请先完成一次分析', 'warning');
+            return;
+        }
+        
+        // 获取并下载数据包（包含CSV、回归JSON、蒙特卡洛JSON[如有]）
+        const resp = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}/files/all_as_zip`);
+        if (!resp.ok) {
+            throw new Error(`HTTP ${resp.status}`);
+        }
+        const blob = await resp.blob();
+        // 从响应头中尝试获取文件名
+        let fileName = `${modelId}.zip`;
+        const disposition = resp.headers.get('Content-Disposition') || resp.headers.get('content-disposition');
+        if (disposition) {
+            const match = disposition.match(/filename\*=UTF-8''([^;]+)|filename=\"?([^;\"]+)\"?/i);
+            const name = match?.[1] || match?.[2];
+            if (name) fileName = decodeURIComponent(name);
+        }
+        // 优先使用 Electron 保存对话框
+        if (window.electronAPI && window.electronAPI.saveZipFile) {
+            const arrayBuffer = await blob.arrayBuffer();
+            const result = await window.electronAPI.saveZipFile(fileName, arrayBuffer);
+            if (!result?.success) {
+                // 回退到浏览器下载
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        } else {
+            // 回退到浏览器下载
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        showNotification(`数据包已导出: ${fileName}`, 'success');
+    } catch (err) {
+        console.error('导出模型失败:', err);
+        showNotification('导出模型失败: ' + err.message, 'error');
+    }
+}
+
+// 生成LaTeX公式的函数
+function generateLatexFormula(expression, targetVariable, constants) {
+    if (!expression) return `${targetVariable} = 0`;
+    
+    // 将表达式中的数字替换为c下标格式
+    let processedExpression = expression;
+    
+    // 提取所有数字（包括小数），但排除变量名中的数字
+    const numberPattern = /(?<![a-zA-Z_])\b-?\d+\.?\d*\b/g;
+    const numbers = expression.match(numberPattern) || [];
+    
+    // 为每个数字创建常数定义，避免重复
+    const constantMap = {};
+    const usedNumbers = new Set();
+    
+    numbers.forEach((num) => {
+        if (!usedNumbers.has(num)) {
+            const index = Object.keys(constantMap).length;
+            const constantName = `c_{${index}}`;
+            constantMap[constantName] = parseFloat(num);
+            usedNumbers.add(num);
+            
+            // 替换所有相同的数字
+            const regex = new RegExp(`\\b${num.replace(/\./g, '\\.')}\\b`, 'g');
+            processedExpression = processedExpression.replace(regex, constantName);
+        }
+    });
+    
+    // 清空传入的constants对象，然后使用新生成的常数
+    Object.keys(constants).forEach(key => delete constants[key]);
+    Object.assign(constants, constantMap);
+    
+    // 转换为LaTeX格式
+    let latex = processedExpression
+        .replace(/\*/g, '\\cdot ')
+        .replace(/\//g, '\\frac{')
+        .replace(/\^/g, '^')
+        .replace(/\(/g, '\\left(')
+        .replace(/\)/g, '\\right)');
+    
+    // 处理分数
+    if (latex.includes('\\frac{')) {
+        latex = latex.replace(/\\frac\{([^}]+)\}\/([^\\s]+)/g, '\\frac{$1}{$2}');
+    }
+    
+    return `${targetVariable} = ${latex}`;
+}
+
+// 导出模型（与数据管理保持一致：标准ZIP包）
+async function exportModel() {
+    return exportRegressionModelDb();
 }
 
 // 更新回归模型列表
 function updateRegressionModelList() {
-    const select = document.getElementById('mc-model');
+    const select = document.getElementById('mc-data-model');
     if (!select) return;
     
-    select.innerHTML = '<option value="">请选择回归模型</option>';
+    select.innerHTML = '<option value="">请选择数据模型</option>';
     regressionModels.forEach(model => {
         const option = document.createElement('option');
-        option.value = model.id;
-        option.textContent = `模型 ${model.id} (R²=${model.r2.toFixed(3)})`;
+        // 这里用于联动蒙特卡洛页的数据模型选择，本地回归结果没有数据模型ID，仅展示表达式模型ID
+        option.value = model.data_model_id || model.id;
+        const r2Text = (typeof model.r2 === 'number') ? model.r2.toFixed(3) : model.r2;
+        option.textContent = `模型 ${model.data_model_id || model.id} (R²=${r2Text})`;
         select.appendChild(option);
     });
 }
 
-// 开始蒙特卡洛分析
+// 开始蒙特卡洛采样分析
 async function startMonteCarlo() {
-    const modelId = document.getElementById('mc-model').value;
+    const dataModelId = document.getElementById('mc-data-model').value;
     const iterations = parseInt(document.getElementById('mc-iterations').value);
     const targetEfficacy = parseFloat(document.getElementById('target-efficacy').value);
     const tolerance = parseFloat(document.getElementById('tolerance').value);
     
-    if (!modelId) {
-        showNotification('请先完成符号回归分析', 'warning');
+    if (!dataModelId) {
+        showNotification('请选择数据模型', 'warning');
         return;
     }
     
@@ -515,27 +1321,51 @@ async function startMonteCarlo() {
         return;
     }
     
-    showLoading('正在进行蒙特卡洛分析...');
+    showLoading('正在进行蒙特卡洛采样分析...');
     
     try {
-        const result = await performMonteCarloAnalysis({
-            model_id: parseInt(modelId),
+        // 读取模型信息以获取目标变量名（例如 HDL）
+        try {
+            const modelResp = await fetch(`${API_BASE_URL}/api/data-models/models/${dataModelId}`);
+            if (modelResp.ok) {
+                const modelJson = await modelResp.json();
+                if (modelJson && modelJson.success && modelJson.model) {
+                    window.__mcTargetName__ = modelJson.model.target_column || '药效';
+                }
+            }
+        } catch (_) {}
+        const payload = {
+            model_id: dataModelId,
             iterations,
             target_efficacy: targetEfficacy,
-            tolerance
-        });
+            tolerance,
+            component_ranges: (window.__mcRanges__ && window.__mcRanges__.__model__ === dataModelId)
+                ? Object.fromEntries(Object.entries(window.__mcRanges__).filter(([k]) => !k.startsWith('__'))) : {}
+        };
+        const result = await performMonteCarloAnalysis(payload);
         
+        currentMonteCarloResult = result;
         displayMonteCarloResults(result);
-        showNotification('蒙特卡洛分析完成', 'success');
+        showNotification('蒙特卡洛采样分析完成', 'success');
+        
+        // 如果返回了数据模型ID，显示提示
+        if (result.data_model_id) {
+            showNotification(`数据模型已更新: ${result.data_model_id}`, 'info');
+        }
+        
+        // 重新加载数据模型列表
+        setTimeout(() => {
+            loadDataModels();
+        }, 1000);
     } catch (error) {
-        showNotification('蒙特卡洛分析失败: ' + error.message, 'error');
-        console.error('❌ 蒙特卡洛分析错误:', error);
+        showNotification('蒙特卡洛采样分析失败: ' + error.message, 'error');
+        console.error('❌ 蒙特卡洛采样分析错误:', error);
     } finally {
         hideLoading();
     }
 }
 
-// 执行蒙特卡洛分析（真实API调用）
+// 执行蒙特卡洛采样分析（真实API调用）
 async function performMonteCarloAnalysis(params) {
     try {
         const response = await fetch(`${API_BASE_URL}/api/monte-carlo-sampling/analyze`, {
@@ -564,38 +1394,69 @@ async function performMonteCarloAnalysis(params) {
     }
 }
 
-// 显示蒙特卡洛结果
+// 显示蒙特卡洛采样结果（重构UI）
 function displayMonteCarloResults(result) {
     const container = document.getElementById('monte-carlo-results');
     if (!container) return;
     
+    // 参数视图
+    const params = [
+        { name: '模拟次数', value: result.iterations },
+        { name: '目标药效', value: result.target_efficacy },
+        { name: '容差', value: result.tolerance },
+        { name: '分析时间(秒)', value: result.analysis_time }
+    ];
+    const paramsHtml = params.map(p => `
+        <div class="param-card"><div class="param-name">${p.name}</div><div class="param-value">${p.value}</div></div>
+    `).join('');
+    
+    // 汇总视图
+    const summary = [
+        { name: '有效样本数', value: result.valid_samples },
+        { name: '成功率', value: `${(result.success_rate * 100).toFixed(1)}%` }
+    ];
+    const summaryHtml = summary.map(s => `
+        <div class="summary-card"><div class="summary-name">${s.name}</div><div class="summary-value">${s.value}</div></div>
+    `).join('');
+    
+    // Top10（若后端不提供，则从 result.distribution 构造示例）
+    const top10 = (result.top10 && Array.isArray(result.top10)) ? result.top10 : [];
+    const topTitle = (window.__mcTargetName__ ? `${window.__mcTargetName__} 值` : '目标值');
+    // 组装表格
+    const varSet = new Set();
+    top10.forEach(it => (it.components || []).forEach(c => varSet.add(c.name)));
+    const vars = Array.from(varSet);
+    const headerRow = ['Rank', topTitle].concat(vars).map(h => `<th>${h}</th>`).join('');
+    const bodyRows = top10.map(it => {
+        const map = {}; (it.components || []).forEach(c => { map[c.name] = c.value; });
+        const cols = [it.rank ?? '', it.efficacy ?? ''].concat(vars.map(v => map[v] ?? ''));
+        return `<tr>${cols.map(c => `<td>${c}</td>`).join('')}</tr>`;
+    }).join('');
+    const top10TableHtml = `
+        <div class="csv-table-container mc-top10-container">
+            <table class="csv-table mc-top-table">
+                <thead><tr>${headerRow}</tr></thead>
+                <tbody>${bodyRows}</tbody>
+            </table>
+        </div>`;
+    
     container.innerHTML = `
         <div class="result-item">
             <h4>分析参数</h4>
-            <p>模拟次数: ${result.iterations}</p>
-            <p>目标药效: ${result.target_efficacy}</p>
-            <p>容差: ${result.tolerance}</p>
+            <div id="mc-params-view" class="params-grid">${paramsHtml}</div>
         </div>
-        
         <div class="result-item">
             <h4>分析结果</h4>
-            <p>有效样本数: ${result.valid_samples}</p>
-            <p>成功率: ${(result.success_rate * 100).toFixed(1)}%</p>
-            <p>分析时间: ${result.analysis_time}秒</p>
+            <div id="mc-summary-view" class="summary-grid">${summaryHtml}</div>
         </div>
-        
         <div class="result-item">
-            <h4>最优配比范围</h4>
-            <ul>
-                ${result.optimal_ranges.map(r => 
-                    `<li>${r.component}: ${r.min.toFixed(2)} - ${r.max.toFixed(2)} (均值: ${r.mean.toFixed(2)})</li>`
-                ).join('')}
-            </ul>
+            <h4>最佳药效（前10条）</h4>
+            <div id="mc-top10-view">${top10TableHtml}</div>
         </div>
-        
         <div class="result-item">
-            <h4>操作</h4>
-            <button class="btn-secondary" onclick="exportMonteCarloResults(${result.iterations})">导出结果</button>
+            <div class="button-group">
+                <button class="btn-secondary" onclick="exportMonteCarloTop10Csv()">导出结果</button>
+            </div>
         </div>
     `;
 }
@@ -812,13 +1673,955 @@ function showAboutDialog() {
 }
 
 // 可视化结果
-function visualizeResults(modelId) {
-    showNotification('图表功能开发中...', 'info');
-}
+// visualizeResults 功能不再需要，保留空实现以免引用残留
+function visualizeResults() {}
 
-// 导出蒙特卡罗结果
+// 导出蒙特卡洛采样结果
 function exportMonteCarloResults(iterations) {
     showNotification('导出功能开发中...', 'info');
+}
+
+// 数据管理相关函数
+async function loadDataModels() {
+    console.log('📊 加载数据模型列表...');
+    const dataPreview = document.getElementById('data-preview');
+    
+    if (!dataPreview) {
+        console.error('找不到数据预览容器');
+        return;
+    }
+    
+    try {
+        showLoading('正在加载数据模型...');
+        
+        const response = await fetch(`${API_BASE_URL}/api/data-models/models`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Username': authManager.currentUser.username
+            }
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || '加载数据模型失败');
+        }
+        
+        displayDataModels(result.models);
+        showNotification(`成功加载 ${result.models.length} 个数据模型`, 'success');
+        
+    } catch (error) {
+        console.error('❌ 加载数据模型失败:', error);
+        showNotification('加载数据模型失败: ' + error.message, 'error');
+        dataPreview.innerHTML = `<p>加载失败: ${error.message}</p>`;
+    } finally {
+        hideLoading();
+    }
+}
+
+function displayDataModels(models) {
+    const dataPreview = document.getElementById('data-preview');
+    
+    if (!dataPreview) {
+        console.error('找不到数据预览容器');
+        return;
+    }
+    
+    if (!models || models.length === 0) {
+        dataPreview.innerHTML = '<p>暂无数据模型</p>';
+        return;
+    }
+    
+    // 创建表格
+    const table = document.createElement('table');
+    table.innerHTML = `
+        <thead>
+            <tr>
+                <th>模型名称</th>
+                <th>模型描述</th>
+                <th>创建时间</th>
+                <th>文件状态</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    `;
+    
+    const tbody = table.querySelector('tbody');
+    
+    models.forEach(model => {
+        const row = document.createElement('tr');
+        const createdDate = new Date(model.created_at * 1000).toLocaleString('zh-CN');
+        
+        // 生成文件状态显示
+        const fileStatus = generateFileStatus(model.metadata);
+        
+        row.innerHTML = `
+            <td><strong>${model.name}</strong></td>
+            <td>${model.description || '暂无描述'}</td>
+            <td>${createdDate}</td>
+            <td>${fileStatus}</td>
+            <td>
+                <button class="btn-sm btn-primary" onclick="viewDataModel('${model.id}')">查看</button>
+                <button class="btn-sm btn-secondary" onclick="exportDataModelZip('${model.id}')">导出</button>
+                <button class="btn-sm btn-danger" onclick="deleteDataModel('${model.id}')">删除</button>
+            </td>
+        `;
+        
+        tbody.appendChild(row);
+    });
+    
+    dataPreview.innerHTML = '';
+    dataPreview.appendChild(table);
+}
+
+function generateFileStatus(metadata) {
+    if (!metadata) return '<span class="status-unknown">未知</span>';
+    // 强制转为布尔，避免字符串 'false' 或 null 被当作真
+    const hasCsv = Boolean(metadata.has_csv_data);
+    const hasReg = Boolean(metadata.has_regression_model);
+    const hasMc = Boolean(metadata.has_monte_carlo_results);
+
+    const status = [];
+    status.push(hasCsv ? '<span class="status-ok">📊 CSV</span>' : '<span class="status-missing">❌ CSV</span>');
+    status.push(hasReg ? '<span class="status-ok">📈 回归</span>' : '<span class="status-missing">❌ 回归</span>');
+    status.push(hasMc ? '<span class="status-ok">🎲 蒙特卡洛</span>' : '<span class="status-missing">❌ 蒙特卡洛</span>');
+    return status.join(' ');
+}
+
+// 导出数据模型的ZIP（CSV + 回归JSON + 蒙特卡洛JSON[如有]）
+async function exportDataModelZip(modelId) {
+    try {
+        if (!modelId) {
+            showNotification('无效的模型ID', 'warning');
+            return;
+        }
+        const resp = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}/files/all_as_zip`);
+        if (!resp.ok) {
+            throw new Error(`HTTP ${resp.status}`);
+        }
+        const blob = await resp.blob();
+        let fileName = `${modelId}.zip`;
+        const disposition = resp.headers.get('Content-Disposition') || resp.headers.get('content-disposition');
+        if (disposition) {
+            const match = disposition.match(/filename\*=UTF-8''([^;]+)|filename=\"?([^;\"]+)\"?/i);
+            const name = match?.[1] || match?.[2];
+            if (name) fileName = decodeURIComponent(name);
+        }
+        if (window.electronAPI && window.electronAPI.saveZipFile) {
+            const arrayBuffer = await blob.arrayBuffer();
+            const result = await window.electronAPI.saveZipFile(fileName, arrayBuffer);
+            if (!result?.success) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        } else {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        showNotification(`数据包已导出: ${fileName}`, 'success');
+    } catch (err) {
+        console.error('导出ZIP失败:', err);
+        showNotification('导出失败: ' + err.message, 'error');
+    }
+}
+
+// 动态加载 JSZip（兼容 ESM 与 UMD）
+async function loadJSZip() {
+    // 如果全局已有，直接返回
+    if (window.JSZip) return window.JSZip;
+    // 优先尝试 UMD 版本
+    await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('JSZip加载失败'));
+        document.head.appendChild(script);
+    });
+    if (window.JSZip) return window.JSZip;
+    // 兜底尝试 ESM 导入
+    try {
+        const mod = await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+        return mod && (mod.default || mod.JSZip || mod);
+    } catch (e) {
+        throw new Error('无法加载JSZip');
+    }
+}
+
+// 为蒙特卡洛采样加载数据模型列表
+async function loadDataModelsForMonteCarlo() {
+    console.log('📊 为蒙特卡洛采样加载数据模型列表...');
+    const dataModelSelect = document.getElementById('mc-data-model');
+    
+    if (!dataModelSelect) {
+        console.error('找不到数据模型选择框');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/data-models/models`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Username': authManager.currentUser.username
+            }
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || '加载数据模型失败');
+        }
+        
+        // 过滤出有符号回归模型的数据模型
+        const modelsWithRegression = result.models.filter(model => 
+            model.metadata && model.metadata.has_regression_model
+        );
+        
+        // 更新选择框
+        dataModelSelect.innerHTML = '<option value="">请选择数据模型</option>';
+        modelsWithRegression.forEach(model => {
+            const option = document.createElement('option');
+            option.value = model.id;
+            option.textContent = `${model.name} (${model.target_column})`;
+            dataModelSelect.appendChild(option);
+        });
+        
+        console.log(`✅ 加载了 ${modelsWithRegression.length} 个可用的数据模型`);
+        
+    } catch (error) {
+        console.error('❌ 加载数据模型失败:', error);
+        showNotification('加载数据模型失败: ' + error.message, 'error');
+        dataModelSelect.innerHTML = '<option value="">加载失败</option>';
+    }
+}
+
+async function viewDataModel(modelId) {
+    console.log(`📊 查看数据模型: ${modelId}`);
+    
+    try {
+        showLoading('正在加载模型详情...');
+        
+        const response = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Username': authManager.currentUser.username
+            }
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || '加载模型详情失败');
+        }
+        
+        showDataModelDetails(result.model);
+        
+    } catch (error) {
+        console.error('❌ 查看数据模型失败:', error);
+        showNotification('查看数据模型失败: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+function showDataModelDetails(model) {
+    // 创建模态框显示模型详情（美化版，仅作用于本弹窗）
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    const featureTags = (model.feature_columns && model.feature_columns.length)
+        ? model.feature_columns.map(col => `<span class="tag">${col}</span>`).join('')
+        : '<span class="text-muted">无</span>';
+    const csvStatus = model.metadata && model.metadata.has_csv_data ? '<span class="status-ok">📊 CSV</span>' : '<span class="status-missing">❌ CSV</span>';
+    const regStatus = model.metadata && model.metadata.has_regression_model ? '<span class="status-ok">📈 回归</span>' : '<span class="status-missing">❌ 回归</span>';
+    const mcStatus = model.metadata && model.metadata.has_monte_carlo_results ? '<span class="status-ok">🎲 蒙特卡洛</span>' : '<span class="status-missing">❌ 蒙特卡洛</span>';
+    
+    modal.innerHTML = `
+        <div class="modal-content model-details">
+            <div class="modal-header">
+                <h3>数据模型详情</h3>
+                <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+            </div>
+            <div class="modal-body">
+                <section class="details-section">
+                    <div class="section-title">基本信息</div>
+                    <div class="info-grid">
+                        <div class="info-item"><div class="info-label">名称</div><div class="info-value">${model.name}</div></div>
+                        <div class="info-item"><div class="info-label">目标变量</div><div class="info-value">${model.target_column || '-'}</div></div>
+                        <div class="info-item info-span-2"><div class="info-label">描述</div><div class="info-value">${model.description || '-'}</div></div>
+                        <div class="info-item info-span-2"><div class="info-label">特征变量</div><div class="info-value tag-list">${featureTags}</div></div>
+                        <div class="info-item"><div class="info-label">创建时间</div><div class="info-value">${model.created_at ? new Date(model.created_at * 1000).toLocaleString('zh-CN') : '-'}</div></div>
+                        <div class="info-item"><div class="info-label">状态</div><div class="info-value">${model.status === 'active' ? '活跃' : '非活跃'}</div></div>
+                    </div>
+                </section>
+                
+                <section class="details-section">
+                    <div class="section-title">分析参数</div>
+                    <div class="info-grid">
+                        <div class="info-item"><div class="info-label">配比方案数量</div><div class="info-value">${model.analysis_params?.population_size || '-'}</div></div>
+                        <div class="info-item"><div class="info-label">优化轮次</div><div class="info-value">${model.analysis_params?.generations || '-'}</div></div>
+                        <div class="info-item"><div class="info-label">最大表达式树深度</div><div class="info-value">${model.analysis_params?.max_tree_depth || '-'}</div></div>
+                        <div class="info-item"><div class="info-label">最大表达式树长度</div><div class="info-value">${model.analysis_params?.max_tree_length || '-'}</div></div>
+                        <div class="info-item"><div class="info-label">表达式语法</div><div class="info-value">${formatGrammarDisplay(model.analysis_params?.symbolic_expression_grammar)}</div></div>
+                        <div class="info-item"><div class="info-label">训练/测试集占比</div><div class="info-value">${model.analysis_params?.train_ratio ? `${model.analysis_params.train_ratio}%/${100-model.analysis_params.train_ratio}%` : '-'}</div></div>
+                         <div class="info-item"><div class="info-label">随机种子随机化</div><div class="info-value">${model.analysis_params?.set_seed_randomly ? '是（结果不可重复）' : '否（结果可重复）'}</div></div>
+                         <div class="info-item"><div class="info-label">Seed模式</div><div class="info-value">${model.analysis_params?.seed_mode || (model.analysis_params?.set_seed_randomly ? '随机' : '固定')}</div></div>
+                         <div class="info-item"><div class="info-label">Seed数值</div><div class="info-value">${model.analysis_params?.seed ?? '-'}</div></div>
+                    </div>
+                </section>
+                
+                <section class="details-section">
+                    <div class="section-title">文件状态</div>
+                    <div class="status-chips">
+                        ${csvStatus} ${regStatus} ${mcStatus}
+                    </div>
+                    <div class="file-actions">
+                        ${model.metadata && model.metadata.has_csv_data 
+                            ? `<button class="btn-sm btn-primary" onclick="viewDataModelFile('${model.id}', 'csv_data')">查看CSV数据</button>` 
+                            : '<span class="text-muted">CSV数据文件不存在</span>'}
+                        ${model.metadata && model.metadata.has_regression_model 
+                            ? `<button class="btn-sm btn-primary" onclick="viewDataModelFile('${model.id}', 'regression_model')">查看回归模型</button>` 
+                            : '<span class="text-muted">回归模型文件不存在</span>'}
+                        ${model.metadata && model.metadata.has_monte_carlo_results 
+                            ? `<button class="btn-sm btn-primary" onclick="viewDataModelFile('${model.id}', 'monte_carlo_results')">查看蒙特卡洛结果</button>` 
+                            : '<span class="text-muted">蒙特卡洛结果文件不存在</span>'}
+                    </div>
+                </section>
+                
+                <section class="details-section advanced-info">
+                    <div class="section-title-row">
+                        <div class="section-title">高级信息</div>
+                        <button class="btn-secondary btn-compact section-collapse-btn" data-collapsed="true">展开</button>
+                    </div>
+                    <div class="advanced-content" style="display:none;">
+                        <div class="info-grid">
+                            ${model.data_source ? `<div class="info-item"><div class="info-label">数据来源</div><div class="info-value">${model.data_source}</div></div>` : ''}
+                            ${model.analysis_type ? `<div class="info-item"><div class="info-label">分析类型</div><div class="info-value">${model.analysis_type}</div></div>` : ''}
+                            ${model.created_by ? `<div class="info-item"><div class="info-label">创建人</div><div class="info-value">${model.created_by}</div></div>` : ''}
+                            ${model.updated_at ? `<div class="info-item"><div class="info-label">更新时间</div><div class="info-value">${new Date(model.updated_at * 1000).toLocaleString('zh-CN')}</div></div>` : ''}
+                            ${model.data_files && model.data_files.csv_data ? `<div class="info-item info-span-2"><div class="info-label">CSV文件</div><div class="info-value">${model.data_files.csv_data}</div></div>` : ''}
+                            ${model.data_files && model.data_files.regression_model ? `<div class="info-item info-span-2"><div class="info-label">回归模型文件</div><div class="info-value">${model.data_files.regression_model}</div></div>` : ''}
+                            ${model.data_files && model.data_files.monte_carlo_results ? `<div class="info-item info-span-2"><div class="info-label">蒙特卡洛结果文件</div><div class="info-value">${model.data_files.monte_carlo_results}</div></div>` : ''}
+                        </div>
+                        <div class="raw-toggle">
+                            <button class="btn-secondary btn-compact raw-json-toggle" data-mode="hidden">显示原始数据</button>
+                            <button class="btn-secondary btn-compact copy-json-btn">复制JSON</button>
+                        </div>
+                        <div class="meta-box raw-json" style="display:none;"><pre>${JSON.stringify({
+                            id: model.id,
+                            data_source: model.data_source,
+                            analysis_type: model.analysis_type,
+                            created_by: model.created_by,
+                            created_at: model.created_at,
+                            updated_at: model.updated_at,
+                            data_files: model.data_files || {},
+                            metadata: model.metadata || {}
+                        }, null, 2)}</pre></div>
+                    </div>
+                </section>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="this.closest('.modal-overlay').remove()">关闭</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // 高级信息折叠/展开与原始JSON切换
+    const collapseBtn = modal.querySelector('.section-collapse-btn');
+    const advContent = modal.querySelector('.advanced-content');
+    const rawToggleBtn = modal.querySelector('.raw-json-toggle');
+    const rawBox = modal.querySelector('.raw-json');
+    const copyBtn = modal.querySelector('.copy-json-btn');
+    
+    collapseBtn?.addEventListener('click', () => {
+        const collapsed = collapseBtn.getAttribute('data-collapsed') === 'true';
+        if (collapsed) {
+            advContent.style.display = '';
+            collapseBtn.textContent = '收起';
+            collapseBtn.setAttribute('data-collapsed', 'false');
+        } else {
+            advContent.style.display = 'none';
+            collapseBtn.textContent = '展开';
+            collapseBtn.setAttribute('data-collapsed', 'true');
+        }
+    });
+    
+    rawToggleBtn?.addEventListener('click', () => {
+        const mode = rawToggleBtn.getAttribute('data-mode') || 'hidden';
+        if (mode === 'hidden') {
+            rawBox.style.display = '';
+            rawToggleBtn.textContent = '隐藏原始数据';
+            rawToggleBtn.setAttribute('data-mode', 'shown');
+        } else {
+            rawBox.style.display = 'none';
+            rawToggleBtn.textContent = '显示原始数据';
+            rawToggleBtn.setAttribute('data-mode', 'hidden');
+        }
+    });
+    
+    copyBtn?.addEventListener('click', async () => {
+        try {
+            const text = rawBox?.innerText || '';
+            if (navigator.clipboard && text) {
+                await navigator.clipboard.writeText(text);
+                showNotification('已复制到剪贴板', 'success');
+            } else {
+                throw new Error('Clipboard API 不可用');
+            }
+        } catch (e) {
+            showNotification('复制失败，请手动选择文本复制', 'warning');
+        }
+    });
+}
+
+async function deleteDataModel(modelId) {
+    console.log(`🗑️ 删除数据模型: ${modelId}`);
+    
+    // 使用统一的主题化确认弹窗
+    if (!(await authManager.showConfirmDialog('确定要删除这个数据模型吗？此操作不可撤销。'))) {
+        return;
+    }
+    
+    try {
+        showLoading('正在删除数据模型...');
+        
+        const response = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Username': authManager.currentUser.username
+            }
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || '删除数据模型失败');
+        }
+        
+        showNotification('数据模型删除成功', 'success');
+        
+        // 重新加载数据模型列表
+        setTimeout(() => {
+            loadDataModels();
+        }, 500);
+        
+    } catch (error) {
+        console.error('❌ 删除数据模型失败:', error);
+        showNotification('删除数据模型失败: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// 查看数据模型文件
+async function viewDataModelFile(modelId, fileType) {
+    console.log(`📄 查看数据模型文件: ${modelId}, 类型: ${fileType}`);
+    
+    try {
+        showLoading('正在加载文件内容...');
+        
+        const response = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}/files/${fileType}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Username': authManager.currentUser.username
+            }
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || '加载文件失败');
+        }
+        
+        showFileContent(result.content, result.filename, fileType);
+        
+    } catch (error) {
+        console.error('❌ 查看数据模型文件失败:', error);
+        showNotification('查看文件失败: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// 显示文件内容（支持"美化视图/原始内容"切换）
+function showFileContent(content, filename, fileType) {
+    const fileTypeNames = {
+        'csv_data': 'CSV数据文件',
+        'regression_model': '符号回归模型',
+        'monte_carlo_results': '蒙特卡洛分析结果'
+    };
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>${fileTypeNames[fileType] || '文件内容'}</h3>
+                <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="file-info">
+                    <p><strong>文件名:</strong> ${filename}</p>
+                    <p><strong>文件类型:</strong> ${fileTypeNames[fileType] || '-'}</p>
+                </div>
+                <div class="view-toggle">
+                    <button class="btn-secondary toggle-view-btn" data-mode="beautified">切换为原始内容</button>
+                </div>
+                <div class="beautified-view"></div>
+                <div class="file-content raw-view" style="display:none;">
+                    <pre>${content}</pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="this.closest('.modal-overlay').remove()">关闭</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // 渲染美化视图
+    try {
+        renderBeautifiedFileContent(modal.querySelector('.beautified-view'), content, filename, fileType);
+    } catch (e) {
+        // 解析失败则默认显示原始内容
+        const toggleBtn = modal.querySelector('.toggle-view-btn');
+        const beautified = modal.querySelector('.beautified-view');
+        const raw = modal.querySelector('.raw-view');
+        if (beautified) beautified.style.display = 'none';
+        if (raw) raw.style.display = '';
+        if (toggleBtn) toggleBtn.textContent = '切换为概览视图';
+        if (toggleBtn) toggleBtn.dataset.mode = 'raw';
+    }
+
+    // 切换按钮事件
+    const toggleBtn = modal.querySelector('.toggle-view-btn');
+    toggleBtn?.addEventListener('click', () => {
+        const mode = toggleBtn.dataset.mode || 'beautified';
+        const beautified = modal.querySelector('.beautified-view');
+        const raw = modal.querySelector('.raw-view');
+        if (mode === 'beautified') {
+            // 切换到原始
+            if (beautified) beautified.style.display = 'none';
+            if (raw) raw.style.display = '';
+            toggleBtn.textContent = '切换为概览视图';
+            toggleBtn.dataset.mode = 'raw';
+        } else {
+            // 切换到美化
+            if (beautified && beautified.children.length === 0) {
+                // 再次渲染兜底
+                try { renderBeautifiedFileContent(beautified, content, filename, fileType); } catch (_) {}
+            }
+            if (beautified) beautified.style.display = '';
+            if (raw) raw.style.display = 'none';
+            toggleBtn.textContent = '切换为原始内容';
+            toggleBtn.dataset.mode = 'beautified';
+        }
+    });
+}
+
+// 渲染美化视图
+function renderBeautifiedFileContent(container, content, filename, fileType) {
+    if (!container) return;
+    if (fileType === 'csv_data') {
+        // CSV 美化：展示基础统计与完整数据
+        const parsed = parseCSV(content || '');
+        const headers = parsed.headers || [];
+        const rows = parsed.data || [];
+        const tableHtml = generateTableWithCoordinates(headers, rows, `CSV数据预览 (共${rows.length}行数据)`);
+        const html = `
+            <div class="beautified-csv">
+                <div class="metric-cards">
+                    <div class="metric-card"><div class="metric-label">文件名</div><div class="metric-value">${filename || '-'}</div></div>
+                    <div class="metric-card"><div class="metric-label">行数</div><div class="metric-value">${parsed.rows || 0}</div></div>
+                    <div class="metric-card"><div class="metric-label">列数</div><div class="metric-value">${parsed.columns || 0}</div></div>
+                </div>
+                <div class="csv-table-container">
+                    ${tableHtml}
+                </div>
+                <div class="csv-info">完整显示 ${rows.length} 行数据</div>
+            </div>
+        `;
+        container.innerHTML = html;
+        
+        // 等待DOM渲染完成后对齐行列号
+        setTimeout(() => {
+            const tableContainer = container.querySelector('.table-with-coordinates');
+            if (tableContainer) {
+                alignCoordinatesToTable(tableContainer);
+            }
+        }, 100);
+        
+        return;
+    }
+
+    if (fileType === 'regression_model') {
+        const json = JSON.parse(content || '{}');
+        const featureImportance = Array.isArray(json.feature_importance) ? json.feature_importance.slice() : [];
+        featureImportance.sort((a, b) => (b.importance || 0) - (a.importance || 0));
+        const html = `
+            <div class="beautified-json">
+                <div class="metric-cards">
+                    <div class="metric-card"><div class="metric-label">目标变量</div><div class="metric-value">${json.target_column || '-'}</div></div>
+                    <div class="metric-card"><div class="metric-label">R²</div><div class="metric-value">${json.r2 ?? '-'}</div></div>
+                    <div class="metric-card"><div class="metric-label">MSE</div><div class="metric-value">${json.mse ?? '-'}</div></div>
+                    <div class="metric-card"><div class="metric-label">复杂度</div><div class="metric-value">${json.model_complexity ?? '-'}</div></div>
+                </div>
+                ${json.expression ? `<div class="expression-box"><div class="expression-label">模型表达式</div><div class="expression-value">${json.expression}</div></div>` : ''}
+                ${featureImportance.length ? `
+                <div class="section-subtitle">特征重要性</div>
+                <div class="importance-table">
+                    ${featureImportance.map(item => `
+                        <div class="importance-row">
+                            <div class="imp-name">${item.feature}</div>
+                            <div class="imp-bar"><span style="width:${Math.min(100, Math.round((item.importance || 0) * 100))}%"></span></div>
+                            <div class="imp-value">${(item.importance ?? 0).toFixed(3)}</div>
+                        </div>
+                    `).join('')}
+                </div>` : ''}
+            </div>
+        `;
+        container.innerHTML = html;
+        return;
+    }
+
+    if (fileType === 'monte_carlo_results') {
+        // 既支持 JSON，也支持 .txt 文本报告
+        let json = null;
+        try { json = JSON.parse(content || '{}'); } catch (_) { json = null; }
+
+        // 新格式（包含 top10）
+        if (json && Array.isArray(json.top10)) {
+            const targetName = json.target_name || '目标';
+            // 汇总卡片
+            const summaryCards = `
+                <div class="metric-cards">
+                    <div class="metric-card"><div class="metric-label">模拟次数</div><div class="metric-value">${json.iterations ?? '-'}</div></div>
+                    <div class="metric-card"><div class="metric-label">成功率</div><div class="metric-value">${json.success_rate != null ? (json.success_rate*100).toFixed(1)+'%' : '-'}</div></div>
+                    <div class="metric-card"><div class="metric-label">有效样本</div><div class="metric-value">${json.valid_samples ?? '-'}</div></div>
+                    <div class="metric-card"><div class="metric-label">分析时间(秒)</div><div class="metric-value">${json.analysis_time ?? '-'}</div></div>
+                </div>`;
+            // Top10 表格
+            const varSet = new Set();
+            json.top10.forEach(it => (it.components||[]).forEach(c => varSet.add(c.name)));
+            const vars = Array.from(varSet);
+            const header = ['Rank', targetName].concat(vars).map(h=>`<th>${h}</th>`).join('');
+            const body = json.top10.map(it => {
+                const map = {}; (it.components||[]).forEach(c=>map[c.name]=c.value);
+                const cols = [it.rank ?? '', it.efficacy ?? ''].concat(vars.map(v=>map[v] ?? ''));
+                return `<tr>${cols.map(c=>`<td>${c}</td>`).join('')}</tr>`;
+            }).join('');
+            const table = `
+                <div class="section-subtitle">最佳药效（前10条）</div>
+                <div class="csv-table-container">
+                  <table class="csv-table"><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>
+                </div>`;
+            container.innerHTML = `<div class="beautified-json">${summaryCards}${table}</div>`;
+            return;
+        }
+
+        // 旧格式（统计/重要性/样本）
+        if (json && (json.target_statistics || json.feature_importance || json.simulations)) {
+            const stats = json.target_statistics || {};
+            const cis = json.confidence_intervals || {};
+            const fi = Array.isArray(json.feature_importance) ? json.feature_importance.slice() : [];
+            fi.sort((a, b) => (b.importance || 0) - (a.importance || 0));
+            const top = fi.slice(0, 10);
+            const sims = Array.isArray(json.simulations) ? json.simulations : [];
+            const html = `
+                <div class="beautified-json">
+                    <div class="metric-cards">
+                        <div class="metric-card"><div class="metric-label">均值</div><div class="metric-value">${fmtNum(stats.mean)}</div></div>
+                        <div class="metric-card"><div class="metric-label">标准差</div><div class="metric-value">${fmtNum(stats.std)}</div></div>
+                        <div class="metric-card"><div class="metric-label">最小值</div><div class="metric-value">${fmtNum(stats.min)}</div></div>
+                        <div class="metric-card"><div class="metric-label">最大值</div><div class="metric-value">${fmtNum(stats.max)}</div></div>
+                    </div>
+                    <div class="section-subtitle">置信区间</div>
+                    <div class="ci-grid">
+                        ${Object.keys(cis).map(k => {
+                            const c = cis[k] || {}; return `<div class=\"ci-item\"><div class=\"ci-label\">${k.toUpperCase()}</div><div class=\"ci-value\">${fmtNum(c.lower)} ~ ${fmtNum(c.upper)}</div></div>`;
+                        }).join('')}
+                    </div>
+                    ${top.length ? `
+                    <div class="section-subtitle">特征重要性（Top ${top.length}）</div>
+                    <div class="importance-table">
+                        ${top.map(item => `
+                            <div class="importance-row">
+                                <div class="imp-name">${item.feature}</div>
+                                <div class="imp-bar"><span style="width:${Math.min(100, Math.round((item.importance || 0) * 100))}%"></span></div>
+                                <div class="imp-value">${(item.importance ?? 0).toFixed(3)}</div>
+                            </div>
+                        `).join('')}
+                    </div>` : ''}
+                    ${sims.length ? `
+                    <div class="section-subtitle">模拟样本（前5条）</div>
+                    <div class="csv-table-container">
+                        <table class="csv-table">
+                            <thead><tr><th>#</th><th>特征维度</th><th>目标值</th></tr></thead>
+                            <tbody>
+                                ${sims.slice(0, 5).map(s => `<tr><td>${s.iteration ?? '-'}</td><td>${Array.isArray(s.features) ? s.features.length : '-'}</td><td>${fmtNum(s.target)}</td></tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </div>` : ''}
+                </div>
+            `;
+            container.innerHTML = html;
+            return;
+        }
+
+        // 文本报告解析
+        const parsed = parseMonteCarloText(content || '');
+        if (parsed) {
+            const html = `
+                <div class="beautified-json">
+                    <div class="metric-cards">
+                        ${parsed.target !== undefined ? `<div class=\"metric-card\"><div class=\"metric-label\">目标药效</div><div class=\"metric-value\">${parsed.target}</div></div>` : ''}
+                        ${parsed.samples !== undefined ? `<div class=\"metric-card\"><div class=\"metric-label\">采样次数</div><div class=\"metric-value\">${parsed.samples}</div></div>` : ''}
+                        ${parsed.valid !== undefined ? `<div class=\"metric-card\"><div class=\"metric-label\">有效样本</div><div class=\"metric-value\">${parsed.valid}</div></div>` : ''}
+                        ${parsed.successRate !== undefined ? `<div class=\"metric-card\"><div class=\"metric-label\">成功率</div><div class=\"metric-value\">${parsed.successRate}%</div></div>` : ''}
+                    </div>
+                    ${parsed.recommendations && parsed.recommendations.length ? `
+                    <div class="section-subtitle">推荐方案（前${Math.min(10, parsed.recommendations.length)}条）</div>
+                    <div class="csv-table-container">
+                        <table class="csv-table">
+                            <thead><tr><th>#</th><th>预期药效</th><th>配比方案</th></tr></thead>
+                            <tbody>
+                                ${parsed.recommendations.slice(0, 10).map((r, idx) => `<tr><td>${idx + 1}</td><td>${r.effect}</td><td>${r.recipe}</td></tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </div>` : ''}
+                </div>
+            `;
+            container.innerHTML = html;
+            return;
+        }
+
+        // 若无法解析，则抛出以触发原始内容回退
+        throw new Error('Unsupported monte carlo text format');
+    }
+
+    // 默认：没有美化
+    container.innerHTML = `<div class="text-muted">该文件类型暂不支持美化视图，可切换查看原始内容</div>`;
+}
+
+function fmtNum(v) {
+    if (typeof v !== 'number') return '-';
+    const s = Math.abs(v) >= 1000 ? v.toFixed(0) : Math.abs(v) >= 1 ? v.toFixed(3) : v.toPrecision(3);
+    return s;
+}
+
+// 解析蒙特卡洛 .txt 文本报告，返回简要结构
+function parseMonteCarloText(text) {
+    if (!text || typeof text !== 'string') return null;
+    const clean = text.replace(/\r/g, '');
+    const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return null;
+
+    const result = {};
+    // 目标药效、采样次数、有效样本、成功率
+    const targetMatch = clean.match(/目标药效[:：]\s*([\d.]+)/);
+    if (targetMatch) result.target = Number(targetMatch[1]);
+    const samplesMatch = clean.match(/采样次数[:：]\s*([\d,]+)/);
+    if (samplesMatch) result.samples = Number(samplesMatch[1].replace(/,/g, ''));
+    const validMatch = clean.match(/有效样本[:：]\s*([\d,]+)/);
+    if (validMatch) result.valid = Number(validMatch[1].replace(/,/g, ''));
+    const successMatch = clean.match(/成功率[:：]\s*([\d.]+)%/);
+    if (successMatch) result.successRate = Number(successMatch[1]);
+
+    // 推荐方案（"推荐方案 1: ...，预期药效: 22.5"风格）
+    const recs = [];
+    const recRe = /推荐方案\s*\d+\s*[:：]\s*([^，,]+(?:[，,].*?)?)\s*[，,]\s*预期药效[:：]\s*([\d.]+)/g;
+    let m;
+    while ((m = recRe.exec(clean)) !== null) {
+        const recipe = (m[1] || '').trim();
+        const effect = Number(m[2]);
+        if (recipe) recs.push({ recipe, effect });
+    }
+    if (recs.length) result.recommendations = recs;
+
+    // 如果至少解析出一项关键数据，则认为有效
+    if (result.target !== undefined || result.samples !== undefined || (result.recommendations && result.recommendations.length)) {
+        return result;
+    }
+    return null;
+}
+
+// 数据管理页面事件监听器
+function setupDataManagementListeners() {
+    const importDataBtn = document.getElementById('import-data-btn');
+    const exportDataBtn = document.getElementById('export-data-btn');
+    const clearDataBtn = document.getElementById('clear-data-btn');
+    
+    if (importDataBtn) {
+        importDataBtn.addEventListener('click', async () => {
+            // 弹出文件选择（支持单个ZIP）
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.zip';
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                try {
+                    showLoading('正在导入数据包...');
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    const resp = await fetch(`${API_BASE_URL}/api/data-models/import`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (!resp.ok) {
+                        const ejson = await resp.json().catch(() => ({}));
+                        throw new Error(ejson.message || `HTTP ${resp.status}`);
+                    }
+                    const data = await resp.json();
+                    if (!data.success) throw new Error(data.message || '导入失败');
+                    showNotification(`导入成功，共 ${data.count} 个模型`, 'success');
+                    loadDataModels();
+                } catch (err) {
+                    console.error('导入失败:', err);
+                    showNotification('导入失败: ' + err.message, 'error');
+                } finally {
+                    hideLoading();
+                }
+            };
+            input.click();
+        });
+    }
+    
+    if (exportDataBtn) {
+        exportDataBtn.addEventListener('click', async () => {
+            try {
+                showLoading('正在导出全部数据模型...');
+                // 后端尚未提供“一键导出全部”端点，此处采用客户端合并方案：
+                // 1) 获取模型列表；2) 逐个拉取单模型ZIP；3) 合并为总ZIP；4) 触发保存
+                const listResp = await fetch(`${API_BASE_URL}/api/data-models/models`);
+                if (!listResp.ok) throw new Error(`HTTP ${listResp.status}`);
+                const listJson = await listResp.json();
+                if (!listJson.success) throw new Error(listJson.message || '无法获取模型列表');
+                const models = listJson.models || [];
+                if (!models.length) {
+                    showNotification('没有可导出的模型', 'info');
+                    return;
+                }
+                // 并行获取所有单模型ZIP
+                const blobs = await Promise.all(models.map(async (m) => {
+                    const r = await fetch(`${API_BASE_URL}/api/data-models/models/${m.id}/files/all_as_zip`);
+                    if (!r.ok) throw new Error(`获取模型 ${m.id} 失败: HTTP ${r.status}`);
+                    return await r.blob();
+                }));
+                // 合并为总ZIP（仅打包子ZIP原样，保持“原封不动”）
+                const JSZip = await loadJSZip();
+                const zip = new JSZip();
+                blobs.forEach((blob, idx) => {
+                    zip.file(`${models[idx].id}.zip`, blob);
+                });
+                const content = await zip.generateAsync({ type: 'blob' });
+                const fileName = `all_models_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.zip`;
+                if (window.electronAPI && window.electronAPI.saveZipFile) {
+                    const arrayBuffer = await content.arrayBuffer();
+                    await window.electronAPI.saveZipFile(fileName, arrayBuffer);
+                } else {
+                    const url = URL.createObjectURL(content);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }
+                showNotification('全部模型已导出', 'success');
+            } catch (err) {
+                console.error('导出失败:', err);
+                showNotification('导出失败: ' + err.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        });
+    }
+    
+    if (clearDataBtn) {
+        clearDataBtn.addEventListener('click', async () => {
+            const confirmed = await authManager.showConfirmDialog('确定要清空所有数据模型吗？此操作不可撤销。');
+            if (!confirmed) return;
+            fetch(`${API_BASE_URL}/api/data-models/clear`, { method: 'POST' })
+                .then(async (resp) => {
+                    if (!resp.ok) {
+                        const e = await resp.json().catch(() => ({}));
+                        throw new Error(e.message || `HTTP ${resp.status}`);
+                    }
+                    return resp.json();
+                })
+                .then(() => {
+                    showNotification('已清空所有数据', 'success');
+                    loadDataModels();
+                })
+                .catch(err => {
+                    console.error('清空失败:', err);
+                    showNotification('清空失败: ' + err.message, 'error');
+                });
+        });
+    }
+}
+
+// 格式化语法显示
+function formatGrammarDisplay(grammar) {
+    if (!grammar || !Array.isArray(grammar) || grammar.length === 0) {
+        return '未设置';
+    }
+    
+    const grammarMap = {
+        'addition': '加法 (+)',
+        'subtraction': '减法 (-)',
+        'multiplication': '乘法 (×)',
+        'division': '除法 (÷)'
+    };
+    
+    return grammar.map(g => grammarMap[g] || g).join(', ');
 }
 
 // 全局函数（供HTML调用）
@@ -828,4 +2631,9 @@ window.startMonteCarlo = startMonteCarlo;
 window.importData = importData;
 window.exportResults = exportResults;
 window.testBackendConnection = testBackendConnection;
-window.saveSettings = saveSettings; 
+window.saveSettings = saveSettings;
+window.loadDataModels = loadDataModels;
+window.viewDataModel = viewDataModel;
+window.deleteDataModel = deleteDataModel; 
+window.viewDataModelFile = viewDataModelFile;
+window.exportMonteCarloTop10Csv = exportMonteCarloTop10Csv;
