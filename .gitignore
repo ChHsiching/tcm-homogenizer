@@ -137,3 +137,16 @@ test-results/
 *.md
 !README.md
 !docs/*.md
+# Runtime data (generated at runtime)
+/backend/csv_data/*
+!/backend/csv_data/.gitkeep
+/backend/data_models/*
+!/backend/data_models/.gitkeep
+/backend/models/*
+!/backend/models/.gitkeep
+/backend/results/*
+!/backend/results/.gitkeep
+/backend/uploads/*
+!/backend/uploads/.gitkeep
+\"EOF\"
+
