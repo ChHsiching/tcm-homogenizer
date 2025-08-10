@@ -25,7 +25,7 @@ function createWindow() {
       webSecurity: false, // 禁用web安全，允许跨域请求
       allowRunningInsecureContent: true // 允许运行不安全内容
     },
-    icon: path.join(__dirname, 'assets/icon.png'), // 可选：应用图标
+    icon: path.join(__dirname, 'assets/icons/app/logo-full.png'), // 可选：应用图标
     title: '中药多组分均化分析客户端',
     show: false // 先不显示，等准备好再显示
   });

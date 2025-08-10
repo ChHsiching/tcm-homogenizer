@@ -38,14 +38,14 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "assets/icon.ico"
+      "icon": "assets/icons/app/logo.ico"
     },
     "linux": {
       "target": [
         "AppImage",
         "deb"
       ],
-      "icon": "assets/icon.png"
+      "icon": "assets/icons/app/logo-full.png"
     }
   },
   "devDependencies": {
