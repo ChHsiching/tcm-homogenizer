@@ -1,6 +1,6 @@
-# 中药多组分均化分析系统
+# 本草智配
 
-一个基于Web技术的中药多组分均化分析系统，采用前后端分离架构，支持用户管理、符号回归分析、蒙特卡洛采样等功能。
+一个基于 Web 技术的中药多组分均化分析系统（项目代号 tcm-homogenizer），采用前后端分离架构，支持用户管理、符号回归分析、蒙特卡洛采样等功能。
 
 ## 功能特性
 
@@ -45,8 +45,8 @@ cd backend && python main.py
 # 启动前端服务
 cd frontend && python -m http.server 3000
 
-# 启动Electron客户端 (可选)
-./scripts/dev-start.sh
+# 启动 Electron 客户端 (可选)
+./scripts/start-dev.sh
 ```
 
 ### 访问应用
@@ -58,51 +58,48 @@ cd frontend && python -m http.server 3000
 
 ```
 tcm-homogenizer/
-├── frontend/                    # 前端代码
-│   ├── index.html              # 主页面
-│   ├── assets/                 # 静态资源
-│   │   ├── icons/             # 图标文件
-│   │   ├── libs/              # 第三方库
-│   │   └── *.svg              # SVG图标
-│   ├── styles/                 # 样式文件
-│   ├── scripts/                # 前端脚本
-│   └── data/                   # 前端数据
-├── backend/                     # 后端代码
-│   ├── main.py                 # Flask应用入口
-│   ├── api/                    # API接口
-│   │   ├── app.py             # Flask应用配置
-│   │   ├── auth.py            # 认证模块
-│   │   └── routes.py          # 路由定义
-│   ├── algorithms/             # 算法模块
-│   │   ├── monte_carlo.py     # 蒙特卡洛算法
-│   │   └── symbolic_regression.py # 符号回归算法
-│   ├── data_models/            # 数据模型元数据
-│   ├── csv_data/               # CSV数据文件
-│   ├── models/                 # 回归模型文件
-│   ├── results/                # 分析结果文件
-│   ├── uploads/                # 上传文件目录
-│   └── utils/                  # 工具模块
-├── scripts/                     # 启动脚本
-│   ├── start-dev.sh           # 开发环境启动
-│   ├── stop-dev.sh            # 停止开发环境
-│   └── status.sh              # 服务状态检查
-├── docs/                        # 项目文档
-│   ├── summaries/              # 功能实现总结
-│   │   ├── 滚动条修复总结.md
-│   │   ├── 完整数据显示功能实现总结.md
-│   │   ├── CSV功能实现总结.md
-│   │   ├── 模型显示改进总结.md
-│   │   ├── 数据管理系统规范总结.md
-│   │   └── 数据管理功能实现总结.md
-│   ├── 开发指南.md             # 开发指南
-│   ├── 开发进度总结.md         # 开发进度
-│   ├── Windows虚拟机打包指南.md # Windows打包指南
-│   ├── 项目初始化总结.md       # 项目初始化
-│   ├── 首页设计总结.md         # 首页设计
-│   └── 开发日志.md             # 开发记录
-├── .gitignore                   # Git忽略文件
-├── package.json                 # Node.js配置
-└── README.md                    # 项目说明
+├── frontend/                      # 前端代码
+│   ├── index.html                # 主页面
+│   ├── assets/                   # 静态资源
+│   │   ├── diagrams/            # 流程/结构图
+│   │   ├── icons/               # 图标
+│   │   │   ├── app/            # 应用与品牌图标（logo/icon）
+│   │   │   └── feature/        # 功能图标（数据管理、回归、蒙特卡洛等）
+│   │   ├── libs/               # 前端第三方库（MathJax、polyfill等）
+│   │   └── tech/               # 技术栈徽标
+│   ├── styles/                   # 样式文件
+│   ├── scripts/                  # 前端脚本
+│   └── data/                     # 前端数据
+├── backend/                       # 后端代码
+│   ├── main.py                   # Flask 应用入口
+│   ├── api/                      # API 接口
+│   │   ├── app.py               # Flask 应用配置
+│   │   ├── auth.py              # 认证模块
+│   │   └── routes.py            # 路由定义
+│   ├── algorithms/               # 算法模块
+│   │   ├── monte_carlo.py       # 蒙特卡洛算法（占位/桩）
+│   │   └── symbolic_regression.py # 符号回归算法（占位/桩）
+│   ├── data_models/              # 数据模型元数据（运行期生成）
+│   ├── csv_data/                 # CSV 数据文件（运行期生成）
+│   ├── models/                   # 回归模型文件（运行期生成）
+│   ├── results/                  # 分析结果文件（运行期生成）
+│   ├── uploads/                  # 上传文件目录（运行期生成）
+│   └── utils/                    # 工具模块与示例数据
+├── scripts/                       # 启动脚本
+│   ├── start-dev.sh             # 开发环境启动（Electron）
+│   ├── stop-dev.sh              # 停止开发环境
+│   └── status.sh                # 服务状态检查
+├── docs/                          # 项目文档
+│   ├── summaries/                # 功能实现总结
+│   ├── 开发指南.md               # 开发指南
+│   ├── 开发进度总结.md           # 开发进度
+│   ├── Windows虚拟机打包指南.md   # Windows 打包指南
+│   ├── 项目初始化总结.md         # 项目初始化
+│   ├── 首页设计总结.md           # 首页设计
+│   └── 开发日志.md               # 开发记录
+├── .gitignore                     # Git 忽略文件
+├── package.json                   # Node.js 配置
+└── README.md                      # 项目说明
 ```
 
 ## 开发指南
