@@ -972,7 +972,7 @@ function displayRegressionResults(result) {
             </div>
                 <div class="result-actions" style="margin-top: 10px;">
                     <button class="btn-secondary" id="edit-model-btn" onclick="switchTab('expression-tree')">修改模型</button>
-                    <button class="btn-secondary" id="export-model-db-btn" onclick="exportRegressionModelDb()" style="margin-left: 8px;">导出模型</button>
+                    <button class="btn-secondary" id="export-model-db-btn" onclick="exportRegressionModelDb()">导出模型</button>
                 </div>
         </div>
         

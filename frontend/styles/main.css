@@ -16,10 +16,15 @@
 }
 #login-btn:hover { transform: translateY(-2px); box-shadow: 0 16px 36px rgba(74, 158, 255, 0.45); }
 #login-btn:active { transform: translateY(0); box-shadow: 0 6px 16px rgba(74, 158, 255, 0.35); }
-/* 回归表达式 - 按钮右对齐 */
+/* 回归表达式 - 操作按钮占满整行，平分宽度 */
 .result-actions {
     display: flex;
-    justify-content: flex-end;
+    width: 100%;
+    gap: 8px;
+}
+.result-actions > button {
+    flex: 1 1 0;
+    min-width: 0;
 }
 /* 全局样式重置 */
 * {
