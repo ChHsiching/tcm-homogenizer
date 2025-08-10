@@ -150,3 +150,6 @@ test-results/
 !/backend/uploads/.gitkeep
 \"EOF\"
 
+
+# Backups
+*.bak
