@@ -120,3 +120,36 @@ dmypy.json
 *.tar.gz
 *.zip
 *.7z
+
+# Debug and test files
+*.png
+test_*.py
+test_*.js
+*.spec.js
+diagnose_*.js
+test_data.*
+*_cookies.txt
+cookies.txt
+*.log
+test-results/
+
+# Documentation cleanup
+*.md
+!README.md
+!docs/*.md
+# Runtime data (generated at runtime)
+/backend/csv_data/*
+!/backend/csv_data/.gitkeep
+/backend/data_models/*
+!/backend/data_models/.gitkeep
+/backend/models/*
+!/backend/models/.gitkeep
+/backend/results/*
+!/backend/results/.gitkeep
+/backend/uploads/*
+!/backend/uploads/.gitkeep
+\"EOF\"
+
+
+# Backups
+*.bak

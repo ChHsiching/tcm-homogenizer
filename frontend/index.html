@@ -5,26 +5,56 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>本草智配</title>
     <link rel="stylesheet" href="styles/main.css">
+    <!-- 成分名称对照表 -->
+    <script src="data/component_names.js"></script>
+    <!-- MathJax库 -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            },
+            chtml: {
+                scale: 1.2,
+                minScale: 1.0,
+                maxScale: 2.0
+            },
+            startup: {
+                pageReady: () => {
+                    return MathJax.startup.defaultPageReady().then(() => {
+                        console.log('MathJax加载完成');
+                    });
+                }
+            }
+        };
+    </script>
+    <script src="assets/libs/polyfill.min.js"></script>
+    <script id="MathJax-script" async src="assets/libs/mathjax.js"></script>
 </head>
 <body>
     <!-- 登录界面 -->
     <div id="login-container" class="login-container">
         <div class="login-box">
             <div class="login-logo">
-                <img src="assets/icons/logo.png" alt="本草智配" class="logo-image">
+                <img src="assets/icons/app/logo.png" alt="本草智配" class="logo-image">
             </div>
             <h2>本草智配</h2>
             <div id="first-run-message" class="first-run-message" style="display: none;">
                 <p>首次启动，请创建管理员账号</p>
             </div>
-            <form id="login-form">
+            <form id="login-form" class="login-form">
                 <div class="form-group">
                     <label for="username">用户名</label>
-                    <input type="text" id="username" name="username" required>
+                    <input type="text" id="username" name="username" required placeholder="请输入用户名">
                 </div>
                 <div class="form-group">
                     <label for="password">密码</label>
-                    <input type="password" id="password" name="password" required>
+                    <input type="password" id="password" name="password" required placeholder="请输入密码">
                 </div>
                 <div class="form-group">
                     <button type="submit" id="login-btn">登录</button>
@@ -40,7 +70,7 @@
         <header class="header">
             <div class="header-left">
                 <div class="header-logo">
-                    <img src="assets/icons/logo.png" alt="本草智配" class="header-logo-image">
+                    <img src="assets/icons/app/logo.png" alt="本草智配" class="header-logo-image">
                 </div>
                 <h1>本草智配</h1>
             </div>
@@ -53,8 +83,14 @@
         <!-- 导航菜单 -->
         <nav class="nav-menu">
             <button class="nav-btn active" data-tab="home">首页</button>
-            <button class="nav-btn" data-tab="regression">符号回归</button>
-            <button class="nav-btn" data-tab="monte-carlo">蒙特卡罗分析</button>
+            <div class="nav-dropdown">
+                <button class="nav-btn" data-tab="regression">符号回归</button>
+                <div class="dropdown-menu">
+                    <button class="dropdown-item" data-tab="regression">符号回归</button>
+                    <button class="dropdown-item" data-tab="expression-tree">符号表达式树</button>
+                </div>
+            </div>
+            <button class="nav-btn" data-tab="monte-carlo">蒙特卡洛采样</button>
             <button class="nav-btn admin-only" data-tab="data-management">数据管理</button>
             <button class="nav-btn admin-only" data-tab="user-management">用户管理</button>
             <button class="nav-btn" data-tab="settings">设置</button>
@@ -64,26 +100,293 @@
         <main class="main-content">
             <!-- 首页 -->
             <div id="home" class="tab-content active">
-                <h2>欢迎使用本草智配</h2>
-                <div class="welcome-content">
-                    <p>本系统提供中药多组分配比分析功能，包括：</p>
-                    <ul>
-                        <li><strong>符号回归分析</strong>：通过遗传算法发现数据中的数学关系</li>
-                        <li><strong>蒙特卡罗分析</strong>：模拟不同配比组合的药效表现</li>
-                        <li><strong>数据管理</strong>：上传、管理和导出分析数据</li>
-                        <li><strong>用户管理</strong>：管理系统用户和权限</li>
-                    </ul>
-                    <div class="status-info">
-                        <p><strong>后端状态</strong>：<span id="connection-status">检查中...</span></p>
-                        <p><strong>当前用户</strong>：<span id="current-user">未登录</span></p>
-                        <p><strong>用户角色</strong>：<span id="user-role">未知</span></p>
+                <!-- 英雄区域 -->
+                <section class="hero-section">
+                    <div class="hero-content">
+                        <div class="hero-text">
+                            <h1 class="hero-title">本草智配</h1>
+                            <p class="hero-subtitle">融合智能算法的中药质量调控系统</p>
+                            <p class="hero-description">
+                                您可以通过交互式平台探索符号回归与蒙特卡洛采样赋能的质控新范式。
+                                本草智配正推动中药质量控制从经验判断向算法驱动的范式跃迁。
+                            </p>
+                            <div class="hero-actions">
+                                <button class="btn-primary btn-hero" onclick="showTab('regression')">
+                                    <span class="btn-icon">🔬</span>
+                                    开始分析
+                                </button>
+                                <button class="btn-secondary btn-hero" onclick="showTab('monte-carlo')">
+                                    <span class="btn-icon">📊</span>
+                                    查看演示
+                                </button>
+                            </div>
+                        </div>
+                        <div class="hero-visual">
+                            <div class="hero-animation">
+                                <div class="brand-orbit">
+                                    <div class="logo-glow-inside"></div>
+                                    <img src="assets/icons/app/icon.svg" alt="本草智配" class="brand-logo"/>
+                                    <div class="orbit-dot" style="--angle: 0deg; --delay: 0s"></div>
+                                    <div class="orbit-dot" style="--angle: 120deg; --delay: 0.15s"></div>
+                                    <div class="orbit-dot" style="--angle: 240deg; --delay: 0.3s"></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                </section>
+
+                <!-- 系统介绍区域 -->
+                <section class="intro-section">
+                    <div class="intro-content">
+                        <h2 class="section-title">什么是本草智配？</h2>
+                        <div class="intro-text">
+                            <p>
+                                本草智配是融合智能算法的中药质量调控系统，您可以通过交互式平台探索符号回归与蒙特卡洛采样赋能的质控新范式。
+                            </p>
+                            <div class="intro-features">
+                                <div class="intro-feature">
+                                    <div class="feature-icon">🧬</div>
+                                    <div class="feature-content">
+                                        <h3>符号回归模块</h3>
+                                        <p>将药材成分与药效关联转化为可读数学表达式，直观揭示"量-效关系"本质；您可以利用剪枝技术，逐步生成从复杂到简单的数学表达式，筛选不同精度下的功效物质群。</p>
+                                    </div>
+                                </div>
+                                <div class="intro-feature">
+                                    <div class="feature-icon">🎲</div>
+                                    <div class="feature-content">
+                                        <h3>蒙特卡洛采样模块</h3>
+                                        <p>实现智能生成万级配比组合，助力锁定最优均化方案。您可以根据质控要求，设定药效阈值并约束成分范围，直接获得符合生产标准的质控规则库。</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 核心功能区域 -->
+                <section class="core-functions-section">
+                    <h2 class="section-title">核心功能</h2>
+                    <div class="functions-grid">
+                        <div class="function-card">
+                            <div class="function-icon">🔬</div>
+                            <h3>符号回归分析</h3>
+                            <p class="function-subtitle">一个以活性为导向的"量-效关系"和功效成分筛选器</p>
+                            <div class="function-description">
+                                <p>系统无需您预设成分权重，您可以根据中药专属的化学轮廓（成分丰度或含量），建立其与生物活性指标的关联，生成可解释的"量-效关系"数学表达式，筛选不同精度下的功效物质群。</p>
+                                <p>根据性能评估结果（平均绝对误差 MAE、均方根误差 RMSE 和决定系数 R²），确定最终的数学表达式和功效物质，保存该方法，并用于后续质量均一化策略。</p>
+                            </div>
+                            <div class="function-tech">
+                                <span class="tech-tag tech-pysr">
+                                    <i class="tech-icon">🧬</i>
+                                    PySR
+                                </span>
+                                <span class="tech-tag tech-genetic">
+                                    <i class="tech-icon">🧬</i>
+                                    遗传算法
+                                </span>
+                                <span class="tech-tag tech-math">
+                                    <i class="tech-icon">📐</i>
+                                    数学建模
+                                </span>
+                            </div>
+                        </div>
+                        <div class="function-card">
+                            <div class="function-icon">🎲</div>
+                            <h3>蒙特卡洛采样</h3>
+                            <p class="function-subtitle">一个可行配比方案的智能生成器</p>
+                            <div class="function-description">
+                                <p>基于符号回归输出的数学描述符，您可以根据质控要求，自由给定药效阈值及成分含量范围。</p>
+                                <p>系统将随机生成大量样本点，从中展示满足约束的可行配比方案，即功效物质具体数值组合。</p>
+                            </div>
+                            <div class="function-tech">
+                                <span class="tech-tag tech-numpy">
+                                    <img src="assets/tech/Numpy.svg" alt="NumPy" class="tech-icon">
+                                    NumPy
+                                </span>
+                                <span class="tech-tag tech-scipy">
+                                    <i class="tech-icon">🔬</i>
+                                    SciPy
+                                </span>
+                                <span class="tech-tag tech-sampling">
+                                    <i class="tech-icon">🎲</i>
+                                    随机采样
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 技术架构区域 -->
+                <section class="architecture-section">
+                    <h2 class="section-title">技术架构</h2>
+                    <div class="architecture-content">
+                        <div class="arch-diagram">
+                            <div class="arch-layer">
+                                <h4>用户界面层</h4>
+                                <div class="arch-components">
+                                    <span class="arch-component tech-electron">
+                                        <img src="assets/tech/electron.svg" alt="Electron" class="tech-icon">
+                                        Electron
+                                    </span>
+                                    <span class="arch-component tech-html">
+                                        <img src="assets/tech/html5.svg" alt="HTML5" class="tech-icon">
+                                        HTML/CSS/JS
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="arch-layer">
+                                <h4>API服务层</h4>
+                                <div class="arch-components">
+                                    <span class="arch-component tech-flask">
+                                        <img src="assets/tech/flask.svg" alt="Flask" class="tech-icon">
+                                        Flask
+                                    </span>
+                                    <span class="arch-component tech-api">
+                                        <img src="assets/tech/restful.svg" alt="RESTful API" class="tech-icon">
+                                        RESTful API
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="arch-layer">
+                                <h4>算法计算层</h4>
+                                <div class="arch-components">
+                                    <span class="arch-component tech-regression">
+                                        <i class="tech-icon">🧬</i>
+                                        符号回归
+                                    </span>
+                                    <span class="arch-component tech-montecarlo">
+                                        <i class="tech-icon">🎲</i>
+                                        蒙特卡洛采样
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="arch-layer">
+                                <h4>数据处理层</h4>
+                                <div class="arch-components">
+                                    <span class="arch-component tech-pandas">
+                                        <img src="assets/tech/pandas.svg" alt="Pandas" class="tech-icon">
+                                        Pandas
+                                    </span>
+                                    <span class="arch-component tech-numpy">
+                                        <img src="assets/tech/Numpy.svg" alt="NumPy" class="tech-icon">
+                                        NumPy
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 工作流程区域 -->
+                <section class="workflow-section">
+                    <h2 class="section-title">系统工作流程</h2>
+                    <div class="workflow-content">
+                        <div class="workflow-diagram">
+                            <img src="assets/diagrams/flow-diagram.svg" alt="本草智配系统工作流程图" class="flow-diagram-img">
+                        </div>
+                        <div class="workflow-description">
+                            <div class="workflow-step">
+                                <div class="step-number">1</div>
+                                <div class="step-content">
+                                    <h4>数据输入</h4>
+                                    <p>上传中药成分数据，包含各成分的含量信息和对应的药效指标</p>
+                                </div>
+                            </div>
+                            <div class="workflow-step">
+                                <div class="step-number">2</div>
+                                <div class="step-content">
+                                    <h4>符号回归分析</h4>
+                                    <p>通过智能算法建立成分与药效之间的数学关系模型</p>
+                                </div>
+                            </div>
+                            <div class="workflow-step">
+                                <div class="step-number">3</div>
+                                <div class="step-content">
+                                    <h4>蒙特卡洛采样</h4>
+                                    <p>基于数学模型生成大量配比方案，筛选满足要求的可行解</p>
+                                </div>
+                            </div>
+                            <div class="workflow-step">
+                                <div class="step-number">4</div>
+                                <div class="step-content">
+                                    <h4>结果输出</h4>
+                                    <p>获得最优配比方案和质量控制规则，指导实际生产</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 应用场景区域 -->
+                <section class="applications-section">
+                    <h2 class="section-title">应用场景</h2>
+                    <div class="applications-grid">
+                        <div class="application-card">
+                            <div class="app-icon">🏥</div>
+                            <h3>医院药房</h3>
+                            <p>为医院中药房提供科学的配方优化建议，提高治疗效果</p>
+                        </div>
+                        <div class="application-card">
+                            <div class="app-icon">🏭</div>
+                            <h3>制药企业</h3>
+                            <p>辅助中药企业进行产品研发，优化配方比例，提升产品质量</p>
+                        </div>
+                        <div class="application-card">
+                            <div class="app-icon">🎓</div>
+                            <h3>科研院所</h3>
+                            <p>为中医药研究提供数据分析工具，支持学术研究和论文发表</p>
+                        </div>
+                        <div class="application-card">
+                            <div class="app-icon">👨‍⚕️</div>
+                            <h3>中医诊所</h3>
+                            <p>帮助中医师进行个性化配方设计，提高诊疗效果</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 系统状态区域 -->
+                <section class="status-section">
+                    <h2 class="section-title">系统状态</h2>
+                    <div class="status-grid">
+                        <div class="status-card">
+                            <div class="status-icon">🔗</div>
+                            <h4>后端连接</h4>
+                            <p id="connection-status">检查中...</p>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-icon">👤</div>
+                            <h4>当前用户</h4>
+                            <p id="current-user">未登录</p>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-icon">🔑</div>
+                            <h4>用户权限</h4>
+                            <p id="user-role">未知</p>
+                        </div>
+                        <div class="status-card">
+                            <div class="status-icon">⚡</div>
+                            <h4>系统性能</h4>
+                            <p>运行正常</p>
+                        </div>
+                    </div>
+                </section>
             </div>
 
             <!-- 符号回归分析 -->
             <div id="regression" class="tab-content">
-                <h2>符号回归分析</h2>
+                <div class="regression-header">
+                    <div class="regression-icon">🧬</div>
+                    <h1 class="regression-title">符号回归分析</h1>
+                    <p class="regression-subtitle">智能算法驱动的"量-效关系"建模</p>
+                    <p class="regression-description">
+                        通过符号回归算法，将药材成分与药效关联转化为可读数学表达式，
+                        直观揭示"量-效关系"本质，筛选不同精度下的功效物质群。
+                    </p>
+                </div>
+
+            <!-- 符号表达式树（空页面） -->
+            <div id="expression-tree" class="tab-content">
+            </div>
                 <div class="analysis-section">
                     <div class="input-section">
                         <h3>数据输入</h3>
@@ -104,38 +407,114 @@
                             </div>
                         </div>
                         <div class="form-group">
-                            <label for="population-size">种群大小</label>
+                            <label for="population-size">配比方案数量</label>
                             <input type="number" id="population-size" value="100" min="10" max="1000">
                         </div>
                         <div class="form-group">
-                            <label for="generations">代数</label>
+                            <label for="generations">优化轮次</label>
                             <input type="number" id="generations" value="50" min="10" max="500">
                         </div>
-                        <button id="start-regression" class="btn-primary">开始分析</button>
+                        <div class="form-group">
+                            <label for="max-tree-depth">最大表达式树深度</label>
+                            <input type="number" id="max-tree-depth" value="35" min="1" max="100">
+                            <small class="form-help">控制符号回归生成的数学表达式树的最大深度</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="max-tree-length">最大表达式树长度</label>
+                            <input type="number" id="max-tree-length" value="35" min="1" max="100">
+                            <small class="form-help">控制符号回归生成的数学表达式树的最大节点数量</small>
+                        </div>
+                        <div class="form-group">
+                            <label>表达式语法选择</label>
+                            <div class="checkbox-group">
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="grammar-addition" value="addition" checked>
+                                    <label for="grammar-addition">加法运算 (+)</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="grammar-subtraction" value="subtraction" checked>
+                                    <label for="grammar-subtraction">减法运算 (-)</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="grammar-multiplication" value="multiplication" checked>
+                                    <label for="grammar-multiplication">乘法运算 (×)</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="grammar-division" value="division" checked>
+                                    <label for="grammar-division">除法运算 (÷)</label>
+                                </div>
+                            </div>
+                            <small class="form-help">选择符号回归表达式中允许的运算符类型</small>
+                        </div>
+                        <div class="form-group">
+                            <label>训练/测试集占比</label>
+                            <div class="split-slider">
+                                <input type="range" id="train-ratio" min="50" max="95" value="80" step="1">
+                                <div class="split-labels">
+                                    <span>训练集: <b id="train-ratio-label">80%</b></span>
+                                    <span>测试集: <b id="test-ratio-label">20%</b></span>
+                                </div>
+                            </div>
+                            <small class="form-help">拖动滑块以分配训练/测试集比例（总计100%）</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="set-seed-randomly">随机种子随机化</label>
+                            <select id="set-seed-randomly">
+                                <option value="false">固定种子（结果可重复）</option>
+                                <option value="true">随机种子（结果不可重复）</option>
+                            </select>
+                            <small class="form-help">控制随机数种子是否随机化，影响分析结果的可重复性</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="seed">随机数种子（Seed）</label>
+                            <div class="input-with-action">
+                                <input type="number" id="seed" value="42" step="1">
+                                <button id="regenerate-seed" class="btn-secondary btn-compact" title="重新生成随机种子">
+                                    <img src="assets/icons/feature/refresh.svg" alt="重新生成" style="width:16px;height:16px;vertical-align:middle;">
+                                </button>
+                            </div>
+                            <small class="form-help">当选择“随机种子（每次随机生成）”时，该输入框将禁用；可点击右侧按钮重新生成随机种子</small>
+                        </div>
+                        <div class="button-group">
+                            <button id="start-regression" class="btn-primary">开始分析</button>
+                            <button id="export-model" class="btn-secondary" disabled>导出模型</button>
+                        </div>
                     </div>
                     <div class="result-section">
                         <h3>分析结果</h3>
                         <div id="regression-results" class="results-container">
-                            <p>请先上传数据并开始分析</p>
+                            <h4>数据预览</h4>
+                            <div id="regression-data-preview" class="data-table"><p>请先上传数据</p></div>
+                            <h4 style="margin-top:16px;">建模结果</h4>
+                            <div id="regression-model-results"><p>请开始分析</p></div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 蒙特卡罗分析 -->
+            <!-- 蒙特卡洛采样 -->
             <div id="monte-carlo" class="tab-content">
-                <h2>蒙特卡罗分析</h2>
+                <div class="monte-carlo-header">
+                    <div class="monte-carlo-icon">🎲</div>
+                    <h1 class="monte-carlo-title">蒙特卡洛采样</h1>
+                    <p class="monte-carlo-subtitle">智能生成万级配比组合的采样引擎</p>
+                    <p class="monte-carlo-description">
+                        基于符号回归输出的数学描述符，智能生成大量样本点，
+                        从中筛选满足约束的可行配比方案，助力锁定最优均化方案。
+                    </p>
+                </div>
                 <div class="analysis-section">
                     <div class="input-section">
                         <h3>分析参数</h3>
                         <div class="form-group">
-                            <label for="mc-model">选择回归模型</label>
-                            <select id="mc-model">
-                                <option value="">请先完成符号回归分析</option>
+                            <label for="mc-data-model">选择数据模型</label>
+                            <select id="mc-data-model">
+                                <option value="">请选择数据模型</option>
                             </select>
+                            <small class="form-help">选择包含符号回归模型的数据模型进行蒙特卡洛采样</small>
                         </div>
                         <div class="form-group">
-                            <label for="mc-iterations">模拟次数</label>
+                            <label for="mc-iterations">采样次数</label>
                             <input type="number" id="mc-iterations" value="1000" min="100" max="10000">
                         </div>
                         <div class="form-group">
@@ -146,12 +525,26 @@
                             <label for="tolerance">容差</label>
                             <input type="number" id="tolerance" value="0.1" step="0.01" min="0.01">
                         </div>
-                        <button id="start-monte-carlo" class="btn-primary">开始分析</button>
+                        <div class="button-group mc-action-group">
+                            <button id="open-range-config" class="btn-secondary">设置变量范围</button>
+                            <button id="start-monte-carlo" class="btn-primary">开始分析</button>
+                        </div>
                     </div>
                     <div class="result-section">
                         <h3>分析结果</h3>
                         <div id="monte-carlo-results" class="results-container">
-                            <p>请先选择回归模型并设置参数</p>
+                            <div class="result-item">
+                                <h4>分析参数</h4>
+                                <div id="mc-params-view" class="params-grid"></div>
+                            </div>
+                            <div class="result-item">
+                                <h4>分析结果</h4>
+                                <div id="mc-summary-view" class="summary-grid"></div>
+                            </div>
+                            <div class="result-item">
+                                <h4>最佳药效（前10条）</h4>
+                                <div id="mc-top10-view" class="top10-grid"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -159,7 +552,21 @@
 
             <!-- 数据管理（管理员功能） -->
             <div id="data-management" class="tab-content">
-                <h2>数据管理</h2>
+                <div class="admin-header">
+                    <div class="admin-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 36 36">
+                            <path fill="#ccd6dd" d="M31 2H5a3 3 0 0 0-3 3v26a3 3 0 0 0 3 3h26a3 3 0 0 0 3-3V5a3 3 0 0 0-3-3"/>
+                            <path fill="#e1e8ed" d="M31 1H5a4 4 0 0 0-4 4v26a4 4 0 0 0 4 4h26a4 4 0 0 0 4-4V5a4 4 0 0 0-4-4m0 2c1.103 0 2 .897 2 2v4h-6V3zm-4 16h6v6h-6zm0-2v-6h6v6zM25 3v6h-6V3zm-6 8h6v6h-6zm0 8h6v6h-6zM17 3v6h-6V3zm-6 8h6v6h-6zm0 8h6v6h-6zM3 5c0-1.103.897-2 2-2h4v6H3zm0 6h6v6H3zm0 8h6v6H3zm2 14c-1.103 0-2-.897-2-2v-4h6v6zm6 0v-6h6v6zm8 0v-6h6v6zm12 0h-4v-6h6v4c0 1.103-.897 2-2 2"/>
+                            <path fill="#5c913b" d="M13 33H7V16a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2z"/>
+                            <path fill="#3b94d9" d="M29 33h-6V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2z"/>
+                            <path fill="#dd2e44" d="M21 33h-6V23a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="admin-title">数据管理</h1>
+                        <p class="admin-subtitle">系统数据导入、导出与管理</p>
+                    </div>
+                </div>
                 <div class="data-section">
                     <div class="data-actions">
                         <h3>数据操作</h3>
@@ -178,7 +585,15 @@
 
             <!-- 用户管理（管理员功能） -->
             <div id="user-management" class="tab-content">
-                <h2>用户管理</h2>
+                <div class="admin-header">
+                    <div class="admin-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 512 512"><path fill="#3b94d9" fill-rule="evenodd" d="M341.336 117.333c0 41.237-33.43 74.667-74.667 74.667s-74.666-33.43-74.666-74.667s33.429-74.666 74.666-74.666s74.667 33.429 74.667 74.666m-170.667 64c0 29.455-23.878 53.334-53.333 53.334s-53.333-23.879-53.333-53.334S87.88 128 117.336 128s53.333 23.878 53.333 53.333M42.669 320c0-35.346 28.654-64 64-64h21.334c2.578 0 5.122.152 7.621.449c-4.913 12.278-7.624 25.738-7.624 39.852v109.032H42.67zm290.249-64h59.26v22.837a88.8 88.8 0 0 1 28.127 16.267l19.804-11.433l29.629 51.32l-19.793 11.427a89.4 89.4 0 0 1 1.482 16.247a89.4 89.4 0 0 1-1.482 16.247l19.794 11.428l-29.63 51.32l-19.804-11.434a88.8 88.8 0 0 1-28.127 16.266v22.841h-59.26v-22.834a88.8 88.8 0 0 1-28.141-16.268l-19.791 11.426l-29.629-51.32l19.775-11.417a89.4 89.4 0 0 1-1.483-16.255c0-5.552.509-10.985 1.483-16.255l-19.775-11.417l29.63-51.32l19.789 11.426a88.8 88.8 0 0 1 28.142-16.269zm65.175 106.667c0 19.637-15.918 35.556-35.555 35.556s-35.556-15.919-35.556-35.556s15.919-35.555 35.556-35.555s35.555 15.918 35.555 35.555m-248.76-64.001c0-47.128 38.205-85.333 85.334-85.333h64c21.753 0 41.605 8.14 56.677 21.54c-67.284 3.796-120.675 59.56-120.675 127.793c0 14.961 2.567 29.322 7.284 42.667h-92.62z" clip-rule="evenodd"/></svg>
+                    </div>
+                    <div>
+                        <h1 class="admin-title">用户管理</h1>
+                        <p class="admin-subtitle">用户账户创建、权限管理</p>
+                    </div>
+                </div>
                 <div class="user-section">
                     <div class="user-actions">
                         <h3>用户操作</h3>
@@ -196,47 +611,232 @@
 
             <!-- 设置 -->
             <div id="settings" class="tab-content">
-                <h2>系统设置</h2>
+                <div class="settings-header">
+                    <div class="settings-icon">⚙️</div>
+                    <div>
+                        <h1 class="settings-title">系统设置</h1>
+                        <p class="settings-subtitle">应用程序配置与个性化</p>
+                    </div>
+                </div>
                 <div class="settings-section">
-                    <div class="form-group">
-                        <label for="backend-port">后端端口</label>
-                        <input type="number" id="backend-port" value="5000" min="1000" max="9999">
+                    <div class="settings-grid">
+                        <!-- 基础设置 -->
+                        <div class="settings-group">
+                        <h3 class="settings-group-title">🔧 基础设置</h3>
+                        <div class="settings-group-content">
+                            <div class="form-group">
+                                <label for="backend-port">后端端口</label>
+                                <input type="number" id="backend-port" value="5000" min="1000" max="9999">
+                            </div>
+                            <div class="form-group">
+                                <label for="auto-start-backend">
+                                    <input type="checkbox" id="auto-start-backend" checked>
+                                    自动启动后端服务
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label for="auto-reconnect">
+                                    <input type="checkbox" id="auto-reconnect" checked>
+                                    自动重连
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label for="connection-timeout">连接超时 (秒)</label>
+                                <input type="number" id="connection-timeout" value="30" min="5" max="300">
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="auto-start-backend">
-                            <input type="checkbox" id="auto-start-backend" checked>
-                            自动启动后端服务
-                        </label>
+
+                    <!-- 界面设置 -->
+                    <div class="settings-group">
+                        <h3 class="settings-group-title">🎨 界面设置</h3>
+                        <div class="settings-group-content">
+                            <div class="form-group">
+                                <label for="theme">主题</label>
+                                <select id="theme">
+                                    <option value="dark">深色主题</option>
+                                    <option value="light">浅色主题</option>
+                                    <option value="auto">跟随系统</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="language">语言</label>
+                                <select id="language">
+                                    <option value="zh-CN">中文简体</option>
+                                    <option value="zh-TW">中文繁体</option>
+                                    <option value="en-US">English</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="font-size">字体大小</label>
+                                <select id="font-size">
+                                    <option value="small">小</option>
+                                    <option value="medium" selected>中</option>
+                                    <option value="large">大</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="animation-speed">动画速度</label>
+                                <select id="animation-speed">
+                                    <option value="fast">快速</option>
+                                    <option value="normal" selected>正常</option>
+                                    <option value="slow">慢速</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="theme">主题</label>
-                        <select id="theme">
-                            <option value="dark">深色</option>
-                            <option value="light">浅色</option>
-                        </select>
+
+                    <!-- 数据设置 -->
+                    <div class="settings-group">
+                        <h3 class="settings-group-title">📊 数据设置</h3>
+                        <div class="settings-group-content">
+                            <div class="form-group">
+                                <label for="default-format">默认格式</label>
+                                <select id="default-format">
+                                    <option value="csv">CSV</option>
+                                    <option value="xlsx">Excel</option>
+                                    <option value="json">JSON</option>
+                                    <option value="txt">TXT</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="auto-save">
+                                    <input type="checkbox" id="auto-save">
+                                    自动保存
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label for="save-interval">保存间隔 (分钟)</label>
+                                <input type="number" id="save-interval" value="5" min="1" max="60">
+                            </div>
+                            <div class="form-group">
+                                <label for="max-file-size">最大文件大小 (MB)</label>
+                                <input type="number" id="max-file-size" value="50" min="1" max="500">
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="language">语言</label>
-                        <select id="language">
-                            <option value="zh-CN">中文</option>
-                            <option value="en-US">English</option>
-                        </select>
+
+                    <!-- 分析设置 -->
+                    <div class="settings-group">
+                        <h3 class="settings-group-title">🔬 分析设置</h3>
+                        <div class="settings-group-content">
+                            <div class="form-group">
+                                <label for="default-population">默认种群大小</label>
+                                <input type="number" id="default-population" value="100" min="10" max="1000">
+                            </div>
+                            <div class="form-group">
+                                <label for="default-generations">默认优化轮次</label>
+                                <input type="number" id="default-generations" value="50" min="10" max="500">
+                            </div>
+                            <div class="form-group">
+                                <label for="default-max-tree-depth">默认最大表达式树深度</label>
+                                <input type="number" id="default-max-tree-depth" value="35" min="1" max="100">
+                            </div>
+                            <div class="form-group">
+                                <label for="default-max-tree-length">默认最大表达式树长度</label>
+                                <input type="number" id="default-max-tree-length" value="35" min="1" max="100">
+                            </div>
+                            <div class="form-group">
+                                <label>默认表达式语法</label>
+                                <div class="checkbox-group">
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="default-grammar-addition" value="addition" checked>
+                                        <label for="default-grammar-addition">加法运算 (+)</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="default-grammar-subtraction" value="subtraction" checked>
+                                        <label for="default-grammar-subtraction">减法运算 (-)</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="default-grammar-multiplication" value="multiplication" checked>
+                                        <label for="default-grammar-multiplication">乘法运算 (×)</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="default-grammar-division" value="division" checked>
+                                        <label for="default-grammar-division">除法运算 (÷)</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="default-iterations">默认采样次数</label>
+                                <input type="number" id="default-iterations" value="1000" min="100" max="10000">
+                            </div>
+                            <div class="form-group">
+                                <label for="precision">计算精度</label>
+                                <select id="precision">
+                                    <option value="low">低精度</option>
+                                    <option value="medium" selected>中等精度</option>
+                                    <option value="high">高精度</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="default-format">默认格式</label>
-                        <select id="default-format">
-                            <option value="csv">CSV</option>
-                            <option value="xlsx">Excel</option>
-                            <option value="json">JSON</option>
-                        </select>
+
+                    <!-- 通知设置 -->
+                    <div class="settings-group">
+                        <h3 class="settings-group-title">🔔 通知设置</h3>
+                        <div class="settings-group-content">
+                            <div class="form-group">
+                                <label for="enable-notifications">
+                                    <input type="checkbox" id="enable-notifications" checked>
+                                    启用通知
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label for="notification-sound">
+                                    <input type="checkbox" id="notification-sound" checked>
+                                    通知声音
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label for="notification-duration">通知显示时间 (秒)</label>
+                                <input type="number" id="notification-duration" value="5" min="1" max="30">
+                            </div>
+                            <div class="form-group">
+                                <label for="notification-position">通知位置</label>
+                                <select id="notification-position">
+                                    <option value="top-right" selected>右上角</option>
+                                    <option value="top-left">左上角</option>
+                                    <option value="bottom-right">右下角</option>
+                                    <option value="bottom-left">左下角</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="auto-save">
-                            <input type="checkbox" id="auto-save">
-                            自动保存
-                        </label>
+
+                    <!-- 安全设置 -->
+                    <div class="settings-group">
+                        <h3 class="settings-group-title">🔒 安全设置</h3>
+                        <div class="settings-group-content">
+                            <div class="form-group">
+                                <label for="session-timeout">会话超时 (分钟)</label>
+                                <input type="number" id="session-timeout" value="30" min="5" max="480">
+                            </div>
+                            <div class="form-group">
+                                <label for="password-expiry">密码过期 (天)</label>
+                                <input type="number" id="password-expiry" value="90" min="30" max="365">
+                            </div>
+                            <div class="form-group">
+                                <label for="login-attempts">最大登录尝试次数</label>
+                                <input type="number" id="login-attempts" value="5" min="3" max="10">
+                            </div>
+                            <div class="form-group">
+                                <label for="enable-logging">
+                                    <input type="checkbox" id="enable-logging" checked>
+                                    启用操作日志
+                                </label>
+                            </div>
+                        </div>
                     </div>
-                    <button id="save-settings" class="btn-primary">保存设置</button>
+                </div>
+
+                <!-- 设置操作按钮 -->
+                <div class="settings-actions">
+                        <button id="save-settings" class="btn-primary">💾 保存设置</button>
+                        <button id="reset-settings" class="btn-secondary">🔄 重置默认</button>
+                        <button id="export-settings" class="btn-secondary">📤 导出配置</button>
+                        <button id="import-settings" class="btn-secondary">📥 导入配置</button>
+                    </div>
                 </div>
             </div>
         </main>

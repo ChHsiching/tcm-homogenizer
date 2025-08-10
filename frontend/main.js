@@ -1,6 +1,7 @@
-const { app, BrowserWindow, Menu, ipcMain, session } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, session, dialog } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
+const fs = require('fs');
 
 // 保持对窗口对象的全局引用，如果不这么做的话，当JavaScript对象被
 // 垃圾回收的时候，窗口会被自动地关闭
@@ -24,7 +25,7 @@ function createWindow() {
       webSecurity: false, // 禁用web安全，允许跨域请求
       allowRunningInsecureContent: true // 允许运行不安全内容
     },
-    icon: path.join(__dirname, 'assets/icon.png'), // 可选：应用图标
+    icon: path.join(__dirname, 'assets/icons/app/logo-full.png'), // 可选：应用图标
     title: '中药多组分均化分析客户端',
     show: false // 先不显示，等准备好再显示
   });
@@ -116,7 +117,7 @@ function createMenu() {
           }
         },
         {
-          label: '蒙特卡罗分析',
+          label: '蒙特卡洛采样分析',
           click: () => {
             mainWindow.webContents.send('menu-monte-carlo');
           }
@@ -161,3 +162,21 @@ ipcMain.handle('stop-backend', async () => {
   // 停止后端服务的逻辑
   return { success: true };
 }); 
+
+// 保存 ZIP 文件到用户指定位置
+ipcMain.handle('save-zip-file', async (event, { defaultFileName, buffer }) => {
+  try {
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: '保存数据包',
+      defaultPath: defaultFileName || 'model_package.zip',
+      filters: [{ name: 'ZIP 文件', extensions: ['zip'] }]
+    });
+    if (canceled || !filePath) {
+      return { success: false, canceled: true };
+    }
+    await fs.promises.writeFile(filePath, buffer);
+    return { success: true, filePath };
+  } catch (error) {
+    return { success: false, error: error?.message || String(error) };
+  }
+});
