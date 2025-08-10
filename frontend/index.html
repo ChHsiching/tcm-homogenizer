@@ -5,6 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>本草智配</title>
     <link rel="stylesheet" href="styles/main.css">
+    <!-- 成分名称对照表 -->
+    <script src="data/component_names.js"></script>
+    <!-- MathJax库 -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            },
+            chtml: {
+                scale: 1.2,
+                minScale: 1.0,
+                maxScale: 2.0
+            },
+            startup: {
+                pageReady: () => {
+                    return MathJax.startup.defaultPageReady().then(() => {
+                        console.log('MathJax加载完成');
+                    });
+                }
+            }
+        };
+    </script>
+    <script src="assets/libs/polyfill.min.js"></script>
+    <script id="MathJax-script" async src="assets/libs/mathjax.js"></script>
 </head>
 <body>
     <!-- 登录界面 -->
@@ -17,14 +47,14 @@
             <div id="first-run-message" class="first-run-message" style="display: none;">
                 <p>首次启动，请创建管理员账号</p>
             </div>
-            <form id="login-form">
+            <form id="login-form" class="login-form">
                 <div class="form-group">
                     <label for="username">用户名</label>
-                    <input type="text" id="username" name="username" required>
+                    <input type="text" id="username" name="username" required placeholder="请输入用户名">
                 </div>
                 <div class="form-group">
                     <label for="password">密码</label>
-                    <input type="password" id="password" name="password" required>
+                    <input type="password" id="password" name="password" required placeholder="请输入密码">
                 </div>
                 <div class="form-group">
                     <button type="submit" id="login-btn">登录</button>
@@ -53,7 +83,13 @@
         <!-- 导航菜单 -->
         <nav class="nav-menu">
             <button class="nav-btn active" data-tab="home">首页</button>
-            <button class="nav-btn" data-tab="regression">符号回归</button>
+            <div class="nav-dropdown">
+                <button class="nav-btn" data-tab="regression">符号回归</button>
+                <div class="dropdown-menu">
+                    <button class="dropdown-item" data-tab="regression">符号回归</button>
+                    <button class="dropdown-item" data-tab="expression-tree">符号表达式树</button>
+                </div>
+            </div>
             <button class="nav-btn" data-tab="monte-carlo">蒙特卡洛采样</button>
             <button class="nav-btn admin-only" data-tab="data-management">数据管理</button>
             <button class="nav-btn admin-only" data-tab="user-management">用户管理</button>
@@ -87,14 +123,12 @@
                         </div>
                         <div class="hero-visual">
                             <div class="hero-animation">
-                                <div class="molecule-container">
-                                    <div class="molecule">
-                                        <div class="atom" style="--delay: 0s"></div>
-                                        <div class="atom" style="--delay: 0.2s"></div>
-                                        <div class="atom" style="--delay: 0.4s"></div>
-                                        <div class="atom" style="--delay: 0.6s"></div>
-                                        <div class="atom" style="--delay: 0.8s"></div>
-                                    </div>
+                                <div class="brand-orbit">
+                                    <div class="logo-glow-inside"></div>
+                                    <img src="assets/icons/icon.svg" alt="本草智配" class="brand-logo"/>
+                                    <div class="orbit-dot" style="--angle: 0deg; --delay: 0s"></div>
+                                    <div class="orbit-dot" style="--angle: 120deg; --delay: 0.15s"></div>
+                                    <div class="orbit-dot" style="--angle: 240deg; --delay: 0.3s"></div>
                                 </div>
                             </div>
                         </div>
@@ -166,7 +200,7 @@
                             </div>
                             <div class="function-tech">
                                 <span class="tech-tag tech-numpy">
-                                    <i class="tech-icon">🔢</i>
+                                    <img src="assets/Numpy.svg" alt="NumPy" class="tech-icon">
                                     NumPy
                                 </span>
                                 <span class="tech-tag tech-scipy">
@@ -349,6 +383,10 @@
                         直观揭示"量-效关系"本质，筛选不同精度下的功效物质群。
                     </p>
                 </div>
+
+            <!-- 符号表达式树（空页面） -->
+            <div id="expression-tree" class="tab-content">
+            </div>
                 <div class="analysis-section">
                     <div class="input-section">
                         <h3>数据输入</h3>
@@ -376,12 +414,79 @@
                             <label for="generations">优化轮次</label>
                             <input type="number" id="generations" value="50" min="10" max="500">
                         </div>
-                        <button id="start-regression" class="btn-primary">开始分析</button>
+                        <div class="form-group">
+                            <label for="max-tree-depth">最大表达式树深度</label>
+                            <input type="number" id="max-tree-depth" value="35" min="1" max="100">
+                            <small class="form-help">控制符号回归生成的数学表达式树的最大深度</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="max-tree-length">最大表达式树长度</label>
+                            <input type="number" id="max-tree-length" value="35" min="1" max="100">
+                            <small class="form-help">控制符号回归生成的数学表达式树的最大节点数量</small>
+                        </div>
+                        <div class="form-group">
+                            <label>表达式语法选择</label>
+                            <div class="checkbox-group">
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="grammar-addition" value="addition" checked>
+                                    <label for="grammar-addition">加法运算 (+)</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="grammar-subtraction" value="subtraction" checked>
+                                    <label for="grammar-subtraction">减法运算 (-)</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="grammar-multiplication" value="multiplication" checked>
+                                    <label for="grammar-multiplication">乘法运算 (×)</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="grammar-division" value="division" checked>
+                                    <label for="grammar-division">除法运算 (÷)</label>
+                                </div>
+                            </div>
+                            <small class="form-help">选择符号回归表达式中允许的运算符类型</small>
+                        </div>
+                        <div class="form-group">
+                            <label>训练/测试集占比</label>
+                            <div class="split-slider">
+                                <input type="range" id="train-ratio" min="50" max="95" value="80" step="1">
+                                <div class="split-labels">
+                                    <span>训练集: <b id="train-ratio-label">80%</b></span>
+                                    <span>测试集: <b id="test-ratio-label">20%</b></span>
+                                </div>
+                            </div>
+                            <small class="form-help">拖动滑块以分配训练/测试集比例（总计100%）</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="set-seed-randomly">随机种子随机化</label>
+                            <select id="set-seed-randomly">
+                                <option value="false">固定种子（结果可重复）</option>
+                                <option value="true">随机种子（结果不可重复）</option>
+                            </select>
+                            <small class="form-help">控制随机数种子是否随机化，影响分析结果的可重复性</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="seed">随机数种子（Seed）</label>
+                            <div class="input-with-action">
+                                <input type="number" id="seed" value="42" step="1">
+                                <button id="regenerate-seed" class="btn-secondary btn-compact" title="重新生成随机种子">
+                                    <img src="assets/refresh.svg" alt="重新生成" style="width:16px;height:16px;vertical-align:middle;">
+                                </button>
+                            </div>
+                            <small class="form-help">当选择“随机种子（每次随机生成）”时，该输入框将禁用；可点击右侧按钮重新生成随机种子</small>
+                        </div>
+                        <div class="button-group">
+                            <button id="start-regression" class="btn-primary">开始分析</button>
+                            <button id="export-model" class="btn-secondary" disabled>导出模型</button>
+                        </div>
                     </div>
                     <div class="result-section">
                         <h3>分析结果</h3>
                         <div id="regression-results" class="results-container">
-                            <p>请先上传数据并开始分析</p>
+                            <h4>数据预览</h4>
+                            <div id="regression-data-preview" class="data-table"><p>请先上传数据</p></div>
+                            <h4 style="margin-top:16px;">建模结果</h4>
+                            <div id="regression-model-results"><p>请开始分析</p></div>
                         </div>
                     </div>
                 </div>
@@ -402,10 +507,11 @@
                     <div class="input-section">
                         <h3>分析参数</h3>
                         <div class="form-group">
-                            <label for="mc-model">选择回归模型</label>
-                            <select id="mc-model">
-                                <option value="">请先完成符号回归分析</option>
+                            <label for="mc-data-model">选择数据模型</label>
+                            <select id="mc-data-model">
+                                <option value="">请选择数据模型</option>
                             </select>
+                            <small class="form-help">选择包含符号回归模型的数据模型进行蒙特卡洛采样</small>
                         </div>
                         <div class="form-group">
                             <label for="mc-iterations">采样次数</label>
@@ -419,12 +525,26 @@
                             <label for="tolerance">容差</label>
                             <input type="number" id="tolerance" value="0.1" step="0.01" min="0.01">
                         </div>
-                        <button id="start-monte-carlo" class="btn-primary">开始分析</button>
+                        <div class="button-group mc-action-group">
+                            <button id="open-range-config" class="btn-secondary">设置变量范围</button>
+                            <button id="start-monte-carlo" class="btn-primary">开始分析</button>
+                        </div>
                     </div>
                     <div class="result-section">
                         <h3>分析结果</h3>
                         <div id="monte-carlo-results" class="results-container">
-                            <p>请先选择回归模型并设置参数</p>
+                            <div class="result-item">
+                                <h4>分析参数</h4>
+                                <div id="mc-params-view" class="params-grid"></div>
+                            </div>
+                            <div class="result-item">
+                                <h4>分析结果</h4>
+                                <div id="mc-summary-view" class="summary-grid"></div>
+                            </div>
+                            <div class="result-item">
+                                <h4>最佳药效（前10条）</h4>
+                                <div id="mc-top10-view" class="top10-grid"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -433,7 +553,15 @@
             <!-- 数据管理（管理员功能） -->
             <div id="data-management" class="tab-content">
                 <div class="admin-header">
-                    <div class="admin-icon">📊</div>
+                    <div class="admin-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 36 36">
+                            <path fill="#ccd6dd" d="M31 2H5a3 3 0 0 0-3 3v26a3 3 0 0 0 3 3h26a3 3 0 0 0 3-3V5a3 3 0 0 0-3-3"/>
+                            <path fill="#e1e8ed" d="M31 1H5a4 4 0 0 0-4 4v26a4 4 0 0 0 4 4h26a4 4 0 0 0 4-4V5a4 4 0 0 0-4-4m0 2c1.103 0 2 .897 2 2v4h-6V3zm-4 16h6v6h-6zm0-2v-6h6v6zM25 3v6h-6V3zm-6 8h6v6h-6zm0 8h6v6h-6zM17 3v6h-6V3zm-6 8h6v6h-6zm0 8h6v6h-6zM3 5c0-1.103.897-2 2-2h4v6H3zm0 6h6v6H3zm0 8h6v6H3zm2 14c-1.103 0-2-.897-2-2v-4h6v6zm6 0v-6h6v6zm8 0v-6h6v6zm12 0h-4v-6h6v4c0 1.103-.897 2-2 2"/>
+                            <path fill="#5c913b" d="M13 33H7V16a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2z"/>
+                            <path fill="#3b94d9" d="M29 33h-6V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2z"/>
+                            <path fill="#dd2e44" d="M21 33h-6V23a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2z"/>
+                        </svg>
+                    </div>
                     <div>
                         <h1 class="admin-title">数据管理</h1>
                         <p class="admin-subtitle">系统数据导入、导出与管理</p>
@@ -458,7 +586,9 @@
             <!-- 用户管理（管理员功能） -->
             <div id="user-management" class="tab-content">
                 <div class="admin-header">
-                    <div class="admin-icon">👥</div>
+                    <div class="admin-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 512 512"><path fill="#3b94d9" fill-rule="evenodd" d="M341.336 117.333c0 41.237-33.43 74.667-74.667 74.667s-74.666-33.43-74.666-74.667s33.429-74.666 74.666-74.666s74.667 33.429 74.667 74.666m-170.667 64c0 29.455-23.878 53.334-53.333 53.334s-53.333-23.879-53.333-53.334S87.88 128 117.336 128s53.333 23.878 53.333 53.333M42.669 320c0-35.346 28.654-64 64-64h21.334c2.578 0 5.122.152 7.621.449c-4.913 12.278-7.624 25.738-7.624 39.852v109.032H42.67zm290.249-64h59.26v22.837a88.8 88.8 0 0 1 28.127 16.267l19.804-11.433l29.629 51.32l-19.793 11.427a89.4 89.4 0 0 1 1.482 16.247a89.4 89.4 0 0 1-1.482 16.247l19.794 11.428l-29.63 51.32l-19.804-11.434a88.8 88.8 0 0 1-28.127 16.266v22.841h-59.26v-22.834a88.8 88.8 0 0 1-28.141-16.268l-19.791 11.426l-29.629-51.32l19.775-11.417a89.4 89.4 0 0 1-1.483-16.255c0-5.552.509-10.985 1.483-16.255l-19.775-11.417l29.63-51.32l19.789 11.426a88.8 88.8 0 0 1 28.142-16.269zm65.175 106.667c0 19.637-15.918 35.556-35.555 35.556s-35.556-15.919-35.556-35.556s15.919-35.555 35.556-35.555s35.555 15.918 35.555 35.555m-248.76-64.001c0-47.128 38.205-85.333 85.334-85.333h64c21.753 0 41.605 8.14 56.677 21.54c-67.284 3.796-120.675 59.56-120.675 127.793c0 14.961 2.567 29.322 7.284 42.667h-92.62z" clip-rule="evenodd"/></svg>
+                    </div>
                     <div>
                         <h1 class="admin-title">用户管理</h1>
                         <p class="admin-subtitle">用户账户创建、权限管理</p>
@@ -597,6 +727,35 @@
                             <div class="form-group">
                                 <label for="default-generations">默认优化轮次</label>
                                 <input type="number" id="default-generations" value="50" min="10" max="500">
+                            </div>
+                            <div class="form-group">
+                                <label for="default-max-tree-depth">默认最大表达式树深度</label>
+                                <input type="number" id="default-max-tree-depth" value="35" min="1" max="100">
+                            </div>
+                            <div class="form-group">
+                                <label for="default-max-tree-length">默认最大表达式树长度</label>
+                                <input type="number" id="default-max-tree-length" value="35" min="1" max="100">
+                            </div>
+                            <div class="form-group">
+                                <label>默认表达式语法</label>
+                                <div class="checkbox-group">
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="default-grammar-addition" value="addition" checked>
+                                        <label for="default-grammar-addition">加法运算 (+)</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="default-grammar-subtraction" value="subtraction" checked>
+                                        <label for="default-grammar-subtraction">减法运算 (-)</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="default-grammar-multiplication" value="multiplication" checked>
+                                        <label for="default-grammar-multiplication">乘法运算 (×)</label>
+                                    </div>
+                                    <div class="checkbox-item">
+                                        <input type="checkbox" id="default-grammar-division" value="division" checked>
+                                        <label for="default-grammar-division">除法运算 (÷)</label>
+                                    </div>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label for="default-iterations">默认采样次数</label>
