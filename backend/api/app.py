@@ -10,7 +10,7 @@ import traceback
 from loguru import logger
 import os
 
-from .routes import symbolic_regression_bp, monte_carlo_bp, data_bp
+from .routes import symbolic_regression_bp, monte_carlo_bp, data_bp, data_models_bp
 from .auth import auth_bp
 
 def create_app(config=None):
@@ -44,6 +44,7 @@ def create_app(config=None):
     app.register_blueprint(symbolic_regression_bp, url_prefix='/api/regression')
     app.register_blueprint(monte_carlo_bp, url_prefix='/api/monte-carlo-sampling')
     app.register_blueprint(data_bp, url_prefix='/api/data')
+    app.register_blueprint(data_models_bp, url_prefix='/api/data-models')
     
     # 全局错误处理
     @app.errorhandler(Exception)
@@ -93,7 +94,8 @@ def create_app(config=None):
                 'health': '/api/health',
                 'regression': '/api/regression',
                 'monte_carlo_sampling': '/api/monte-carlo-sampling',
-                'data': '/api/data'
+                'data': '/api/data',
+                'data_models': '/api/data-models'
             }
         })
     
