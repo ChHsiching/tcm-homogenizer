@@ -1,0 +1,85 @@
+\documentclass[class=minimal,border=0pt]{standalone}
+\usepackage{tikz}
+\begin{document}
+\begin{tikzpicture}
+\def\ws{1}
+\def\hs{0.7}
+\node (0) at (\ws*58,\hs*0) {Prog};
+\node (1) at (\ws*58,\hs*-4.2) {RPB};
+\node (2) at (\ws*58,\hs*-8.4) {+};
+\node (3) at (\ws*52,\hs*-12.6) {*};
+\node (4) at (\ws*62,\hs*-12.6) {9.3054E-001};
+\node (5) at (\ws*48,\hs*-16.8) {+};
+\node (6) at (\ws*58,\hs*-16.8) {5.3559E-003};
+\node (7) at (\ws*35,\hs*-21) {-};
+\node (8) at (\ws*60,\hs*-21) {/};
+\node (9) at (\ws*25,\hs*-25.2) {/};
+\node (10) at (\ws*45,\hs*-25.2) {/};
+\node (11) at (\ws*55,\hs*-25.2) {1.2192E+000 VR};
+\node (12) at (\ws*65,\hs*-25.2) {-};
+\node (13) at (\ws*20,\hs*-29.4) {*};
+\node (14) at (\ws*30,\hs*-29.4) {2.9628E+000 VR};
+\node (15) at (\ws*40,\hs*-29.4) {2.6756E+000};
+\node (16) at (\ws*50,\hs*-29.4) {4.0832E-001 HYP};
+\node (17) at (\ws*60,\hs*-29.4) {5.4189E+000};
+\node (18) at (\ws*70,\hs*-29.4) {1.9105E+000 HYP};
+\node (19) at (\ws*10,\hs*-33.6) {+};
+\node (20) at (\ws*30,\hs*-33.6) {+};
+\node (21) at (\ws*5,\hs*-37.8) {1.9105E+000 HYP};
+\node (22) at (\ws*15,\hs*-37.8) {-};
+\node (23) at (\ws*25,\hs*-37.8) {-1.9323E+000};
+\node (24) at (\ws*35,\hs*-37.8) {*};
+\node (25) at (\ws*10,\hs*-42) {+};
+\node (26) at (\ws*20,\hs*-42) {-1.0458E+001};
+\node (27) at (\ws*30,\hs*-42) {-7.8141E-002 MA};
+\node (28) at (\ws*40,\hs*-42) {+};
+\node (29) at (\ws*5,\hs*-46.2) {+};
+\node (30) at (\ws*15,\hs*-46.2) {1.2977E+000 CA};
+\node (31) at (\ws*35,\hs*-46.2) {+};
+\node (32) at (\ws*45,\hs*-46.2) {6.0783E-001 UA};
+\node (33) at (\ws*0,\hs*-50.4) {6.0150E-001 QA};
+\node (34) at (\ws*10,\hs*-50.4) {4.2745E-001 HYP};
+\node (35) at (\ws*30,\hs*-50.4) {+};
+\node (36) at (\ws*40,\hs*-50.4) {5.9744E-001 UA};
+\node (37) at (\ws*25,\hs*-54.6) {-1.9323E+000};
+\node (38) at (\ws*35,\hs*-54.6) {1.4812E+000 OA};
+\draw (0) -- (1);
+\draw (1) -- (2);
+\draw (2) -- (3);
+\draw (2) -- (4);
+\draw (3) -- (5);
+\draw (3) -- (6);
+\draw (5) -- (7);
+\draw (5) -- (8);
+\draw (7) -- (9);
+\draw (7) -- (10);
+\draw (8) -- (11);
+\draw (8) -- (12);
+\draw (9) -- (13);
+\draw (9) -- (14);
+\draw (10) -- (15);
+\draw (10) -- (16);
+\draw (12) -- (17);
+\draw (12) -- (18);
+\draw (13) -- (19);
+\draw (13) -- (20);
+\draw (19) -- (21);
+\draw (19) -- (22);
+\draw (20) -- (23);
+\draw (20) -- (24);
+\draw (22) -- (25);
+\draw (22) -- (26);
+\draw (24) -- (27);
+\draw (24) -- (28);
+\draw (25) -- (29);
+\draw (25) -- (30);
+\draw (28) -- (31);
+\draw (28) -- (32);
+\draw (29) -- (33);
+\draw (29) -- (34);
+\draw (31) -- (35);
+\draw (31) -- (36);
+\draw (35) -- (37);
+\draw (35) -- (38);
+\end{tikzpicture}
+\end{document}

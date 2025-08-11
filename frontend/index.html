@@ -514,7 +514,7 @@
                         </div>
                     </div>
                     <div class="expr-right" id="expr-right-panel">
-                        <div class="expr-card expr-formula-card" id="expr-formula-card">
+                        <div class="expr-card expr-formula-card" id="expr-formula-card" style="min-width:0;">
                             <h3>回归表达式</h3>
                             <div id="expr-formula-container" class="results-container">
                                 <p>加载中...</p>
@@ -523,7 +523,9 @@
                         <div class="expr-card expr-tree-card">
                             <h3>表达式树</h3>
                             <div id="expression-tree-canvas" class="results-container">
-                                <p>即将展示符号表达式树</p>
+                                <div class="expr-tree-inner">
+                                    <p>即将展示符号表达式树</p>
+                                </div>
                             </div>
                         </div>
                         <div class="expr-card expr-feature-card">
@@ -926,6 +928,8 @@
 
     <script src="scripts/auth.js"></script>
     <script src="scripts/renderer.js"></script>
+    <!-- 符号表达式树：解析/AST/规范化（步骤一） -->
+    <script src="scripts/exprTree.js"></script>
     <script>
         // 调试脚本
         console.log('主页面脚本加载完成');

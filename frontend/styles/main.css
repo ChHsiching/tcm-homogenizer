@@ -927,6 +927,7 @@ input.readonly-not-allowed {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    min-width: 0; /* 允许右侧列在Grid中收缩，避免被内容撑爆 */
 }
 
 .expr-card {
@@ -936,6 +937,7 @@ input.readonly-not-allowed {
     padding: 16px;
     /* 自适应高度 */
     min-height: 0;
+    min-width: 0; /* 防止长内容撑破网格列 */
 }
 
 .expr-card h3 {
@@ -964,6 +966,8 @@ input.readonly-not-allowed {
 
 #expr-formula-card .regression-formula {
     overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
 }
 
 /* 让右上“回归表达式”根据内容自适应高度，而不是继承 results-container 的网格最小高度 */
@@ -971,6 +975,7 @@ input.readonly-not-allowed {
     min-height: 0 !important;
     display: block !important;
     padding: 12px;
+    min-width: 0; /* 保证内部滚动而不是撑开列 */
 }
 
 /* 右侧三个同级模块统一取消通用容器的最小高度和网格布局，避免多余空白 */
@@ -980,9 +985,26 @@ input.readonly-not-allowed {
     padding: 12px;
 }
 
-/* 表达式树画布的占位高度（仅空态下给出合理可视区） */
+/* 表达式树画布区域：内容水平/垂直居中，必要时可滚动 */
 #expression-tree-canvas {
-    min-height: 220px;
+    min-height: 360px;
+    display: block !important;
+    position: relative;
+    overflow: visible; /* 允许子容器撑开，可见 */
+}
+
+#expression-tree-canvas .expr-tree-inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    min-height: 360px;
+}
+
+#expression-tree-canvas .expr-tree-inner svg {
+    display: block;
+    margin: 0 auto;
 }
 
 .input-section, .result-section {
@@ -991,6 +1013,7 @@ input.readonly-not-allowed {
     border-radius: 8px;
     border: 1px solid var(--border-color);
     height: 100%;
+    overflow: hidden; /* 防止内部 result-item 溢出 */
 }
 
 .input-section h3, .result-section h3 {
@@ -1319,6 +1342,8 @@ input[type="checkbox"]:focus {
     background: var(--bg-secondary);
     border-radius: 5px;
     border: 1px solid var(--border-color);
+    max-width: 100%;    /* 不超出父容器宽度 */
+    overflow: hidden;   /* 裁剪内部溢出 */
 }
 
 .result-item h4 {
@@ -1338,7 +1363,7 @@ input[type="checkbox"]:focus {
 /* MathJax公式渲染容器 */
 .regression-formula-container {
     max-height: 400px;
-    overflow: auto;
+    overflow: hidden; /* 外层不滚动，内部公式单独滚动 */
     border: 1px solid var(--border-color);
     border-radius: 6px;
     background: var(--bg-tertiary);
@@ -1353,6 +1378,9 @@ input[type="checkbox"]:focus {
     background: var(--bg-secondary);
     border-radius: 8px;
     border: 1px solid var(--border-color);
+    overflow-x: auto;      /* 横向滚动 */
+    overflow-y: hidden;
+    white-space: nowrap;   /* 保证横向滚动有效 */
 }
 
 .regression-formula .MathJax {
@@ -1370,6 +1398,8 @@ input[type="checkbox"]:focus {
     background: var(--bg-secondary);
     border-radius: 8px;
     border: 1px solid var(--border-color);
+    max-height: 240px;      /* 固定可视高度 */
+    overflow-y: auto;       /* 内容超出时竖向滚动 */
 }
 
 .regression-constants h5 {
@@ -1384,6 +1414,7 @@ input[type="checkbox"]:focus {
     gap: 10px;
     font-family: 'Courier New', monospace;
     font-size: 13px;
+    align-content: start;   /* 当出现滚动条时，让网格从顶部开始排布 */
 }
 
 .regression-constants .constant-item {

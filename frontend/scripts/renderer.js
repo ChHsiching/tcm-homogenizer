@@ -432,7 +432,7 @@ function switchTab(tabName) {
     }, 100);
 }
 
-// 渲染“符号表达式树”页面（按专用布局分别填充左右区域）
+// 渲染"符号表达式树"页面（按专用布局分别填充左右区域）
 async function renderExpressionTreePage() {
     const perfContainer = document.getElementById('expr-performance-container');
     const detailedContainer = document.getElementById('expr-detailed-container');
@@ -445,62 +445,342 @@ async function renderExpressionTreePage() {
         detailedContainer.innerHTML = '';
         formulaContainer.innerHTML = '';
         featureContainer.innerHTML = '';
-        // 优先使用最新一次回归结果；否则尝试使用最新数据模型
-        let summaryPayload = null;
+        // 优先使用最新一次回归结果；否则直接从数据库获取最新数据
+        let summary = null;
         if (window.currentRegressionResult) {
-            summaryPayload = { model: window.currentRegressionResult };
+            // 统一改为：即使有当前回归结果，也从数据库取回归文件，保证与数据库一致
+            try {
+                const modelId = window.currentRegressionResult.data_model_id;
+                if (modelId) {
+                    const regResp = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}/files/regression_model`);
+                    if (regResp.ok) {
+                        const regJson = await regResp.json();
+                        if (regJson && regJson.success && regJson.content) {
+                            const reg = JSON.parse(regJson.content);
+                            summary = {
+                                id: modelId,
+                                data_model_id: modelId,
+                                expression: reg.expression_text || reg.expression || '0',
+                                expression_latex: reg.expression_latex || '',
+                                target_variable: reg.target_variable || 'HDL',
+                                constants: reg.constants || {},
+                                r2: reg.r2 || 0,
+                                mse: reg.mse || 0,
+                                feature_importance: reg.feature_importance || [],
+                                detailed_metrics: reg.detailed_metrics || {},
+                                created_at: reg.created_at || Date.now()
+                            };
+                            console.log('✅ 从数据库获取到当前回归结果的模型数据:', modelId);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('从数据库加载当前回归结果模型失败:', err);
+            }
         } else {
-            // 回退：请求后端获取最新数据模型（按时间排序返回的第一个）
-            const resp = await fetch(`${API_BASE_URL}/api/data-models/models`);
-            if (resp.ok) {
-                const listJson = await resp.json();
-                if (listJson && listJson.success && Array.isArray(listJson.models) && listJson.models.length > 0) {
-                    const latest = listJson.models[0];
-                    summaryPayload = { model_id: latest.id };
+            // 没有当前回归结果，直接从数据库获取最新数据
+            try {
+                const resp = await fetch(`${API_BASE_URL}/api/data-models/models`);
+                if (resp.ok) {
+                    const listJson = await resp.json();
+                    if (listJson && listJson.success && Array.isArray(listJson.models) && listJson.models.length > 0) {
+                        const latest = listJson.models[0];
+                        const modelId = latest.id;
+                        // 直接从数据库获取回归模型文件内容
+                        const regResp = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}/files/regression_model`);
+                        if (regResp.ok) {
+                            const regJson = await regResp.json();
+                            if (regJson && regJson.success && regJson.content) {
+                                const reg = JSON.parse(regJson.content);
+                                // 构造完整的摘要数据
+                                summary = {
+                                    id: modelId,
+                                    data_model_id: modelId,
+                                    expression: reg.expression_text || reg.expression || '0',
+                                    expression_latex: reg.expression_latex || '',
+                                    target_variable: reg.target_variable || 'HDL',
+                                    constants: reg.constants || {},
+                                    r2: reg.r2 || 0,
+                                    mse: reg.mse || 0,
+                                    feature_importance: reg.feature_importance || [],
+                                    detailed_metrics: reg.detailed_metrics || {},
+                                    created_at: reg.created_at || Date.now()
+                                };
+                                console.log('✅ 从数据库获取到最新数据:', modelId);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('从数据库获取数据失败:', error);
+            }
+        }
+        // 兜底：如果从数据库没有获取到数据，才使用后端模拟数据
+        if (!summary) {
+            console.warn('⚠️ 数据库中没有找到任何符号回归模型，无法渲染表达式树');
+            showNotification('数据库中没有找到符号回归模型，请先在"符号回归"页面完成一次分析', 'warning');
+            perfContainer.innerHTML = '<p class="text-muted">暂无模型</p>';
+            detailedContainer.innerHTML = '<p class="text-muted">暂无</p>';
+            formulaContainer.innerHTML = '<p class="text-muted">暂无公式</p>';
+            featureContainer.innerHTML = '<p class="text-muted">暂无特征权重</p>';
+            return;
+        }
+        // 确保数据完整性：验证expression字段
+        if (!summary.expression || summary.expression === '0') {
+            console.warn('⚠️ 数据不完整，尝试重新获取');
+            // 如果有模型ID，尝试重新获取数据
+            if (summary.id || summary.data_model_id) {
+                try {
+                    const modelId = summary.id || summary.data_model_id;
+                    const regResp = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}/files/regression_model`);
+                    if (regResp.ok) {
+                        const regJson = await regResp.json();
+                        if (regJson && regJson.success && regJson.content) {
+                            const reg = JSON.parse(regJson.content);
+                            summary.expression = reg.expression_text || reg.expression || summary.expression;
+                            console.log('✅ 重新获取到表达式数据:', summary.expression);
+                        }
+                    }
+                } catch (error) {
+                    console.error('重新获取数据失败:', error);
                 }
             }
         }
-
-        let summary = await fetchExpressionTreeSummary(summaryPayload);
-        // 兜底：若没有特征权重，尝试从最新数据模型的回归文件拉取
-        if (!summary || !Array.isArray(summary.feature_importance) || summary.feature_importance.length === 0) {
-            try {
-                let modelId = null;
-                // 优先使用当前回归结果的 model_id
-                modelId = window.currentRegressionResult?.data_model_id || null;
-                // 若 summary.id 看起来像数据模型ID，则直接使用
-                if (!modelId && typeof summary?.id === 'string' && summary.id.startsWith('model_')) {
-                    modelId = summary.id;
-                }
-                // 再次兜底：取最新模型
-                if (!modelId) {
-                    const resp = await fetch(`${API_BASE_URL}/api/data-models/models`);
-                    const json = await resp.json();
-                    if (json && json.success && Array.isArray(json.models) && json.models.length > 0) {
-                        modelId = json.models[0].id;
-                    }
-                }
-                if (modelId) {
-                    const regResp = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}/files/regression_model`);
-                    const regJson = await regResp.json();
-                    if (regJson && regJson.success && regJson.content) {
-                        const reg = JSON.parse(regJson.content);
-                        if (Array.isArray(reg.feature_importance) && reg.feature_importance.length > 0) {
-                            summary.feature_importance = reg.feature_importance;
-                        }
-                        if (reg.detailed_metrics && !summary.detailed_metrics) {
-                            summary.detailed_metrics = reg.detailed_metrics;
-                        }
-                    }
-                }
-            } catch (_) {}
+        // 统一使用数据库中的 MathJax 作为单一真源来驱动 SVG：将 LaTeX 转为中缀
+        if (summary.expression_latex) {
+            const normalized = latexToInfix(summary.expression_latex, summary.constants);
+            if (normalized) summary.expression = normalized;
         }
+        // 显示摘要信息
         displayExpressionTreeSummary(summary);
+        // 渲染表达式树
+        try {
+            renderExpressionTreeSVG(summary);
+        } catch (e) {
+            const canvas = document.getElementById('expression-tree-canvas');
+            if (canvas) canvas.innerHTML = `<p class="text-muted">表达式树渲染失败：${e.message}</p>`;
+        }
+        // 添加自动刷新功能：每5分钟自动刷新一次数据
+        if (window.__exprTreeAutoRefreshTimer__) {
+            clearInterval(window.__exprTreeAutoRefreshTimer__);
+        }
+        window.__exprTreeAutoRefreshTimer__ = setInterval(async () => {
+            console.log('🔄 自动刷新表达式树数据...');
+            try {
+                await renderExpressionTreePage();
+                showNotification('表达式树数据已自动刷新', 'info');
+            } catch (error) {
+                console.error('自动刷新失败:', error);
+            }
+        }, 5 * 60 * 1000); // 5分钟
     } catch (e) {
         console.error('表达式树概览加载失败', e);
         perfContainer.innerHTML = `<p class="text-muted">加载失败：${e.message}</p>`;
         showNotification('表达式树概览加载失败: ' + e.message, 'error');
     }
+}
+// LaTeX 转中缀表达式（全局复用，保持 SVG 与上方公式同源）
+function latexToInfix(latex, constantsMap) {
+  if (!latex || typeof latex !== 'string') return '';
+  let s = String(latex);
+  s = s.replace(/\r?\n/g, ' ');
+  const endIdx = s.indexOf('\\end{align*}');
+  if (endIdx !== -1) s = s.slice(0, endIdx);
+  const eqMatch = s.match(/&\s*=\s*(.*)$/) || s.match(/&=\s*(.*)$/);
+  if (eqMatch) s = eqMatch[1];
+  s = s.replace(/\\begin\{align\*\}/g, '')
+       .replace(/\\nonumber/g, '')
+       .replace(/\\;/g, ' ')
+       .trim();
+  function findMatchingBrace(str, startIdx) {
+    let depth = 0;
+    for (let i = startIdx; i < str.length; i++) {
+      const ch = str[i];
+      if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) return i;
+      }
+    }
+    return -1;
+  }
+  function replaceFirstCfrac(str) {
+    const tag = '\\cfrac';
+    const i = str.indexOf(tag);
+    if (i === -1) return str;
+    const aStart = str.indexOf('{', i + tag.length);
+    if (aStart === -1) return str;
+    const aEnd = findMatchingBrace(str, aStart);
+    if (aEnd === -1) return str;
+    const bStart = str.indexOf('{', aEnd + 1);
+    if (bStart === -1) return str;
+    const bEnd = findMatchingBrace(str, bStart);
+    if (bEnd === -1) return str;
+    const num = str.slice(aStart + 1, aEnd);
+    const den = str.slice(bStart + 1, bEnd);
+    const before = str.slice(0, i);
+    const after = str.slice(bEnd + 1);
+    return before + '(' + num + ')/(' + den + ')' + after;
+  }
+  while (s.includes('\\cfrac')) s = replaceFirstCfrac(s);
+  s = s.replace(/\\left\s*/g, '')
+       .replace(/\\right\s*/g, '')
+       .replace(/\\cdot/g, '*')
+       .replace(/\\times/g, '*')
+       .replace(/\\,/g, ' ')
+       .replace(/\\!/g, ' ');
+  s = s.replace(/\\text\{([^}]*)\}/g, '$1');
+  const idxToVal = new Map();
+  try {
+    const entries = Object.entries(constantsMap || {});
+    for (const [k, v] of entries) {
+      const m = String(k).match(/^c(?:[_{]?)(\d+)\}?$/i);
+      if (m) idxToVal.set(m[1], v);
+    }
+  } catch (_) {}
+  function replaceConstByIndex(match, p1) {
+    if (idxToVal.has(p1)) return String(idxToVal.get(p1));
+    return match;
+  }
+  s = s.replace(/c_\{\s*(\d+)\s*\}/g, replaceConstByIndex)
+       .replace(/c\{\s*(\d+)\s*\}/g, replaceConstByIndex)
+       .replace(/c_(\d+)/g, replaceConstByIndex)
+       .replace(/\bc(\d+)\b/g, replaceConstByIndex);
+  s = s.replace(/\s+/g, ' ').trim();
+  return s;
+}
+
+function renderExpressionTreeSVG(summary) {
+    const canvas = document.getElementById('expression-tree-canvas');
+    if (!canvas) return;
+    const inner = canvas.querySelector('.expr-tree-inner') || canvas;
+    const expression = (summary && summary.expression) || '0';
+    inner.innerHTML = '';
+    try {
+        const exprPreview = String(expression).slice(0, 120);
+        console.log('[ExprTree] 使用表达式（已规范化）来源:', summary?.id || summary?.data_model_id || 'unknown', '| 预览:', exprPreview);
+    } catch (_) {}
+    let ast = ExprTree.normalizeAst(ExprTree.parseExpressionToAst(expression));
+    window.currentExpressionAst = ast;
+    window.__exprTreeUndo__ = [];
+    window.__currentModelId__ = summary.id || summary.data_model_id;
+    ExprTree.computeWeights(ast, { mode: 'coef' });
+    const rect = canvas.getBoundingClientRect();
+    const layoutInfo = ExprTree.layoutTree(ast, Math.max(rect.width, 900), { siblingGap: 24, vGap: 120, drawScale: 1.5 });
+    const svg = ExprTree.renderSvgTree(inner, ast, { width: layoutInfo.width, config: layoutInfo.config, bounds: layoutInfo.bounds });
+    wireToolbarActions(inner, () => svg);
+}
+
+function wireToolbarActions(container, getSvg) {
+    const btnDel = container.parentElement.querySelector('#btn-delete');
+    const btnUndo = container.parentElement.querySelector('#btn-undo');
+    const btnSimplify = container.parentElement.querySelector('#btn-simplify');
+    const btnOptimize = container.parentElement.querySelector('#btn-optimize');
+    // 推断数据模型ID（用于写回）
+    const modelId = (window.currentRegressionResult && window.currentRegressionResult.data_model_id) || null;
+    const getSelectedId = () => {
+        const svg = getSvg();
+        const sel = svg && svg.querySelector('[data-selected="true"]');
+        return sel ? sel.getAttribute('data-node-id') : null;
+    };
+    const rerender = async (ast) => {
+        const canvas = document.getElementById('expression-tree-canvas');
+        const inner = canvas.querySelector('.expr-tree-inner') || canvas;
+        inner.innerHTML = '';
+        ExprTree.computeWeights(ast, { mode: 'coef' });
+        const rect = canvas.getBoundingClientRect();
+        const layoutInfo = ExprTree.layoutTree(ast, Math.max(rect.width, 900), { siblingGap: 24, vGap: 120, drawScale: 1.5 });
+        const svg = ExprTree.renderSvgTree(inner, ast, { width: layoutInfo.width, config: layoutInfo.config, bounds: layoutInfo.bounds });
+        wireToolbarActions(inner, () => svg);
+        
+        // 同步上方公式：使用与后端一致的 MathJax（带 HDL &= 前缀）
+        const expressionStr = ExprTree.astToLatex(ast, 'HDL');
+        const formulaContainer = document.getElementById('expr-formula-container');
+        if (formulaContainer) {
+            formulaContainer.innerHTML = `
+                <div class="regression-formula-container">
+                    <div class="regression-formula">$${expressionStr}$</div>
+                </div>`;
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                MathJax.typesetPromise([formulaContainer]).catch(()=>{});
+            }
+        }
+        
+        // 写回数据库：同步更新到后端
+        const modelId = window.__currentModelId__;
+        if (modelId) {
+            try {
+                // 1. 更新主数据模型
+                const mainModelResp = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        symbolic_regression: {
+                            expression_latex: expressionStr,
+                            updated_at: Date.now()
+                        }
+                    })
+                });
+                
+                if (!mainModelResp.ok) {
+                    throw new Error(`主数据模型更新失败: ${mainModelResp.status}`);
+                }
+                
+                // 2. 更新回归模型文件
+                const regModelResp = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}/files/regression_model`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        expression_latex: expressionStr,
+                        expression: expressionStr,
+                        updated_at: Date.now()
+                    })
+                });
+                
+                if (!regModelResp.ok) {
+                    throw new Error(`回归模型文件更新失败: ${regModelResp.status}`);
+                }
+                
+                console.log('✅ 表达式树修改已同步到数据库');
+                showNotification('表达式树修改已同步到数据库', 'success');
+                
+            } catch (error) {
+                console.error('❌ 数据库同步失败:', error);
+                showNotification('数据库同步失败: ' + error.message, 'error');
+            }
+        } else {
+            console.warn('⚠️ 无法获取模型ID，跳过数据库同步');
+        }
+    };
+
+    if (btnDel) btnDel.onclick = () => {
+        const id = getSelectedId();
+        if (!id) return;
+        window.__exprTreeUndo__.push(ExprTree.cloneAst(window.currentExpressionAst));
+        const next = ExprTree.deleteNodeById(window.currentExpressionAst, id);
+        window.currentExpressionAst = ExprTree.simplifyAst(next);
+        showNotification('正在删除节点/子树...', 'info');
+        rerender(window.currentExpressionAst);
+    };
+    if (btnUndo) btnUndo.onclick = () => {
+        if (!window.__exprTreeUndo__ || window.__exprTreeUndo__.length === 0) return;
+        const prev = window.__exprTreeUndo__.pop();
+        window.currentExpressionAst = prev;
+        showNotification('正在撤销操作...', 'info');
+        rerender(window.currentExpressionAst);
+    };
+    if (btnSimplify) btnSimplify.onclick = () => {
+        window.__exprTreeUndo__.push(ExprTree.cloneAst(window.currentExpressionAst));
+        window.currentExpressionAst = ExprTree.simplifyAst(window.currentExpressionAst);
+        showNotification('正在简化表达式...', 'info');
+        rerender(window.currentExpressionAst);
+    };
+    if (btnOptimize) btnOptimize.onclick = () => {
+        window.__exprTreeUndo__.push(ExprTree.cloneAst(window.currentExpressionAst));
+        window.currentExpressionAst = ExprTree.simplifyAst(window.currentExpressionAst);
+        showNotification('正在优化表达式...', 'info');
+        rerender(window.currentExpressionAst);
+    };
 }
 
 // 获取表达式树页面左侧所需摘要（空壳API）
@@ -534,8 +814,23 @@ function displayExpressionTreeSummary(result) {
     const expression = result.expression || '';
     const targetVariable = result.target_variable || 'Y';
     const constants = result.constants || {};
-    const latexFormula = generateLatexFormula(expression, targetVariable, constants);
+    // 若后端提供了 LaTeX 公式，则直接使用；否则由表达式生成
+    const latexFormula = result.expression_latex
+        ? result.expression_latex
+        : generateLatexFormula(expression, targetVariable, constants);
     const detailed = result.detailed_metrics || {};
+
+    // 帮助：常数排序与 LaTeX 格式化
+    const formatConstantsForDisplay = (consts) => {
+        const entries = Object.entries(consts || {}).map(([k, v]) => {
+            const m = String(k).match(/^c(?:_|\{)?(\d+)\}?$/i);
+            const idx = m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER;
+            const latexKey = m ? `c_{${m[1]}}` : String(k);
+            return { idx, key: latexKey, value: v };
+        });
+        entries.sort((a, b) => a.idx - b.idx);
+        return entries;
+    };
 
     // 右上：公式
     formulaContainer.innerHTML = `
@@ -545,12 +840,15 @@ function displayExpressionTreeSummary(result) {
             <div class="regression-constants">
                 <h5>常数定义</h5>
                 <div class="constant-list">
-                    ${Object.entries(constants).map(([k,v])=>`<div class="constant-item">$${k} = ${v}$</div>`).join('')}
+                    ${formatConstantsForDisplay(constants).map(item => `<div class="constant-item">$${item.key} = ${item.value}$</div>`).join('')}
                 </div>
             </div>` : ''}
         </div>
         <div class="result-actions" style="margin-top: 10px;">
             <button class="btn-secondary" onclick="switchTab('regression')">返回回归</button>
+            <button class="btn-primary" onclick="refreshExpressionTreeData()" style="margin-left: 10px;">
+                刷新数据
+            </button>
         </div>
     `;
 
@@ -628,9 +926,18 @@ function displayExpressionTreeSummary(result) {
         </div>
     `;
 
-    // 只对右上公式区做 MathJax 渲染
+    // 只对右上公式区做 MathJax 渲染（带兜底重试，确保切页后首次也能渲染）
     if (window.MathJax && window.MathJax.typesetPromise) {
         MathJax.typesetPromise([formulaContainer]).catch(err => console.error('MathJax渲染错误:', err));
+    } else {
+        const retryTypeset = () => {
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                MathJax.typesetPromise([formulaContainer]).catch(err => console.error('MathJax渲染错误:', err));
+            } else {
+                setTimeout(retryTypeset, 100);
+            }
+        };
+        setTimeout(retryTypeset, 100);
     }
 }
 
@@ -1158,9 +1465,23 @@ function displayRegressionResults(result) {
     const targetVariable = result.target_variable || 'Y';
     const constants = result.constants || {};
     
-    // 生成LaTeX公式（会更新constants对象）
-    const latexFormula = generateLatexFormula(expression, targetVariable, constants);
+    // 生成LaTeX公式（若后端已提供 expression_latex 则直接使用）
+    const latexFormula = result.expression_latex
+        ? result.expression_latex
+        : generateLatexFormula(expression, targetVariable, constants);
     
+    // 常数排序（与表达式树页面一致）
+    const formatConstantsForDisplay = (consts) => {
+        const entries = Object.entries(consts || {}).map(([k, v]) => {
+            const m = String(k).match(/^c(?:_|\{)?(\d+)\}?$/i);
+            const idx = m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER;
+            const latexKey = m ? `c_{${m[1]}}` : String(k);
+            return { idx, key: latexKey, value: v };
+        });
+        entries.sort((a, b) => a.idx - b.idx);
+        return entries;
+    };
+
     container.innerHTML = `
         <div class="result-item">
             <h4>回归表达式</h4>
@@ -1172,8 +1493,8 @@ function displayRegressionResults(result) {
                 <div class="regression-constants">
                     <h5>常数定义</h5>
                     <div class="constant-list">
-                        ${Object.entries(constants).map(([key, value]) => 
-                            `<div class="constant-item">$${key} = ${value}$</div>`
+                        ${formatConstantsForDisplay(constants).map(item =>
+                            `<div class="constant-item">$${item.key} = ${item.value}$</div>`
                         ).join('')}
                     </div>
                 </div>
@@ -1447,48 +1768,34 @@ async function exportRegressionModelDb() {
 // 生成LaTeX公式的函数
 function generateLatexFormula(expression, targetVariable, constants) {
     if (!expression) return `${targetVariable} = 0`;
-    
-    // 将表达式中的数字替换为c下标格式
     let processedExpression = expression;
-    
-    // 提取所有数字（包括小数），但排除变量名中的数字
-    const numberPattern = /(?<![a-zA-Z_])\b-?\d+\.?\d*\b/g;
+    // 简化的数字匹配，避免使用不兼容的负向后行断言
+    const numberPattern = /-?\d+\.?\d*/g;
     const numbers = expression.match(numberPattern) || [];
-    
-    // 为每个数字创建常数定义，避免重复
     const constantMap = {};
     const usedNumbers = new Set();
-    
     numbers.forEach((num) => {
         if (!usedNumbers.has(num)) {
             const index = Object.keys(constantMap).length;
             const constantName = `c_{${index}}`;
             constantMap[constantName] = parseFloat(num);
             usedNumbers.add(num);
-            
-            // 替换所有相同的数字
             const regex = new RegExp(`\\b${num.replace(/\./g, '\\.')}\\b`, 'g');
             processedExpression = processedExpression.replace(regex, constantName);
         }
     });
-    
-    // 清空传入的constants对象，然后使用新生成的常数
     Object.keys(constants).forEach(key => delete constants[key]);
     Object.assign(constants, constantMap);
-    
-    // 转换为LaTeX格式
     let latex = processedExpression
         .replace(/\*/g, '\\cdot ')
         .replace(/\//g, '\\frac{')
         .replace(/\^/g, '^')
         .replace(/\(/g, '\\left(')
         .replace(/\)/g, '\\right)');
-    
-    // 处理分数
     if (latex.includes('\\frac{')) {
-        latex = latex.replace(/\\frac\{([^}]+)\}\/([^\\s]+)/g, '\\frac{$1}{$2}');
+        // 修正 \\frac{num}/den → \\frac{num}{den}
+        latex = latex.replace(/\\frac\{([^}]+)\}\/([^\s]+)/g, function(_, a, b){ return `\\frac{${a}}{${b}}`; });
     }
-    
     return `${targetVariable} = ${latex}`;
 }
 
@@ -2520,7 +2827,7 @@ function renderBeautifiedFileContent(container, content, filename, fileType) {
                     <div class="metric-card"><div class="metric-label">MSE</div><div class="metric-value">${json.mse ?? '-'}</div></div>
                     <div class="metric-card"><div class="metric-label">复杂度</div><div class="metric-value">${json.model_complexity ?? '-'}</div></div>
                 </div>
-                ${json.expression ? `<div class="expression-box"><div class="expression-label">模型表达式</div><div class="expression-value">${json.expression}</div></div>` : ''}
+                ${json.expression_latex ? `<div class="expression-box"><div class="expression-label">模型表达式（MathJax）</div><div class="expression-value">$${json.expression_latex}$</div></div>` : (json.expression ? `<div class="expression-box"><div class="expression-label">模型表达式（MathJax）</div><div class="expression-value">$${json.expression}$</div></div>` : (json.expression_text ? `<div class="expression-box"><div class="expression-label">模型表达式（文本）</div><div class="expression-value">${json.expression_text}</div></div>` : ''))}
                 ${featureImportance.length ? `
                 <div class="section-subtitle">特征重要性</div>
                 <div class="importance-table">
@@ -2535,6 +2842,13 @@ function renderBeautifiedFileContent(container, content, filename, fileType) {
             </div>
         `;
         container.innerHTML = html;
+        // 对 MathJax 公式进行渲染（无论是 expression_latex 还是 expression）
+        if ((json.expression_latex || json.expression) && window.MathJax && window.MathJax.typesetPromise) {
+            // 等待 DOM 渲染完成后执行 MathJax
+            setTimeout(() => {
+                MathJax.typesetPromise([container]).catch(()=>{});
+            }, 100);
+        }
         return;
     }
 
@@ -2745,7 +3059,7 @@ function setupDataManagementListeners() {
         exportDataBtn.addEventListener('click', async () => {
             try {
                 showLoading('正在导出全部数据模型...');
-                // 后端尚未提供“一键导出全部”端点，此处采用客户端合并方案：
+                // 后端尚未提供"一键导出全部"端点，此处采用客户端合并方案：
                 // 1) 获取模型列表；2) 逐个拉取单模型ZIP；3) 合并为总ZIP；4) 触发保存
                 const listResp = await fetch(`${API_BASE_URL}/api/data-models/models`);
                 if (!listResp.ok) throw new Error(`HTTP ${listResp.status}`);
@@ -2762,7 +3076,7 @@ function setupDataManagementListeners() {
                     if (!r.ok) throw new Error(`获取模型 ${m.id} 失败: HTTP ${r.status}`);
                     return await r.blob();
                 }));
-                // 合并为总ZIP（仅打包子ZIP原样，保持“原封不动”）
+                // 合并为总ZIP（仅打包子ZIP原样，保持"原封不动"）
                 const JSZip = await loadJSZip();
                 const zip = new JSZip();
                 blobs.forEach((blob, idx) => {
@@ -2846,3 +3160,15 @@ window.viewDataModel = viewDataModel;
 window.deleteDataModel = deleteDataModel; 
 window.viewDataModelFile = viewDataModelFile;
 window.exportMonteCarloTop10Csv = exportMonteCarloTop10Csv;
+
+// 刷新表达式树数据（供HTML调用）
+window.refreshExpressionTreeData = async function() {
+    try {
+        showNotification('正在刷新数据...', 'info');
+        await renderExpressionTreePage();
+        showNotification('数据刷新完成', 'success');
+    } catch (error) {
+        console.error('刷新数据失败:', error);
+        showNotification('刷新数据失败: ' + error.message, 'error');
+    }
+};
