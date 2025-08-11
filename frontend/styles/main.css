@@ -906,6 +906,85 @@ input.readonly-not-allowed {
     border: 1px solid var(--border-color);
 }
 
+/* 符号表达式树 专用布局 */
+.expr-tree-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr; /* 左侧更窄，右侧主区 */
+    gap: 24px;
+    background: var(--bg-secondary);
+    padding: 24px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+}
+
+.expr-left {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.expr-right {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.expr-card {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    /* 自适应高度 */
+    min-height: 0;
+}
+
+.expr-card h3 {
+    margin-bottom: 12px;
+    color: var(--text-primary);
+    font-size: 18px;
+}
+
+.expr-left .expr-card {
+    /* 让左侧卡片不要溢出，内部内容自适应 */
+    overflow: hidden;
+}
+
+#expr-performance-container .performance-metrics {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+}
+
+#expr-detailed-container .metrics-grid {
+    grid-template-columns: 1fr; /* 左侧收缩为单列 */
+}
+
+.expr-tree-card {
+    /* 改为弹性高度，树区域按内容自适应 */
+    min-height: 0;
+}
+
+#expr-formula-card .regression-formula {
+    overflow-x: auto;
+}
+
+/* 让右上“回归表达式”根据内容自适应高度，而不是继承 results-container 的网格最小高度 */
+#expr-formula-container {
+    min-height: 0 !important;
+    display: block !important;
+    padding: 12px;
+}
+
+/* 右侧三个同级模块统一取消通用容器的最小高度和网格布局，避免多余空白 */
+.expr-right .results-container {
+    min-height: 0 !important;
+    display: block !important;
+    padding: 12px;
+}
+
+/* 表达式树画布的占位高度（仅空态下给出合理可视区） */
+#expression-tree-canvas {
+    min-height: 220px;
+}
+
 .input-section, .result-section {
     padding: 20px;
     background: var(--bg-tertiary);
@@ -1202,7 +1281,7 @@ input[type="checkbox"]:focus {
 }
 
 .results-container {
-    min-height: 200px;
+    min-height: 160px;
     padding: 15px;
     background: var(--bg-tertiary);
     border-radius: 5px;

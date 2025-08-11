@@ -57,6 +57,106 @@ def load_data_models():
                     logger.error(f"加载数据模型文件 {filename} 失败: {e}")
     return models
 
+@symbolic_regression_bp.route('/expression-tree/summary', methods=['POST'])
+def expression_tree_summary():
+    """表达式树页面左侧摘要（空壳模拟）。
+    优先使用请求体中的 model（即前端刚跑完的回归结果）；否则若提供 model_id，则从数据模型文件读取；
+    若仍不可用，则返回一份固定示例，保证页面可渲染。
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+        result = None
+
+        # 1) 直接使用前端传来的回归结果
+        if isinstance(data.get('model'), dict):
+            result = data['model']
+        else:
+            # 2) 尝试使用提供的 model_id
+            model_id = data.get('model_id')
+            if model_id:
+                filename = f"{model_id}.json"
+                filepath = os.path.join(DATA_MODELS_DIR, filename)
+                if os.path.exists(filepath):
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        model = json.load(f)
+                    # 读取回归模型文件（更完整的数据来源）
+                    reg_json = None
+                    try:
+                        reg_name = (model.get('data_files') or {}).get('regression_model')
+                        if reg_name:
+                            reg_path = os.path.join(MODELS_DIR, reg_name)
+                            if os.path.exists(reg_path):
+                                with open(reg_path, 'r', encoding='utf-8') as rf:
+                                    reg_json = json.load(rf)
+                    except Exception as _:
+                        reg_json = None
+
+                    # 合并字段：优先使用回归模型JSON，其次模型元数据，最后给出合理兜底
+                    result = {
+                        'id': model.get('id'),
+                        'expression': (reg_json or {}).get('expression') or model.get('expression') or 'QA * 0.5 + NCGA * 0.3 + 0.1',
+                        'target_variable': (reg_json or {}).get('target_variable') or model.get('target_column', 'Y'),
+                        'constants': (reg_json or {}).get('constants') or model.get('constants') or {},
+                        'r2': (reg_json or {}).get('r2') or model.get('metadata', {}).get('r2_score', 0.85),
+                        'mse': (reg_json or {}).get('mse') or model.get('metadata', {}).get('mse_score', 0.12),
+                        'feature_importance': (reg_json or {}).get('feature_importance') or model.get('feature_importance') or [],
+                        'detailed_metrics': (reg_json or {}).get('detailed_metrics') or model.get('detailed_metrics') or {
+                            "average_relative_error_test": 12.3,
+                            "average_relative_error_training": 10.8,
+                            "mean_absolute_error_test": 0.233,
+                            "mean_absolute_error_training": 0.201,
+                            "mean_squared_error_test": 0.121,
+                            "mean_squared_error_training": 0.103,
+                            "model_depth": 7,
+                            "model_length": 22,
+                            "normalized_mean_squared_error_test": 0.088,
+                            "normalized_mean_squared_error_training": 0.079,
+                            "pearson_r_test": 0.921,
+                            "pearson_r_training": 0.935,
+                            "root_mean_squared_error_test": 0.348,
+                            "root_mean_squared_error_training": 0.321
+                        },
+                        'data_model_id': model.get('id')
+                    }
+
+        # 3) 兜底固定示例
+        if result is None:
+            result = {
+                'id': int(time.time()),
+                'expression': 'QA * 0.5 + NCGA * 0.3 + 0.1',
+                'target_variable': 'Y',
+                'constants': {'c_0': 0.5, 'c_1': 0.3, 'c_2': 0.1},
+                'r2': 0.86,
+                'mse': 0.118,
+                'feature_importance': [
+                    {'feature': 'QA', 'importance': 0.8},
+                    {'feature': 'NCGA', 'importance': 0.6},
+                    {'feature': 'CGA', 'importance': 0.4}
+                ],
+                'detailed_metrics': {
+                    "average_relative_error_test": 12.3,
+                    "average_relative_error_training": 10.8,
+                    "mean_absolute_error_test": 0.233,
+                    "mean_absolute_error_training": 0.201,
+                    "mean_squared_error_test": 0.121,
+                    "mean_squared_error_training": 0.103,
+                    "model_depth": 7,
+                    "model_length": 22,
+                    "normalized_mean_squared_error_test": 0.088,
+                    "normalized_mean_squared_error_training": 0.079,
+                    "pearson_r_test": 0.921,
+                    "pearson_r_training": 0.935,
+                    "root_mean_squared_error_test": 0.348,
+                    "root_mean_squared_error_training": 0.321
+                },
+                'data_model_id': None
+            }
+
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.error(f"表达式树摘要返回失败: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 def save_data_model(model):
     """保存数据模型"""
     try:

@@ -409,6 +409,13 @@ function switchTab(tabName) {
             loadDataModelsForMonteCarlo();
         }, 800); // 延迟到动画完成后执行
     }
+    // 特殊处理：切换到 符号表达式树 页面时渲染左侧概览
+    if (tabName === 'expression-tree') {
+        console.log('🔍 切换到符号表达式树页面');
+        setTimeout(() => {
+            renderExpressionTreePage();
+        }, 600);
+    }
     
     // 更新状态栏
     updateStatusBar();
@@ -423,6 +430,208 @@ function switchTab(tabName) {
             });
         }
     }, 100);
+}
+
+// 渲染“符号表达式树”页面（按专用布局分别填充左右区域）
+async function renderExpressionTreePage() {
+    const perfContainer = document.getElementById('expr-performance-container');
+    const detailedContainer = document.getElementById('expr-detailed-container');
+    const formulaContainer = document.getElementById('expr-formula-container');
+    const featureContainer = document.getElementById('expr-feature-container');
+    if (!perfContainer || !detailedContainer || !formulaContainer || !featureContainer) return;
+
+    try {
+        perfContainer.innerHTML = '<p>正在加载模型信息...</p>';
+        detailedContainer.innerHTML = '';
+        formulaContainer.innerHTML = '';
+        featureContainer.innerHTML = '';
+        // 优先使用最新一次回归结果；否则尝试使用最新数据模型
+        let summaryPayload = null;
+        if (window.currentRegressionResult) {
+            summaryPayload = { model: window.currentRegressionResult };
+        } else {
+            // 回退：请求后端获取最新数据模型（按时间排序返回的第一个）
+            const resp = await fetch(`${API_BASE_URL}/api/data-models/models`);
+            if (resp.ok) {
+                const listJson = await resp.json();
+                if (listJson && listJson.success && Array.isArray(listJson.models) && listJson.models.length > 0) {
+                    const latest = listJson.models[0];
+                    summaryPayload = { model_id: latest.id };
+                }
+            }
+        }
+
+        let summary = await fetchExpressionTreeSummary(summaryPayload);
+        // 兜底：若没有特征权重，尝试从最新数据模型的回归文件拉取
+        if (!summary || !Array.isArray(summary.feature_importance) || summary.feature_importance.length === 0) {
+            try {
+                let modelId = null;
+                // 优先使用当前回归结果的 model_id
+                modelId = window.currentRegressionResult?.data_model_id || null;
+                // 若 summary.id 看起来像数据模型ID，则直接使用
+                if (!modelId && typeof summary?.id === 'string' && summary.id.startsWith('model_')) {
+                    modelId = summary.id;
+                }
+                // 再次兜底：取最新模型
+                if (!modelId) {
+                    const resp = await fetch(`${API_BASE_URL}/api/data-models/models`);
+                    const json = await resp.json();
+                    if (json && json.success && Array.isArray(json.models) && json.models.length > 0) {
+                        modelId = json.models[0].id;
+                    }
+                }
+                if (modelId) {
+                    const regResp = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}/files/regression_model`);
+                    const regJson = await regResp.json();
+                    if (regJson && regJson.success && regJson.content) {
+                        const reg = JSON.parse(regJson.content);
+                        if (Array.isArray(reg.feature_importance) && reg.feature_importance.length > 0) {
+                            summary.feature_importance = reg.feature_importance;
+                        }
+                        if (reg.detailed_metrics && !summary.detailed_metrics) {
+                            summary.detailed_metrics = reg.detailed_metrics;
+                        }
+                    }
+                }
+            } catch (_) {}
+        }
+        displayExpressionTreeSummary(summary);
+    } catch (e) {
+        console.error('表达式树概览加载失败', e);
+        perfContainer.innerHTML = `<p class="text-muted">加载失败：${e.message}</p>`;
+        showNotification('表达式树概览加载失败: ' + e.message, 'error');
+    }
+}
+
+// 获取表达式树页面左侧所需摘要（空壳API）
+async function fetchExpressionTreeSummary(payload) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/regression/expression-tree/summary`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload || {})
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.message || `HTTP ${response.status}`);
+        }
+        const json = await response.json();
+        if (!json.success) throw new Error(json.message || '接口返回失败');
+        return json.result;
+    } catch (err) {
+        throw err;
+    }
+}
+
+// 渲染左/右区域摘要（公式、性能、详细指标、特征权重）
+function displayExpressionTreeSummary(result) {
+    const perfContainer = document.getElementById('expr-performance-container');
+    const detailedContainer = document.getElementById('expr-detailed-container');
+    const formulaContainer = document.getElementById('expr-formula-container');
+    const featureContainer = document.getElementById('expr-feature-container');
+    if (!perfContainer || !detailedContainer || !formulaContainer || !featureContainer) return;
+
+    const expression = result.expression || '';
+    const targetVariable = result.target_variable || 'Y';
+    const constants = result.constants || {};
+    const latexFormula = generateLatexFormula(expression, targetVariable, constants);
+    const detailed = result.detailed_metrics || {};
+
+    // 右上：公式
+    formulaContainer.innerHTML = `
+        <div class="regression-formula-container">
+            <div class="regression-formula">$${latexFormula}$</div>
+            ${Object.keys(constants).length ? `
+            <div class="regression-constants">
+                <h5>常数定义</h5>
+                <div class="constant-list">
+                    ${Object.entries(constants).map(([k,v])=>`<div class="constant-item">$${k} = ${v}$</div>`).join('')}
+                </div>
+            </div>` : ''}
+        </div>
+        <div class="result-actions" style="margin-top: 10px;">
+            <button class="btn-secondary" onclick="switchTab('regression')">返回回归</button>
+        </div>
+    `;
+
+    // 左侧：性能
+    perfContainer.innerHTML = `
+        <div class="performance-metrics">
+            <div class="performance-metric"><div class="metric-label">决定系数 R²</div><div class="metric-value">${(result.r2 ?? 0).toFixed(3)}</div><div class="metric-unit">Coefficient of Determination</div></div>
+            <div class="performance-metric"><div class="metric-label">均方误差 MSE</div><div class="metric-value">${(result.mse ?? 0).toFixed(3)}</div><div class="metric-unit">Mean Squared Error</div></div>
+        </div>
+    `;
+
+    // 左侧：详细指标
+    if (result.detailed_metrics) {
+        detailedContainer.innerHTML = `
+            <div class="detailed-metrics">
+                <div class="metrics-grid">
+                    <div class="metric-section">
+                        <h6>误差指标</h6>
+                        <div class="metric-list">
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">平均相对误差</span><span class="metric-name-en">Average relative error</span><span class="metric-dataset">(测试)</span></div><span class="metric-value">${detailed.average_relative_error_test}%</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">平均相对误差</span><span class="metric-name-en">Average relative error</span><span class="metric-dataset">(训练)</span></div><span class="metric-value">${detailed.average_relative_error_training}%</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">平均绝对误差</span><span class="metric-name-en">Mean absolute error</span><span class="metric-dataset">(测试)</span></div><span class="metric-value">${detailed.mean_absolute_error_test}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">平均绝对误差</span><span class="metric-name-en">Mean absolute error</span><span class="metric-dataset">(训练)</span></div><span class="metric-value">${detailed.mean_absolute_error_training}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">均方误差</span><span class="metric-name-en">Mean squared error</span><span class="metric-dataset">(测试)</span></div><span class="metric-value">${detailed.mean_squared_error_test}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">均方误差</span><span class="metric-name-en">Mean squared error</span><span class="metric-dataset">(训练)</span></div><span class="metric-value">${detailed.mean_squared_error_training}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">归一化均方误差</span><span class="metric-name-en">Normalized MSE</span><span class="metric-dataset">(测试)</span></div><span class="metric-value">${detailed.normalized_mean_squared_error_test}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">归一化均方误差</span><span class="metric-name-en">Normalized MSE</span><span class="metric-dataset">(训练)</span></div><span class="metric-value">${detailed.normalized_mean_squared_error_training}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">均方根误差</span><span class="metric-name-en">Root MSE</span><span class="metric-dataset">(测试)</span></div><span class="metric-value">${detailed.root_mean_squared_error_test}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">均方根误差</span><span class="metric-name-en">Root MSE</span><span class="metric-dataset">(训练)</span></div><span class="metric-value">${detailed.root_mean_squared_error_training}</span></div>
+                        </div>
+                    </div>
+                    <div class="metric-section">
+                        <h6>相关性指标</h6>
+                        <div class="metric-list">
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">皮尔逊相关系数</span><span class="metric-name-en">Pearson's R</span><span class="metric-dataset">(测试)</span></div><span class="metric-value">${detailed.pearson_r_test}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">皮尔逊相关系数</span><span class="metric-name-en">Pearson's R</span><span class="metric-dataset">(训练)</span></div><span class="metric-value">${detailed.pearson_r_training}</span></div>
+                        </div>
+                    </div>
+                    <div class="metric-section">
+                        <h6>模型结构</h6>
+                        <div class="metric-list">
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">模型深度</span><span class="metric-name-en">Model Depth</span></div><span class="metric-value">${detailed.model_depth}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">模型长度</span><span class="metric-name-en">Model Length</span></div><span class="metric-value">${detailed.model_length}</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else {
+        detailedContainer.innerHTML = '<p class="text-muted">无</p>';
+    }
+
+    // 右下：特征权重
+    // 构造中文名映射（无外部函数时降级使用英文名）
+    const getCn = (name) => {
+        try {
+            if (typeof getComponentChineseName === 'function') {
+                return getComponentChineseName(name);
+            }
+        } catch (_) {}
+        return name || '';
+    };
+    featureContainer.innerHTML = `
+        <div class="feature-importance">
+            ${(result.feature_importance || []).map(f => `
+                <div class="feature-importance-item">
+                    <div class="feature-name-container">
+                        <div class="feature-name-en">${f.feature ?? ''}</div>
+                        <div class="feature-name-cn">${getCn(f.feature ?? '')}</div>
+                    </div>
+                    <div class="importance-bar"><div class="importance-fill" style="width: ${(Number(f.importance||0)*100).toFixed(1)}%"></div></div>
+                    <div class="importance-value">${(Number(f.importance)||0).toFixed(3)}</div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+
+    // 只对右上公式区做 MathJax 渲染
+    if (window.MathJax && window.MathJax.typesetPromise) {
+        MathJax.typesetPromise([formulaContainer]).catch(err => console.error('MathJax渲染错误:', err));
+    }
 }
 
 // 生成Python可存储的随机整数（32位有符号范围内）
