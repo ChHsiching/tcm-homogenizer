@@ -160,7 +160,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 应用初始化
 async function initializeApp() {
-    console.log('🚀 初始化中药多组分均化分析客户端...');
+    console.log('🚀 初始化本草智配客户端...');
     
     // 初始化认证系统
     await authManager.initialize();
@@ -184,7 +184,7 @@ async function initializeApp() {
     await testBackendConnection();
     
     // 显示欢迎通知
-    showNotification('欢迎使用中药多组分均化分析客户端', 'success');
+    showNotification('欢迎使用本草智配客户端', 'success');
     
     // 测试用户管理功能
     if (authManager) {
@@ -2185,7 +2185,7 @@ function showNotification(message, type = 'info') {
 
 // 显示关于对话框
 function showAboutDialog() {
-    alert('中药多组分均化分析客户端 v1.0.0\n\n基于Electron + Flask的跨平台桌面应用');
+    alert('本草智配客户端 v1.0.0\n\n基于Electron + Flask的跨平台桌面应用');
 }
 
 // 可视化结果

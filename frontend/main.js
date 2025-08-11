@@ -26,7 +26,7 @@ function createWindow() {
       allowRunningInsecureContent: true // 允许运行不安全内容
     },
     icon: path.join(__dirname, 'assets/icons/app/logo-full.png'), // 可选：应用图标
-    title: '中药多组分均化分析客户端',
+    title: '本草智配客户端',
     show: false // 先不显示，等准备好再显示
   });
 
