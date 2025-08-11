@@ -78,8 +78,8 @@ def create_app(config=None):
     def health_check():
         """健康检查接口"""
         return jsonify({
-            'service': '本草智配后端',
             'status': 'healthy',
+            'service': '本草智配后端',
             'version': '1.0.0'
         })
     
