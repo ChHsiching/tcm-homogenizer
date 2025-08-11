@@ -57,6 +57,166 @@ def load_data_models():
                     logger.error(f"加载数据模型文件 {filename} 失败: {e}")
     return models
 
+@symbolic_regression_bp.route('/expression-tree/summary', methods=['POST'])
+def expression_tree_summary():
+    """表达式树页面左侧摘要（空壳模拟）。
+    优先使用请求体中的 model（即前端刚跑完的回归结果）；否则若提供 model_id，则从数据模型文件读取；
+    若仍不可用，则返回一份固定示例，保证页面可渲染。
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+        result = None
+
+        # 1) 直接使用前端传来的回归结果
+        if isinstance(data.get('model'), dict):
+            result = data['model']
+        else:
+            # 2) 尝试使用提供的 model_id
+            model_id = data.get('model_id')
+            if model_id:
+                filename = f"{model_id}.json"
+                filepath = os.path.join(DATA_MODELS_DIR, filename)
+                if os.path.exists(filepath):
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        model = json.load(f)
+                    # 读取回归模型文件（更完整的数据来源）
+                    reg_json = None
+                    try:
+                        reg_name = (model.get('data_files') or {}).get('regression_model')
+                        if reg_name:
+                            reg_path = os.path.join(MODELS_DIR, reg_name)
+                            if os.path.exists(reg_path):
+                                with open(reg_path, 'r', encoding='utf-8') as rf:
+                                    reg_json = json.load(rf)
+                    except Exception as _:
+                        reg_json = None
+
+                    # 合并字段：优先使用回归模型JSON，其次模型元数据，最后给出合理兜底
+                    result = {
+                        'id': model.get('id'),
+                        'expression': (reg_json or {}).get('expression_text') or (reg_json or {}).get('expression') or model.get('expression') or (
+                            "(((((1.9105 * HYP + ((((0.6015 * QA + 0.42745 * HYP) + 1.2977 * CA) - (-10.458))))"
+                            " * (-1.9323 + -0.078141 * MA * (((-1.9323 + 1.4812 * OA) + 0.59744 * UA) + 0.60783 * UA)))"
+                            " / (2.9628 * VR) - 2.6756 / (0.40832 * HYP)) + (1.2192 * VR) / (5.4189 - 1.9105 * HYP))"
+                            " * 0.0053559 + 0.93054)"
+                        ),
+                        'target_variable': (reg_json or {}).get('target_variable') or model.get('target_column', 'Y'),
+                        'constants': (reg_json or {}).get('constants') or model.get('constants') or {
+                            'c{0}': 1.9105,
+                            'c{1}': 0.6015,
+                            'c{2}': 0.42745,
+                            'c{3}': 1.2977,
+                            'c{4}': -10.458,
+                            'c{5}': -1.9323,
+                            'c{6}': -0.078141,
+                            'c{7}': -1.9323,
+                            'c{8}': 1.4812,
+                            'c{9}': 0.59744,
+                            'c{10}': 0.60783,
+                            'c{11}': 2.9628,
+                            'c{12}': 2.6756,
+                            'c{13}': 0.40832,
+                            'c{14}': 1.2192,
+                            'c{15}': 5.4189,
+                            'c{16}': 1.9105,
+                            'c{17}': 0.0053559,
+                            'c{18}': 0.93054,
+                        },
+                        'expression_latex': (reg_json or {}).get('expression_latex') or (
+                            r"HDL =  \left(  \left(  \left(  \cfrac{  \left( c_{0}  \cdot\text{HYP} +  \left(  \left(  \left( c_{1}  \cdot\text{QA} + c_{2}  \cdot\text{HYP} \right)  + c_{3}  \cdot\text{CA} \right)  - c_{4} \right)  \right)  \cdot  \left( c_{5} + c_{6}  \cdot\text{MA}  \cdot  \left(  \left(  \left( c_{7} + c_{8}  \cdot\text{OA} \right)  + c_{9}  \cdot\text{UA} \right)  + c_{10}  \cdot\text{UA} \right)  \right) }{c_{11}  \cdot\text{VR} }  -  \cfrac{ c_{12}}{c_{13}  \cdot\text{HYP} }  \right)  +  \cfrac{ c_{14}  \cdot\text{VR}}{ \left( c_{15} - c_{16}  \cdot\text{HYP} \right)  }  \right)  \cdot c_{17} + c_{18} \right)"
+                        ),
+                        'r2': (reg_json or {}).get('r2') or model.get('metadata', {}).get('r2_score', 0.85),
+                        'mse': (reg_json or {}).get('mse') or model.get('metadata', {}).get('mse_score', 0.12),
+                        'feature_importance': (reg_json or {}).get('feature_importance') or model.get('feature_importance') or [],
+                        'detailed_metrics': (reg_json or {}).get('detailed_metrics') or model.get('detailed_metrics') or {
+                            "average_relative_error_test": 12.3,
+                            "average_relative_error_training": 10.8,
+                            "mean_absolute_error_test": 0.233,
+                            "mean_absolute_error_training": 0.201,
+                            "mean_squared_error_test": 0.121,
+                            "mean_squared_error_training": 0.103,
+                            "model_depth": 7,
+                            "model_length": 22,
+                            "normalized_mean_squared_error_test": 0.088,
+                            "normalized_mean_squared_error_training": 0.079,
+                            "pearson_r_test": 0.921,
+                            "pearson_r_training": 0.935,
+                            "root_mean_squared_error_test": 0.348,
+                            "root_mean_squared_error_training": 0.321
+                        },
+                        'data_model_id': model.get('id')
+                    }
+
+        # 3) 兜底固定示例（改为复杂表达式）
+        if result is None:
+            result = {
+                'id': int(time.time()),
+                'expression': (
+                    "(((((1.9105 * HYP + ((((0.6015 * QA + 0.42745 * HYP) + 1.2977 * CA) - (-10.458))))"
+                    " * (-1.9323 + -0.078141 * MA * (((-1.9323 + 1.4812 * OA) + 0.59744 * UA) + 0.60783 * UA)))"
+                    " / (2.9628 * VR) - 2.6756 / (0.40832 * HYP)) + (1.2192 * VR) / (5.4189 - 1.9105 * HYP))"
+                    " * 0.0053559 + 0.93054)"
+                ),
+                'expression_latex': (
+                    r"HDL =  \left(  \left(  \left(  \cfrac{  \left( c_{0}  \cdot\text{HYP} +  \left(  \left(  \left( c_{1}  \cdot\text{QA} + c_{2}  \cdot\text{HYP} \right)  + c_{3}  \cdot\text{CA} \right)  - c_{4} \right)  \right)  \cdot  \left( c_{5} + c_{6}  \cdot\text{MA}  \cdot  \left(  \left(  \left( c_{7} + c_{8}  \cdot\text{OA} \right)  + c_{9}  \cdot\text{UA} \right)  + c_{10}  \cdot\text{UA} \right)  \right) }{c_{11}  \cdot\text{VR} }  -  \cfrac{ c_{12}}{c_{13}  \cdot\text{HYP} }  \right)  +  \cfrac{ c_{14}  \cdot\text{VR}}{ \left( c_{15} - c_{16}  \cdot\text{HYP} \right)  }  \right)  \cdot c_{17} + c_{18} \right)"
+                ),
+                'target_variable': 'HDL',
+                'constants': {
+                    'c{0}': 1.9105,
+                    'c{1}': 0.6015,
+                    'c{2}': 0.42745,
+                    'c{3}': 1.2977,
+                    'c{4}': -10.458,
+                    'c{5}': -1.9323,
+                    'c{6}': -0.078141,
+                    'c{7}': -1.9323,
+                    'c{8}': 1.4812,
+                    'c{9}': 0.59744,
+                    'c{10}': 0.60783,
+                    'c{11}': 2.9628,
+                    'c{12}': 2.6756,
+                    'c{13}': 0.40832,
+                    'c{14}': 1.2192,
+                    'c{15}': 5.4189,
+                    'c{16}': 1.9105,
+                    'c{17}': 0.0053559,
+                    'c{18}': 0.93054,
+                },
+                'r2': 0.86,
+                'mse': 0.118,
+                'feature_importance': [
+                    {'feature': 'HYP', 'importance': 0.85},
+                    {'feature': 'QA', 'importance': 0.7},
+                    {'feature': 'CA', 'importance': 0.6},
+                    {'feature': 'VR', 'importance': 0.55},
+                    {'feature': 'OA', 'importance': 0.5},
+                    {'feature': 'UA', 'importance': 0.45},
+                    {'feature': 'MA', 'importance': 0.4},
+                ],
+                'detailed_metrics': {
+                    "average_relative_error_test": 12.3,
+                    "average_relative_error_training": 10.8,
+                    "mean_absolute_error_test": 0.233,
+                    "mean_absolute_error_training": 0.201,
+                    "mean_squared_error_test": 0.121,
+                    "mean_squared_error_training": 0.103,
+                    "model_depth": 11,
+                    "model_length": 48,
+                    "normalized_mean_squared_error_test": 0.088,
+                    "normalized_mean_squared_error_training": 0.079,
+                    "pearson_r_test": 0.921,
+                    "pearson_r_training": 0.935,
+                    "root_mean_squared_error_test": 0.348,
+                    "root_mean_squared_error_training": 0.321
+                },
+                'data_model_id': None
+            }
+
+        return jsonify({'success': True, 'result': result})
+    except Exception as e:
+        logger.error(f"表达式树摘要返回失败: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 def save_data_model(model):
     """保存数据模型"""
     try:
@@ -189,6 +349,18 @@ def get_data_model(model_id):
         
         with open(filepath, 'r', encoding='utf-8') as f:
             model = json.load(f)
+        # 兼容：若 regression_model 文件中有 expression_latex，则覆盖主模型的 expression 字段，保持前端统一从数据库读取 MathJax
+        try:
+            reg_name = (model.get('data_files') or {}).get('regression_model')
+            if reg_name:
+                reg_path = os.path.join(MODELS_DIR, reg_name)
+                if os.path.exists(reg_path):
+                    with open(reg_path, 'r', encoding='utf-8') as rf:
+                        reg_json = json.load(rf)
+                    if isinstance(reg_json, dict) and reg_json.get('expression_latex'):
+                        model.setdefault('symbolic_regression', {})['expression_latex'] = reg_json['expression_latex']
+        except Exception:
+            pass
         
         return jsonify({
             'success': True,
@@ -290,6 +462,77 @@ def get_data_model_file(model_id, file_type):
         return jsonify({
             'success': False,
             'error': '获取数据模型文件失败',
+            'message': str(e)
+        }), 500
+
+@data_models_bp.route('/models/<model_id>/files/<file_type>', methods=['PUT'])
+def update_data_model_file(model_id, file_type):
+    """更新数据模型文件内容"""
+    try:
+        data = request.get_json()
+        
+        # 检查模型是否存在
+        filename = f"{model_id}.json"
+        filepath = os.path.join(DATA_MODELS_DIR, filename)
+        
+        if not os.path.exists(filepath):
+            return jsonify({
+                'success': False,
+                'error': '数据模型不存在'
+            }), 404
+        
+        # 加载模型
+        with open(filepath, 'r', encoding='utf-8') as f:
+            model = json.load(f)
+        
+        # 根据文件类型更新对应文件
+        if file_type == 'regression_model':
+            reg_filename = model.get('data_files', {}).get('regression_model')
+            if reg_filename:
+                reg_filepath = os.path.join(MODELS_DIR, reg_filename)
+                if os.path.exists(reg_filepath):
+                    # 读取现有内容
+                    with open(reg_filepath, 'r', encoding='utf-8') as f:
+                        reg_content = json.load(f)
+                    
+                    # 更新字段
+                    if 'expression_latex' in data:
+                        reg_content['expression_latex'] = data['expression_latex']
+                    if 'expression' in data:
+                        reg_content['expression'] = data['expression']
+                    if 'updated_at' in data:
+                        reg_content['updated_at'] = data['updated_at']
+                    
+                    # 写回文件
+                    with open(reg_filepath, 'w', encoding='utf-8') as f:
+                        json.dump(reg_content, f, ensure_ascii=False, indent=2)
+                    
+                    logger.info(f"回归模型文件已更新: {reg_filename}")
+                    return jsonify({
+                        'success': True,
+                        'message': '回归模型文件更新成功'
+                    })
+                else:
+                    return jsonify({
+                        'success': False,
+                        'error': '回归模型文件不存在'
+                    }), 404
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': '回归模型文件未关联'
+                }), 404
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'不支持更新文件类型: {file_type}'
+            }), 400
+        
+    except Exception as e:
+        logger.error(f"更新数据模型文件失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': '更新数据模型文件失败',
             'message': str(e)
         }), 500
 
@@ -503,7 +746,7 @@ def update_data_model(model_id):
         with open(filepath, 'r', encoding='utf-8') as f:
             model = json.load(f)
         
-        # 更新模型数据
+        # 更新模型数据（允许写入/更新 MathJax 公式）
         allowed_fields = ['name', 'description', 'status', 'symbolic_regression', 'monte_carlo', 'metadata']
         for field in allowed_fields:
             if field in data:
@@ -583,14 +826,20 @@ def analyze():
             np.random.seed(seed_value)
             logger.info(f"使用随机种子（每次随机生成）: {seed_value}")
         
-        # 生成模拟结果
+        # 生成模拟结果（改为固定的复杂表达式，便于前端验证树形展示）
         model_id = int(time.time())
-        expression_parts = []
-        for i, feature in enumerate(feature_columns[:min(3, len(feature_columns))]):  # 最多使用3个特征
-            coefficient = round(0.5 - i * 0.1, 2)
-            expression_parts.append(f"{feature} * {coefficient}")
-        
-        expression = " + ".join(expression_parts) + " + 0.1"
+        expression = (
+            "(((((1.9105 * HYP + ((((0.6015 * QA + 0.42745 * HYP) + 1.2977 * CA) - (-10.458))))"
+            " * (-1.9323 + -0.078141 * MA * (((-1.9323 + 1.4812 * OA) + 0.59744 * UA) + 0.60783 * UA)))"
+            " / (2.9628 * VR) - 2.6756 / (0.40832 * HYP)) + (1.2192 * VR) / (5.4189 - 1.9105 * HYP))"
+            " * 0.0053559 + 0.93054)"
+        )
+
+        # 对应的 LaTeX 公式（不包含 $ 包裹，直接插入 MathJax 块环境）
+        # 使用正确的 MathJax 格式，包含 \cfrac 和 \text{} 等
+        latex_expression = (
+            r"\begin{align*} \nonumber HDL & =  \left(  \left(  \left(  \cfrac{  \left( c_{0}  \cdot\text{HYP} +  \left(  \left(  \left( c_{1}  \cdot\text{QA} + c_{2}  \cdot\text{HYP} \right)  + c_{3}  \cdot\text{CA} \right)  - c_{4} \right)  \right)  \cdot  \left( c_{5} + c_{6}  \cdot\text{MA} \cdot  \left(  \left(  \left( c_{7} + c_{8}  \cdot\text{OA} \right)  + c_{9}  \cdot\text{UA} \right)  + c_{10}  \cdot\text{UA} \right)  \right) }{c_{11}  \cdot\text{VR} }  -  \cfrac{ c_{12}}{c_{13}  \cdot\text{HYP} }  \right)  +  \cfrac{ c_{14}  \cdot\text{VR}}{ \left( c_{15} - c_{16}  \cdot\text{HYP} \right)  }  \right)  \cdot c_{17} + c_{18} \right) \end{align*}"
+        )
         
         # 生成特征重要性
         feature_importance = []
@@ -604,19 +853,37 @@ def analyze():
         # 生成预测结果
         predictions = []
         for i, row in enumerate(input_data):  # 处理所有数据行
-            actual = float(row.get(target_column, 0)) or random.uniform(1.5, 3.0)
+            # 对于列表格式的数据，我们生成随机值作为预测结果
+            actual = random.uniform(1.5, 3.0)
             predicted = actual + random.uniform(-0.3, 0.3)
             predictions.append({
                 "actual": round(actual, 3),
                 "predicted": round(predicted, 3)
             })
         
-        # 生成常数 - 只生成公式中实际需要的常数
-        constants = {}
-        # 根据表达式中的数字数量生成对应数量的常数
-        # 这里我们只生成4个常数，对应表达式中的4个数字
-        for i in range(4):  # 只生成c0到c3的常数
-            constants[f'c_{i}'] = round(random.uniform(-10, 10), 4)
+        # 生成常数 - 固定为给定的 19 个常数
+        # 使用 c{index} 形式的键名，避免前端误解析为 c_0 与 c{0} 的不同含义
+        constants = {
+            'c{0}': 1.9105,
+            'c{1}': 0.6015,
+            'c{2}': 0.42745,
+            'c{3}': 1.2977,
+            'c{4}': -10.458,
+            'c{5}': -1.9323,
+            'c{6}': -0.078141,
+            'c{7}': -1.9323,
+            'c{8}': 1.4812,
+            'c{9}': 0.59744,
+            'c{10}': 0.60783,
+            'c{11}': 2.9628,
+            'c{12}': 2.6756,
+            'c{13}': 0.40832,
+            'c{14}': 1.2192,
+            'c{15}': 5.4189,
+            'c{16}': 1.9105,
+            'c{17}': 0.0053559,
+            'c{18}': 0.93054,
+        }
         
         # 生成详细的性能指标
         detailed_metrics = {
@@ -639,7 +906,8 @@ def analyze():
         result = {
             "id": model_id,
             "expression": expression,
-            "target_variable": target_column,
+            "expression_latex": latex_expression,
+            "target_variable": "HDL",
             "constants": constants,
             "r2": round(random.uniform(0.7, 0.95), 3),
             "mse": round(random.uniform(0.05, 0.25), 3),
@@ -691,10 +959,16 @@ def analyze():
                 # 后备：根据内存数据重构CSV
                 csv_data = _prepare_csv_data(input_data, target_column, feature_columns)
             
-            # 准备符号回归模型数据
+            # 准备符号回归模型数据（写入 MathJax 公式 expression_latex）
+            def _to_latex(expr_text, target):
+                # 这里保存一份与前端一致的 MathJax 公式，使用正确的格式
+                # 包含 \cfrac 和 \text{} 等，确保与API返回格式一致
+                return r"\begin{align*} \nonumber HDL & =  \left(  \left(  \left(  \cfrac{  \left( c_{0}  \cdot\text{HYP} +  \left(  \left(  \left( c_{1}  \cdot\text{QA} + c_{2}  \cdot\text{HYP} \right)  + c_{3}  \cdot\text{CA} \right)  - c_{4} \right)  \right)  \cdot  \left( c_{5} + c_{6}  \cdot\text{MA} \cdot  \left(  \left(  \left( c_{7} + c_{8}  \cdot\text{OA} \right)  + c_{9}  \cdot\text{UA} \right)  + c_{10}  \cdot\text{UA} \right)  \right) }{c_{11}  \cdot\text{VR} }  -  \cfrac{ c_{12}}{c_{13}  \cdot\text{HYP} }  \right)  +  \cfrac{ c_{14}  \cdot\text{VR}}{ \left( c_{15} - c_{16}  \cdot\text{HYP} \right)  }  \right)  \cdot c_{17} + c_{18} \right) \end{align*}"
             regression_model = {
                 'id': model_id,
-                'expression': expression,
+                'expression_text': expression,
+                'expression': _to_latex(expression, target_column or 'Y'),
+                'expression_latex': _to_latex(expression, target_column or 'Y'),
                 'target_variable': target_column,
                 'constants': constants,
                 'r2': result['r2'],
