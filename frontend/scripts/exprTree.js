@@ -929,6 +929,16 @@
     svg.appendChild(nodesLayer);
     let selectedNodeId = null;
 
+    // 构建父子关系映射，用于判断 Subtraction 的右子节点（减数）
+    const parentById = new Map();
+    const childIndexById = new Map();
+    traverse(root, (n) => {
+      (n.children || []).forEach((ch, idx) => {
+        parentById.set(ch.id, n);
+        childIndexById.set(ch.id, idx);
+      });
+    });
+
     // 绘制连线
     const xOffset = cfg.margin.left - (bounds.minX || 0);
     const yOffset = cfg.margin.top + cfg.nodeRadius; // 使根节点完全显示
@@ -1039,7 +1049,7 @@
 
       // Tooltip
       const title = document.createElementNS(svgNS, 'title');
-      const subExpr = safeSubExpr(node);
+      const subExpr = subExprForTooltip(node);
       const w = Number(node.weight || 0).toFixed(6);
       const cn = (typeof window !== 'undefined' && window.COMPONENT_NAMES && node.kind === 'variable') ? (window.COMPONENT_NAMES[String(node.value)] || '') : '';
       title.textContent = `${subExpr}\n权重: ${w}${cn ? `\n${cn}` : ''}`;
@@ -1118,6 +1128,36 @@
     function getMaxDepth(n) { if (!n) return 0; if (!n.children || n.children.length === 0) return 0; return 1 + Math.max(...n.children.map(getMaxDepth)); }
     function opToText(op) { return op === 'add' ? 'Addition' : op === 'sub' ? 'Subtraction' : op === 'mul' ? 'Multiplication' : op === 'div' ? 'Division' : String(op || '?'); }
     function safeSubExpr(n) { try { return astToExpression(n); } catch (_) { return ''; } }
+    function subExprForTooltip(n) {
+      try {
+        const p = parentById.get(n.id);
+        const idx = childIndexById.get(n.id);
+        // 若该节点为 Subtraction 的右子节点（减数），则悬浮窗中去掉其自身的前导负号，仅保留父级的减号语义
+        if (p && p.kind === 'operator' && p.op === 'sub' && idx === 1) {
+          const raw = astToExpression(n);
+          return stripLeadingMinus(raw);
+        }
+        return astToExpression(n);
+      } catch (_) { return ''; }
+    }
+    function stripLeadingMinus(expr) {
+      let s = String(expr || '').trim();
+      if (!s) return s;
+      // 处理以 "-1 * " 开头的表达式
+      if (s.startsWith('-1 * ')) {
+        s = s.slice(5);
+        // 去掉可能的无意义前导 "1 * "
+        if (s.startsWith('1 * ')) s = s.slice(4);
+        return s;
+      }
+      // 处理以 '-' 开头的数字或子表达式
+      if (s.startsWith('-')) {
+        s = s.slice(1).trimStart();
+      }
+      // 兜底：移除潜在的 "1 * " 前缀
+      if (s.startsWith('1 * ')) s = s.slice(4);
+      return s;
+    }
   }
 
   ExprTree.renderSvgTree = renderSvgTree;
