@@ -491,11 +491,57 @@
       const exprA = astToExpression(a);
       const exprB = astToExpression(b);
       if (node.op === 'add') return `${exprA} + ${exprB}`;
-      if (node.op === 'sub') return `${exprA} - ${exprB}`;
+      // 在减法中，如果右孩子本身带有负号（负常数或负系数变量，或-1乘子），
+      // 为避免出现 "A - -B" 的双负号，悬浮窗等文本表达中将其转为 "A - B" 形式。
+      if (node.op === 'sub') {
+        const exprBAdjusted = expressionForSubRight(b);
+        return `${exprA} - ${exprBAdjusted}`;
+      }
       if (node.op === 'mul') return `${maybeParen(a, node.op)} * ${maybeParen(b, node.op)}`;
       if (node.op === 'div') return `${maybeParen(a, node.op)} / ${maybeParen(b, node.op)}`;
     }
     return '0';
+  }
+
+  // 在减法中用于格式化右侧被减数，移除其“自身携带的负号”，保留减法运算符的负号语义
+  function expressionForSubRight(n) {
+    if (!n) return '0';
+    // 常数：输出绝对值
+    if (n.kind === 'constant') {
+      const v = Number(n.value);
+      return formatNumberSci(Math.abs(v), 6);
+    }
+    // 变量：若系数为负，改为其绝对值；-1 则省略为变量本身
+    if (n.kind === 'variable') {
+      const coef = (typeof n.coefficient === 'number') ? n.coefficient : 1;
+      if (coef < 0) {
+        const absCoef = Math.abs(coef);
+        if (absCoef === 1) return String(n.value);
+        return `${formatNumberSci(absCoef, 6)} * ${n.value}`;
+      }
+      if (coef === 1) return String(n.value);
+      if (coef === -1) return String(n.value);
+      return `${formatNumberSci(coef, 6)} * ${n.value}`;
+    }
+    // 乘法：若含负常数因子，去除其负号
+    if (n.kind === 'operator' && n.op === 'mul' && n.children && n.children.length === 2) {
+      const a = n.children[0];
+      const b = n.children[1];
+      if (a && a.kind === 'constant' && Number(a.value) < 0) {
+        const k = Math.abs(Number(a.value));
+        const right = maybeParen(b, 'mul');
+        if (k === 1) return right;
+        return `${formatNumberSci(k, 6)} * ${right}`;
+      }
+      if (b && b.kind === 'constant' && Number(b.value) < 0) {
+        const k = Math.abs(Number(b.value));
+        const left = maybeParen(a, 'mul');
+        if (k === 1) return left;
+        return `${formatNumberSci(k, 6)} * ${left}`;
+      }
+    }
+    // 其他情况：保持原有表达
+    return astToExpression(n);
   }
 
   function maybeParen(node, parentOp) {
@@ -929,16 +975,6 @@
     svg.appendChild(nodesLayer);
     let selectedNodeId = null;
 
-    // 构建父子关系映射，用于判断 Subtraction 的右子节点（减数）
-    const parentById = new Map();
-    const childIndexById = new Map();
-    traverse(root, (n) => {
-      (n.children || []).forEach((ch, idx) => {
-        parentById.set(ch.id, n);
-        childIndexById.set(ch.id, idx);
-      });
-    });
-
     // 绘制连线
     const xOffset = cfg.margin.left - (bounds.minX || 0);
     const yOffset = cfg.margin.top + cfg.nodeRadius; // 使根节点完全显示
@@ -1049,7 +1085,7 @@
 
       // Tooltip
       const title = document.createElementNS(svgNS, 'title');
-      const subExpr = subExprForTooltip(node);
+      const subExpr = safeSubExpr(node);
       const w = Number(node.weight || 0).toFixed(6);
       const cn = (typeof window !== 'undefined' && window.COMPONENT_NAMES && node.kind === 'variable') ? (window.COMPONENT_NAMES[String(node.value)] || '') : '';
       title.textContent = `${subExpr}\n权重: ${w}${cn ? `\n${cn}` : ''}`;
@@ -1128,36 +1164,6 @@
     function getMaxDepth(n) { if (!n) return 0; if (!n.children || n.children.length === 0) return 0; return 1 + Math.max(...n.children.map(getMaxDepth)); }
     function opToText(op) { return op === 'add' ? 'Addition' : op === 'sub' ? 'Subtraction' : op === 'mul' ? 'Multiplication' : op === 'div' ? 'Division' : String(op || '?'); }
     function safeSubExpr(n) { try { return astToExpression(n); } catch (_) { return ''; } }
-    function subExprForTooltip(n) {
-      try {
-        const p = parentById.get(n.id);
-        const idx = childIndexById.get(n.id);
-        // 若该节点为 Subtraction 的右子节点（减数），则悬浮窗中去掉其自身的前导负号，仅保留父级的减号语义
-        if (p && p.kind === 'operator' && p.op === 'sub' && idx === 1) {
-          const raw = astToExpression(n);
-          return stripLeadingMinus(raw);
-        }
-        return astToExpression(n);
-      } catch (_) { return ''; }
-    }
-    function stripLeadingMinus(expr) {
-      let s = String(expr || '').trim();
-      if (!s) return s;
-      // 处理以 "-1 * " 开头的表达式
-      if (s.startsWith('-1 * ')) {
-        s = s.slice(5);
-        // 去掉可能的无意义前导 "1 * "
-        if (s.startsWith('1 * ')) s = s.slice(4);
-        return s;
-      }
-      // 处理以 '-' 开头的数字或子表达式
-      if (s.startsWith('-')) {
-        s = s.slice(1).trimStart();
-      }
-      // 兜底：移除潜在的 "1 * " 前缀
-      if (s.startsWith('1 * ')) s = s.slice(4);
-      return s;
-    }
   }
 
   ExprTree.renderSvgTree = renderSvgTree;
