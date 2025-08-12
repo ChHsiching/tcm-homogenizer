@@ -2934,17 +2934,49 @@ function renderBeautifiedFileContent(container, content, filename, fileType) {
 
     if (fileType === 'regression_model') {
         const json = JSON.parse(content || '{}');
+        const dm = json.detailed_metrics || {};
         const featureImportance = Array.isArray(json.feature_importance) ? json.feature_importance.slice() : [];
         featureImportance.sort((a, b) => (b.importance || 0) - (a.importance || 0));
+
+        const fmt = (v) => (v === 0 || typeof v === 'number') ? (Math.abs(v) < 1e-4 ? v.toExponential(2) : Number(v).toFixed(3)) : (v ?? '-');
+
         const html = `
             <div class="beautified-json">
                 <div class="metric-cards">
                     <div class="metric-card"><div class="metric-label">目标变量</div><div class="metric-value">${json.target_column || '-'}</div></div>
-                    <div class="metric-card"><div class="metric-label">皮尔逊相关系数(测试)</div><div class="metric-value">${json.detailed_metrics?.pearson_r_test ?? '-'}</div></div>
-                    <div class="metric-card"><div class="metric-label">皮尔逊相关系数(训练)</div><div class="metric-value">${json.detailed_metrics?.pearson_r_training ?? '-'}</div></div>
+                    <div class="metric-card"><div class="metric-label">皮尔逊相关系数(测试)</div><div class="metric-value">${dm.pearson_r_test ?? '-'}</div></div>
+                    <div class="metric-card"><div class="metric-label">皮尔逊相关系数(训练)</div><div class="metric-value">${dm.pearson_r_training ?? '-'}</div></div>
                     <div class="metric-card"><div class="metric-label">复杂度</div><div class="metric-value">${json.model_complexity ?? '-'}</div></div>
                 </div>
                 ${json.expression_latex ? `<div class="expression-box"><div class="expression-label">模型表达式（MathJax）</div><div class="expression-value">$${json.expression_latex}$</div></div>` : (json.expression ? `<div class="expression-box"><div class="expression-label">模型表达式（MathJax）</div><div class="expression-value">$${json.expression}$</div></div>` : (json.expression_text ? `<div class="expression-box"><div class="expression-label">模型表达式（文本）</div><div class="expression-value">${json.expression_text}</div></div>` : ''))}
+
+                <div class="section-subtitle">详细指标</div>
+                <div class="metrics-grid">
+                    <div class="metric-section">
+                        <h6>误差指标</h6>
+                        <div class="metric-list">
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">平均相对误差</span><span class="metric-name-en">Average relative error</span><span class="metric-dataset">(测试)</span></div><span class="metric-value">${dm.average_relative_error_test != null ? dm.average_relative_error_test + '%' : '-'}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">平均相对误差</span><span class="metric-name-en">Average relative error</span><span class="metric-dataset">(训练)</span></div><span class="metric-value">${dm.average_relative_error_training != null ? dm.average_relative_error_training + '%' : '-'}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">平均绝对误差</span><span class="metric-name-en">Mean absolute error</span><span class="metric-dataset">(测试)</span></div><span class="metric-value">${fmt(dm.mean_absolute_error_test)}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">平均绝对误差</span><span class="metric-name-en">Mean absolute error</span><span class="metric-dataset">(训练)</span></div><span class="metric-value">${fmt(dm.mean_absolute_error_training)}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">均方误差</span><span class="metric-name-en">Mean squared error</span><span class="metric-dataset">(测试)</span></div><span class="metric-value">${fmt(dm.mean_squared_error_test)}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">均方误差</span><span class="metric-name-en">Mean squared error</span><span class="metric-dataset">(训练)</span></div><span class="metric-value">${fmt(dm.mean_squared_error_training)}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">归一化均方误差</span><span class="metric-name-en">Normalized MSE</span><span class="metric-dataset">(测试)</span></div><span class="metric-value">${fmt(dm.normalized_mean_squared_error_test)}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">归一化均方误差</span><span class="metric-name-en">Normalized MSE</span><span class="metric-dataset">(训练)</span></div><span class="metric-value">${fmt(dm.normalized_mean_squared_error_training)}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">均方根误差</span><span class="metric-name-en">Root MSE</span><span class="metric-dataset">(测试)</span></div><span class="metric-value">${fmt(dm.root_mean_squared_error_test)}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">均方根误差</span><span class="metric-name-en">Root MSE</span><span class="metric-dataset">(训练)</span></div><span class="metric-value">${fmt(dm.root_mean_squared_error_training)}</span></div>
+                        </div>
+                    </div>
+
+                    <div class="metric-section">
+                        <h6>模型结构</h6>
+                        <div class="metric-list">
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">模型深度</span><span class="metric-name-en">Model Depth</span></div><span class="metric-value">${dm.model_depth ?? '-'}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">模型长度</span><span class="metric-name-en">Model Length</span></div><span class="metric-value">${dm.model_length ?? '-'}</span></div>
+                        </div>
+                    </div>
+                </div>
+
                 ${featureImportance.length ? `
                 <div class="section-subtitle">特征重要性</div>
                 <div class="importance-table">
