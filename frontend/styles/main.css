@@ -952,7 +952,8 @@ input.readonly-not-allowed {
 }
 
 #expr-performance-container .performance-metrics {
-    grid-template-columns: repeat(2, minmax(120px, 1fr));
+    /* 改为上下排布两张卡片 */
+    grid-template-columns: 1fr;
 }
 
 #expr-detailed-container .metrics-grid {
