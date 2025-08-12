@@ -1,9 +1,8 @@
-#!/usr/bin/env bash
+#!/bin/bash
+
 # 本草智配客户端 - 项目状态检查脚本
 
-set -e
-
-echo "📋 本草智配客户端 - 状态检查"
+echo "🔍 检查项目状态..."
 
 # 获取项目根目录
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
