@@ -643,10 +643,16 @@ input.readonly-not-allowed {
 
 /* 状态栏内容布局 */
 .status-bar .status-left,
+.status-bar .status-center,
 .status-bar .status-right {
     display: flex;
     align-items: center;
     gap: 15px;
+}
+
+.status-bar .status-center {
+    flex: 1;
+    justify-content: center;
 }
 
 /* 导航菜单 - 添加过渡效果 */
@@ -971,7 +977,7 @@ input.readonly-not-allowed {
     white-space: nowrap;
 }
 
-/* 让右上“回归表达式”根据内容自适应高度，而不是继承 results-container 的网格最小高度 */
+/* 让右上"回归表达式"根据内容自适应高度，而不是继承 results-container 的网格最小高度 */
 #expr-formula-container {
     min-height: 0 !important;
     display: block !important;
@@ -1701,7 +1707,7 @@ input[type="checkbox"]:focus {
     text-align: right;
 }
 
-/* 符号表达式树左侧“详细指标”模块的定制排版与悬停动效 */
+/* 符号表达式树左侧"详细指标"模块的定制排版与悬停动效 */
 #expr-detailed-container .metric-list { gap: 10px; }
 #expr-detailed-container .metric-item {
     display: flex;
@@ -1734,7 +1740,7 @@ input[type="checkbox"]:focus {
 
 .feature-importance-item {
     display: grid;
-    grid-template-columns: 140px 1fr 60px;
+    grid-template-columns: 140px 1fr 170px;
     align-items: center;
     gap: 15px;
     padding: var(--spacing-sm) var(--spacing-md);
@@ -1792,8 +1798,10 @@ input[type="checkbox"]:focus {
     font-size: var(--font-size-sm);
     font-weight: bold;
     color: var(--accent-primary);
-    min-width: 50px;
+    min-width: 150px;
     text-align: right;
+    font-family: 'Courier New', monospace;
+    word-break: break-all;
 }
 
 /* 数据管理页面 */
@@ -2007,7 +2015,9 @@ input[type="checkbox"]:focus {
     
     .feature-importance-item .importance-value {
         text-align: left;
-        min-width: auto;
+        min-width: 120px;
+        font-family: 'Courier New', monospace;
+        word-break: break-all;
     }
 }
 
@@ -4766,4 +4776,211 @@ input[type="checkbox"]:focus {
 #data-preview table td:nth-child(3) .metrics-summary .metric-item {
     padding: 1px 3px;
     gap: 4px;
+}
+
+/* 连接状态指示灯样式 */
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    box-shadow: 0 0 0 0 rgba(128, 128, 128, 0.7);
+    animation: pulse 2s infinite;
+    transition: all 0.3s ease;
+}
+
+.status-indicator.connected {
+    background: var(--accent-success);
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7);
+    animation: pulse-success 2s infinite;
+}
+
+.status-indicator.disconnected {
+    background: var(--accent-error);
+    box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.7);
+    animation: pulse-error 2s infinite;
+}
+
+.status-indicator.checking {
+    background: var(--accent-warning);
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.7);
+    animation: pulse-warning 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(128, 128, 128, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgba(128, 128, 128, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(128, 128, 128, 0);
+    }
+}
+
+@keyframes pulse-success {
+    0% {
+        box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgba(74, 222, 128, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
+    }
+}
+
+@keyframes pulse-error {
+    0% {
+        box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgba(248, 113, 113, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(248, 113, 113, 0);
+    }
+}
+
+@keyframes pulse-warning {
+    0% {
+        box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgba(251, 191, 36, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
+    }
+}
+
+/* 清空通知按钮样式 */
+.btn-clear-notifications {
+    background: var(--accent-warning);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(251, 191, 36, 0.3);
+    display: none;
+}
+
+.btn-clear-notifications:hover {
+    background: #f59e0b;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(251, 191, 36, 0.4);
+}
+
+.btn-clear-notifications:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 4px rgba(251, 191, 36, 0.3);
+}
+
+/* 时间显示样式 */
+.time-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.clock-icon {
+    font-size: 14px;
+    transition: all 0.3s ease;
+    animation: clock-pulse 2s infinite;
+}
+
+/* 上午时段：日出效果 */
+.clock-icon.morning {
+    animation: morning-glow 3s infinite;
+    filter: drop-shadow(0 0 8px rgba(255, 165, 0, 0.6));
+}
+
+/* 下午时段：阳光效果 */
+.clock-icon.afternoon {
+    animation: afternoon-glow 3s infinite;
+    filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.6));
+}
+
+/* 傍晚时段：夕阳效果 */
+.clock-icon.evening {
+    animation: evening-glow 3s infinite;
+    filter: drop-shadow(0 0 8px rgba(255, 69, 0, 0.6));
+}
+
+/* 夜晚时段：月光效果 */
+.clock-icon.night {
+    animation: night-glow 3s infinite;
+    filter: drop-shadow(0 0 8px rgba(138, 43, 226, 0.6));
+}
+
+/* 基础时钟脉冲动画 */
+@keyframes clock-pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* 上午发光动画 */
+@keyframes morning-glow {
+    0%, 100% {
+        filter: drop-shadow(0 0 8px rgba(255, 165, 0, 0.6));
+        transform: scale(1);
+    }
+    50% {
+        filter: drop-shadow(0 0 12px rgba(255, 165, 0, 0.8));
+        transform: scale(1.05);
+    }
+}
+
+/* 下午发光动画 */
+@keyframes afternoon-glow {
+    0%, 100% {
+        filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.6));
+        transform: scale(1);
+    }
+    50% {
+        filter: drop-shadow(0 0 12px rgba(255, 215, 0, 0.8));
+        transform: scale(1.05);
+    }
+}
+
+/* 傍晚发光动画 */
+@keyframes evening-glow {
+    0%, 100% {
+        filter: drop-shadow(0 0 8px rgba(255, 69, 0, 0.6));
+        transform: scale(1);
+    }
+    50% {
+        filter: drop-shadow(0 0 12px rgba(255, 69, 0, 0.8));
+        transform: scale(1.05);
+    }
+}
+
+/* 夜晚发光动画 */
+@keyframes night-glow {
+    0%, 100% {
+        filter: drop-shadow(0 0 8px rgba(138, 43, 226, 0.6));
+        transform: scale(1);
+    }
+    50% {
+        filter: drop-shadow(0 0 12px rgba(138, 43, 226, 0.8));
+        transform: scale(1.05);
+    }
 }

@@ -282,6 +282,404 @@ MOCK_INDICATORS_SEQUENCE = [None] + [
     }
 ]
 
+# 符号回归分析的初始特征权重（基线数据）
+MOCK_WEIGHTS_BASELINE = [
+    {'feature': 'VR', 'importance': 0.40331375862937024},
+    {'feature': 'HYP', 'importance': 0.30740076820527074},
+    {'feature': 'UA', 'importance': 0.23746410777792382},
+    {'feature': 'CA', 'importance': 0.22610791660542262},
+    {'feature': 'MA', 'importance': 0.15483347260005331},
+    {'feature': 'QA', 'importance': 0.026878474944676545},
+    {'feature': 'OA', 'importance': 0.013918586597244875},
+    {'feature': 'MDA', 'importance': 0},
+    {'feature': 'QUE', 'importance': 0},
+    {'feature': 'CRA', 'importance': 0},
+    {'feature': 'EPI', 'importance': 0},
+    {'feature': 'PC1', 'importance': 0},
+    {'feature': 'PB2', 'importance': 0},
+    {'feature': 'VG', 'importance': 0},
+    {'feature': 'RUT', 'importance': 0},
+    {'feature': 'GUA', 'importance': 0},
+    {'feature': 'AST', 'importance': 0},
+    {'feature': 'PIS', 'importance': 0},
+    {'feature': 'CCGA', 'importance': 0},
+    {'feature': 'CGA', 'importance': 0},
+    {'feature': 'NCGA', 'importance': 0}
+]
+
+# 符号表达式树操作的模拟特征权重序列（不要从文件读取，直接内嵌）
+# 下标1..15分别对应第1~15次树结构变更后的特征权重；下标0表示基线，不覆盖。
+MOCK_WEIGHTS_SEQUENCE = [None] + [
+    [
+        {'feature': 'VR', 'importance': 0.40331375862937024},
+        {'feature': 'HYP', 'importance': 0.30740076820527074},
+        {'feature': 'UA', 'importance': 0.23746410777792382},
+        {'feature': 'CA', 'importance': 0.22610791660542262},
+        {'feature': 'MA', 'importance': 0.15483347260005331},
+        {'feature': 'QA', 'importance': 0.026878474944676545},
+        {'feature': 'OA', 'importance': 0.013918586597244875},
+        {'feature': 'MDA', 'importance': 0},
+        {'feature': 'QUE', 'importance': 0},
+        {'feature': 'CRA', 'importance': 0},
+        {'feature': 'EPI', 'importance': 0},
+        {'feature': 'PC1', 'importance': 0},
+        {'feature': 'PB2', 'importance': 0},
+        {'feature': 'VG', 'importance': 0},
+        {'feature': 'RUT', 'importance': 0},
+        {'feature': 'GUA', 'importance': 0},
+        {'feature': 'AST', 'importance': 0},
+        {'feature': 'PIS', 'importance': 0},
+        {'feature': 'CCGA', 'importance': 0},
+        {'feature': 'CGA', 'importance': 0},
+        {'feature': 'NCGA', 'importance': 0}
+    ],
+    [
+        {'feature': 'VR', 'importance': 0.40331375862937047},
+        {'feature': 'HYP', 'importance': 0.30740076820527074},
+        {'feature': 'UA', 'importance': 0.23746410777792459},
+        {'feature': 'CA', 'importance': 0.22610791660542306},
+        {'feature': 'MA', 'importance': 0.15483347260005353},
+        {'feature': 'QA', 'importance': 0.026878474944676323},
+        {'feature': 'OA', 'importance': 0.013918586597245208},
+        {'feature': 'MDA', 'importance': 0},
+        {'feature': 'QUE', 'importance': 0},
+        {'feature': 'CRA', 'importance': 0},
+        {'feature': 'EPI', 'importance': 0},
+        {'feature': 'PC1', 'importance': 0},
+        {'feature': 'PB2', 'importance': 0},
+        {'feature': 'VG', 'importance': 0},
+        {'feature': 'RUT', 'importance': 0},
+        {'feature': 'GUA', 'importance': 0},
+        {'feature': 'AST', 'importance': 0},
+        {'feature': 'PIS', 'importance': 0},
+        {'feature': 'CCGA', 'importance': 0},
+        {'feature': 'CGA', 'importance': 0},
+        {'feature': 'NCGA', 'importance': 0}
+    ],
+    [
+        {'feature': 'VR', 'importance': 0.40331375862937041},
+        {'feature': 'HYP', 'importance': 0.30740076820527051},
+        {'feature': 'UA', 'importance': 0.23746410777792437},
+        {'feature': 'CA', 'importance': 0.22610791660542284},
+        {'feature': 'MA', 'importance': 0.15483347260005331},
+        {'feature': 'QA', 'importance': 0.026878474944676323},
+        {'feature': 'OA', 'importance': 0.013918586597244986},
+        {'feature': 'MDA', 'importance': 0},
+        {'feature': 'QUE', 'importance': 0},
+        {'feature': 'CRA', 'importance': 0},
+        {'feature': 'EPI', 'importance': 0},
+        {'feature': 'PC1', 'importance': 0},
+        {'feature': 'PB2', 'importance': 0},
+        {'feature': 'VG', 'importance': 0},
+        {'feature': 'RUT', 'importance': 0},
+        {'feature': 'GUA', 'importance': 0},
+        {'feature': 'AST', 'importance': 0},
+        {'feature': 'PIS', 'importance': 0},
+        {'feature': 'CCGA', 'importance': 0},
+        {'feature': 'CGA', 'importance': 0},
+        {'feature': 'NCGA', 'importance': 0}
+    ],
+    [
+        {'feature': 'VR', 'importance': 0.40331375862937041},
+        {'feature': 'HYP', 'importance': 0.30740076820527051},
+        {'feature': 'UA', 'importance': 0.23746410777792437},
+        {'feature': 'CA', 'importance': 0.22610791660542284},
+        {'feature': 'MA', 'importance': 0.15483347260005331},
+        {'feature': 'QA', 'importance': 0.026878474944676323},
+        {'feature': 'OA', 'importance': 0.013918586597244986},
+        {'feature': 'MDA', 'importance': 0},
+        {'feature': 'QUE', 'importance': 0},
+        {'feature': 'CRA', 'importance': 0},
+        {'feature': 'EPI', 'importance': 0},
+        {'feature': 'PC1', 'importance': 0},
+        {'feature': 'PB2', 'importance': 0},
+        {'feature': 'VG', 'importance': 0},
+        {'feature': 'RUT', 'importance': 0},
+        {'feature': 'GUA', 'importance': 0},
+        {'feature': 'AST', 'importance': 0},
+        {'feature': 'PIS', 'importance': 0},
+        {'feature': 'CCGA', 'importance': 0},
+        {'feature': 'CGA', 'importance': 0},
+        {'feature': 'NCGA', 'importance': 0}
+    ],
+    [
+        {'feature': 'HYP', 'importance': 0.36678996351202248},
+        {'feature': 'VR', 'importance': 0.3610819114205992},
+        {'feature': 'UA', 'importance': 0.28351747274386141},
+        {'feature': 'CA', 'importance': 0.22066636862784783},
+        {'feature': 'MA', 'importance': 0.12704990635004476},
+        {'feature': 'QA', 'importance': 0.026878474944676323},
+        {'feature': 'OA', 'importance': 0.013918586597244986},
+        {'feature': 'MDA', 'importance': 0},
+        {'feature': 'QUE', 'importance': 0},
+        {'feature': 'CRA', 'importance': 0},
+        {'feature': 'EPI', 'importance': 0},
+        {'feature': 'PC1', 'importance': 0},
+        {'feature': 'PB2', 'importance': 0},
+        {'feature': 'VG', 'importance': 0},
+        {'feature': 'RUT', 'importance': 0},
+        {'feature': 'GUA', 'importance': 0},
+        {'feature': 'AST', 'importance': 0},
+        {'feature': 'PIS', 'importance': 0},
+        {'feature': 'CCGA', 'importance': 0},
+        {'feature': 'CGA', 'importance': 0},
+        {'feature': 'NCGA', 'importance': 0}
+    ],
+    [
+        {'feature': 'HYP', 'importance': 0.36678996351202248},
+        {'feature': 'VR', 'importance': 0.3610819114205992},
+        {'feature': 'UA', 'importance': 0.28351747274386141},
+        {'feature': 'CA', 'importance': 0.22066636862784783},
+        {'feature': 'MA', 'importance': 0.12704990635004476},
+        {'feature': 'QA', 'importance': 0.026878474944676323},
+        {'feature': 'OA', 'importance': 0.013918586597244986},
+        {'feature': 'MDA', 'importance': 0},
+        {'feature': 'QUE', 'importance': 0},
+        {'feature': 'CRA', 'importance': 0},
+        {'feature': 'EPI', 'importance': 0},
+        {'feature': 'PC1', 'importance': 0},
+        {'feature': 'PB2', 'importance': 0},
+        {'feature': 'VG', 'importance': 0},
+        {'feature': 'RUT', 'importance': 0},
+        {'feature': 'GUA', 'importance': 0},
+        {'feature': 'AST', 'importance': 0},
+        {'feature': 'PIS', 'importance': 0},
+        {'feature': 'CCGA', 'importance': 0},
+        {'feature': 'CGA', 'importance': 0},
+        {'feature': 'NCGA', 'importance': 0}
+    ],
+    [
+        {'feature': 'HYP', 'importance': 0.36678996351202248},
+        {'feature': 'VR', 'importance': 0.3610819114205992},
+        {'feature': 'UA', 'importance': 0.28351747274386141},
+        {'feature': 'CA', 'importance': 0.22066636862784783},
+        {'feature': 'MA', 'importance': 0.12704990635004476},
+        {'feature': 'QA', 'importance': 0.026878474944676323},
+        {'feature': 'OA', 'importance': 0.013918586597244986},
+        {'feature': 'MDA', 'importance': 0},
+        {'feature': 'QUE', 'importance': 0},
+        {'feature': 'CRA', 'importance': 0},
+        {'feature': 'EPI', 'importance': 0},
+        {'feature': 'PC1', 'importance': 0},
+        {'feature': 'PB2', 'importance': 0},
+        {'feature': 'VG', 'importance': 0},
+        {'feature': 'RUT', 'importance': 0},
+        {'feature': 'GUA', 'importance': 0},
+        {'feature': 'AST', 'importance': 0},
+        {'feature': 'PIS', 'importance': 0},
+        {'feature': 'CCGA', 'importance': 0},
+        {'feature': 'CGA', 'importance': 0},
+        {'feature': 'NCGA', 'importance': 0}
+    ],
+    [
+        {'feature': 'HYP', 'importance': 0.36678996351202248},
+        {'feature': 'VR', 'importance': 0.3610819114205992},
+        {'feature': 'UA', 'importance': 0.28351747274386141},
+        {'feature': 'CA', 'importance': 0.22066636862784783},
+        {'feature': 'MA', 'importance': 0.12704990635004476},
+        {'feature': 'MDA', 'importance': 0},
+        {'feature': 'QUE', 'importance': 0},
+        {'feature': 'CRA', 'importance': 0},
+        {'feature': 'OA', 'importance': 0},
+        {'feature': 'EPI', 'importance': 0},
+        {'feature': 'PC1', 'importance': 0},
+        {'feature': 'PB2', 'importance': 0},
+        {'feature': 'VG', 'importance': 0},
+        {'feature': 'RUT', 'importance': 0},
+        {'feature': 'GUA', 'importance': 0},
+        {'feature': 'AST', 'importance': 0},
+        {'feature': 'PIS', 'importance': 0},
+        {'feature': 'CCGA', 'importance': 0},
+        {'feature': 'CGA', 'importance': 0},
+        {'feature': 'NCGA', 'importance': 0},
+        {'feature': 'QA', 'importance': 0}
+    ],
+    [
+        {'feature': 'HYP', 'importance': 0.36678996351202248},
+        {'feature': 'VR', 'importance': 0.3610819114205992},
+        {'feature': 'UA', 'importance': 0.28351747274386141},
+        {'feature': 'CA', 'importance': 0.22066636862784783},
+        {'feature': 'MA', 'importance': 0.12704990635004476},
+        {'feature': 'MDA', 'importance': 0},
+        {'feature': 'QUE', 'importance': 0},
+        {'feature': 'CRA', 'importance': 0},
+        {'feature': 'OA', 'importance': 0},
+        {'feature': 'EPI', 'importance': 0},
+        {'feature': 'PC1', 'importance': 0},
+        {'feature': 'PB2', 'importance': 0},
+        {'feature': 'VG', 'importance': 0},
+        {'feature': 'RUT', 'importance': 0},
+        {'feature': 'GUA', 'importance': 0},
+        {'feature': 'AST', 'importance': 0},
+        {'feature': 'PIS', 'importance': 0},
+        {'feature': 'CCGA', 'importance': 0},
+        {'feature': 'CGA', 'importance': 0},
+        {'feature': 'NCGA', 'importance': 0},
+        {'feature': 'QA', 'importance': 0}
+    ],
+    [
+        {'feature': 'HYP', 'importance': 0.36678996351202248},
+        {'feature': 'VR', 'importance': 0.3610819114205992},
+        {'feature': 'UA', 'importance': 0.28351747274386141},
+        {'feature': 'CA', 'importance': 0.22066636862784783},
+        {'feature': 'MA', 'importance': 0.12704990635004476},
+        {'feature': 'MDA', 'importance': 0},
+        {'feature': 'QUE', 'importance': 0},
+        {'feature': 'CRA', 'importance': 0},
+        {'feature': 'OA', 'importance': 0},
+        {'feature': 'EPI', 'importance': 0},
+        {'feature': 'PC1', 'importance': 0},
+        {'feature': 'PB2', 'importance': 0},
+        {'feature': 'VG', 'importance': 0},
+        {'feature': 'RUT', 'importance': 0},
+        {'feature': 'CRA', 'importance': 0},
+        {'feature': 'AST', 'importance': 0},
+        {'feature': 'PIS', 'importance': 0},
+        {'feature': 'CCGA', 'importance': 0},
+        {'feature': 'CGA', 'importance': 0},
+        {'feature': 'NCGA', 'importance': 0},
+        {'feature': 'QA', 'importance': 0}
+    ],
+    [
+        {'feature': 'HYP', 'importance': 0.36678996351202248},
+        {'feature': 'VR', 'importance': 0.3610819114205992},
+        {'feature': 'UA', 'importance': 0.28351747274386141},
+        {'feature': 'CA', 'importance': 0.22066636862784783},
+        {'feature': 'MA', 'importance': 0.12704990635004476},
+        {'feature': 'MDA', 'importance': 0},
+        {'feature': 'QUE', 'importance': 0},
+        {'feature': 'CRA', 'importance': 0},
+        {'feature': 'OA', 'importance': 0},
+        {'feature': 'EPI', 'importance': 0},
+        {'feature': 'PC1', 'importance': 0},
+        {'feature': 'PB2', 'importance': 0},
+        {'feature': 'VG', 'importance': 0},
+        {'feature': 'RUT', 'importance': 0},
+        {'feature': 'GUA', 'importance': 0},
+        {'feature': 'AST', 'importance': 0},
+        {'feature': 'PIS', 'importance': 0},
+        {'feature': 'CCGA', 'importance': 0},
+        {'feature': 'CGA', 'importance': 0},
+        {'feature': 'NCGA', 'importance': 0},
+        {'feature': 'QA', 'importance': 0}
+    ],
+    [
+        {'feature': 'HYP', 'importance': 0.36678996351202248},
+        {'feature': 'VR', 'importance': 0.3610819114205992},
+        {'feature': 'UA', 'importance': 0.28351747274386141},
+        {'feature': 'CA', 'importance': 0.22066636862784783},
+        {'feature': 'MA', 'importance': 0.12704990635004476},
+        {'feature': 'MDA', 'importance': 0},
+        {'feature': 'QUE', 'importance': 0},
+        {'feature': 'CRA', 'importance': 0},
+        {'feature': 'OA', 'importance': 0},
+        {'feature': 'EPI', 'importance': 0},
+        {'feature': 'PC1', 'importance': 0},
+        {'feature': 'PB2', 'importance': 0},
+        {'feature': 'VG', 'importance': 0},
+        {'feature': 'RUT', 'importance': 0},
+        {'feature': 'GUA', 'importance': 0},
+        {'feature': 'AST', 'importance': 0},
+        {'feature': 'PIS', 'importance': 0},
+        {'feature': 'CCGA', 'importance': 0},
+        {'feature': 'CGA', 'importance': 0},
+        {'feature': 'NCGA', 'importance': 0},
+        {'feature': 'QA', 'importance': 0}
+    ],
+    [
+        {'feature': 'HYP', 'importance': 0.36678996351202248},
+        {'feature': 'VR', 'importance': 0.3610819114205992},
+        {'feature': 'UA', 'importance': 0.28351747274386141},
+        {'feature': 'CA', 'importance': 0.22066636862784783},
+        {'feature': 'MA', 'importance': 0.12704990635004476},
+        {'feature': 'MDA', 'importance': 0},
+        {'feature': 'QUE', 'importance': 0},
+        {'feature': 'CRA', 'importance': 0},
+        {'feature': 'OA', 'importance': 0},
+        {'feature': 'EPI', 'importance': 0},
+        {'feature': 'PC1', 'importance': 0},
+        {'feature': 'PB2', 'importance': 0},
+        {'feature': 'VG', 'importance': 0},
+        {'feature': 'RUT', 'importance': 0},
+        {'feature': 'GUA', 'importance': 0},
+        {'feature': 'AST', 'importance': 0},
+        {'feature': 'PIS', 'importance': 0},
+        {'feature': 'CCGA', 'importance': 0},
+        {'feature': 'CGA', 'importance': 0},
+        {'feature': 'NCGA', 'importance': 0},
+        {'feature': 'QA', 'importance': 0}
+    ],
+    [
+        {'feature': 'HYP', 'importance': 0.36678996351202248},
+        {'feature': 'VR', 'importance': 0.3610819114205992},
+        {'feature': 'UA', 'importance': 0.28351747274386141},
+        {'feature': 'CA', 'importance': 0.22066636862784783},
+        {'feature': 'MA', 'importance': 0.12704990635004476},
+        {'feature': 'MDA', 'importance': 0},
+        {'feature': 'QUE', 'importance': 0},
+        {'feature': 'CRA', 'importance': 0},
+        {'feature': 'OA', 'importance': 0},
+        {'feature': 'EPI', 'importance': 0},
+        {'feature': 'PC1', 'importance': 0},
+        {'feature': 'PB2', 'importance': 0},
+        {'feature': 'VG', 'importance': 0},
+        {'feature': 'RUT', 'importance': 0},
+        {'feature': 'GUA', 'importance': 0},
+        {'feature': 'AST', 'importance': 0},
+        {'feature': 'PIS', 'importance': 0},
+        {'feature': 'CCGA', 'importance': 0},
+        {'feature': 'CGA', 'importance': 0},
+        {'feature': 'NCGA', 'importance': 0},
+        {'feature': 'QA', 'importance': 0}
+    ],
+    [
+        {'feature': 'HYP', 'importance': 0.36678996351202248},
+        {'feature': 'VR', 'importance': 0.3610819114205992},
+        {'feature': 'UA', 'importance': 0.28351747274386141},
+        {'feature': 'CA', 'importance': 0.22066636862784783},
+        {'feature': 'MA', 'importance': 0.12704990635004476},
+        {'feature': 'MDA', 'importance': 0},
+        {'feature': 'QUE', 'importance': 0},
+        {'feature': 'CRA', 'importance': 0},
+        {'feature': 'OA', 'importance': 0},
+        {'feature': 'EPI', 'importance': 0},
+        {'feature': 'PC1', 'importance': 0},
+        {'feature': 'PB2', 'importance': 0},
+        {'feature': 'VG', 'importance': 0},
+        {'feature': 'RUT', 'importance': 0},
+        {'feature': 'GUA', 'importance': 0},
+        {'feature': 'AST', 'importance': 0},
+        {'feature': 'PIS', 'importance': 0},
+        {'feature': 'CCGA', 'importance': 0},
+        {'feature': 'CGA', 'importance': 0},
+        {'feature': 'NCGA', 'importance': 0},
+        {'feature': 'QA', 'importance': 0}
+    ],
+    [
+        {'feature': 'HYP', 'importance': 0.36678996351202248},
+        {'feature': 'VR', 'importance': 0.3610819114205992},
+        {'feature': 'UA', 'importance': 0.28351747274386141},
+        {'feature': 'CA', 'importance': 0.22066636862784783},
+        {'feature': 'MA', 'importance': 0.12704990635004476},
+        {'feature': 'MDA', 'importance': 0},
+        {'feature': 'QUE', 'importance': 0},
+        {'feature': 'CRA', 'importance': 0},
+        {'feature': 'OA', 'importance': 0},
+        {'feature': 'EPI', 'importance': 0},
+        {'feature': 'PC1', 'importance': 0},
+        {'feature': 'PB2', 'importance': 0},
+        {'feature': 'VG', 'importance': 0},
+        {'feature': 'RUT', 'importance': 0},
+        {'feature': 'GUA', 'importance': 0},
+        {'feature': 'AST', 'importance': 0},
+        {'feature': 'PIS', 'importance': 0},
+        {'feature': 'CCGA', 'importance': 0},
+        {'feature': 'CGA', 'importance': 0},
+        {'feature': 'NCGA', 'importance': 0},
+        {'feature': 'QA', 'importance': 0}
+    ]
+]
+
 def load_data_models():
     """加载所有数据模型"""
     models = []
@@ -378,18 +776,20 @@ def expression_tree_summary():
                         'feature_importance': (reg_json or {}).get('feature_importance') or model.get('feature_importance') or [],
                         'impact_tree': (reg_json or {}).get('impact_tree') or model.get('symbolic_regression', {}).get('impact_tree') or None,
                         'detailed_metrics': (reg_json or {}).get('detailed_metrics') or model.get('detailed_metrics') or {
-                            "average_relative_error_test": 12.3,
-                            "average_relative_error_training": 10.8,
-                            "mean_absolute_error_test": 0.233,
-                            "mean_absolute_error_training": 0.201,
-                            "mean_squared_error_test": 0.121,
-                            "mean_squared_error_training": 0.103,
-                            "model_depth": 7,
-                            "model_length": 22,
-                            "normalized_mean_squared_error_test": 0.088,
-                            "normalized_mean_squared_error_training": 0.079,
-                            "root_mean_squared_error_test": 0.348,
-                            "root_mean_squared_error_training": 0.321
+                            "average_relative_error_test": 2.74596305113801,
+                            "average_relative_error_training": 2.3574806852981,
+                            "mean_absolute_error_test": 0.020585454497077455,
+                            "mean_absolute_error_training": 0.018182586660249116,
+                            "mean_squared_error_test": 0.00073464638025446652,
+                            "mean_squared_error_training": 0.00053687909383770213,
+                            "model_depth": 14,
+                            "model_length": 39,
+                            "normalized_mean_squared_error_test": 0.14358163045309325,
+                            "normalized_mean_squared_error_training": 0.12666355569075077,
+                            "pearson_r_test": 0.86776941659869866,
+                            "pearson_r_training": 0.87333644430924906,
+                            "root_mean_squared_error_test": 0.027104360908430703,
+                            "root_mean_squared_error_training": 0.023170651562649292
                         },
                         'data_model_id': model.get('id')
                     }
@@ -497,20 +897,20 @@ def expression_tree_summary():
                     }
                 },
                 'detailed_metrics': {
-                    "average_relative_error_test": 2.75,
-                    "average_relative_error_training": 2.36,
-                    "mean_absolute_error_test": 0.0206,
-                    "mean_absolute_error_training": 0.0182,
-                    "mean_squared_error_test": 0.000735,
-                    "mean_squared_error_training": 0.000537,
+                    "average_relative_error_test": 2.74596305113801,
+                    "average_relative_error_training": 2.3574806852981,
+                    "mean_absolute_error_test": 0.020585454497077455,
+                    "mean_absolute_error_training": 0.018182586660249116,
+                    "mean_squared_error_test": 0.00073464638025446652,
+                    "mean_squared_error_training": 0.00053687909383770213,
                     "model_depth": 14,
                     "model_length": 39,
-                    "normalized_mean_squared_error_test": 0.1436,
-                    "normalized_mean_squared_error_training": 0.1267,
-                    "pearson_r_test": 0.8678,
-                    "pearson_r_training": 0.8733,
-                    "root_mean_squared_error_test": 0.0271,
-                    "root_mean_squared_error_training": 0.0232
+                    "normalized_mean_squared_error_test": 0.14358163045309325,
+                    "normalized_mean_squared_error_training": 0.12666355569075077,
+                    "pearson_r_test": 0.86776941659869866,
+                    "pearson_r_training": 0.87333644430924906,
+                    "root_mean_squared_error_test": 0.027104360908430703,
+                    "root_mean_squared_error_training": 0.023170651562649292
                 },
                 'data_model_id': None
             }
@@ -811,9 +1211,11 @@ def update_data_model_file(model_id, file_type):
                         reg_content['impact_tree'] = data['impact_tree']
                     # 表达式树操作驱动的指标轮换/撤销
                     action = (data or {}).get('expr_tree_action')
-                    # 初始化基线指标
+                    # 初始化基线指标和特征权重
                     if 'baseline_detailed_metrics' not in reg_content:
                         reg_content['baseline_detailed_metrics'] = reg_content.get('detailed_metrics') or {}
+                    if 'baseline_feature_importance' not in reg_content:
+                        reg_content['baseline_feature_importance'] = reg_content.get('feature_importance') or []
                     op_index = int(model.get('metadata', {}).get('expr_tree_op_index', 0) or 0)
                     new_index = op_index
                     if action in ('delete', 'simplify', 'optimize'):
@@ -822,32 +1224,43 @@ def update_data_model_file(model_id, file_type):
                         idx = new_index if new_index <= 15 else 15
                         if idx > 0:
                             seq_metrics = MOCK_INDICATORS_SEQUENCE[idx]
+                            seq_weights = MOCK_WEIGHTS_SEQUENCE[idx]
                             if isinstance(seq_metrics, dict):
                                 reg_content['detailed_metrics'] = seq_metrics
                                 model.setdefault('metadata', {})['pearson_r_test'] = seq_metrics.get('pearson_r_test')
                                 model['metadata']['pearson_r_training'] = seq_metrics.get('pearson_r_training')
+                            if isinstance(seq_weights, list):
+                                reg_content['feature_importance'] = seq_weights
                         model.setdefault('metadata', {})['expr_tree_op_index'] = new_index
                     elif action == 'undo':
                         new_index = max(0, op_index - 1)
                         if new_index == 0:
                             base = reg_content.get('baseline_detailed_metrics') or {}
+                            base_weights = reg_content.get('baseline_feature_importance') or []
                             if base:
                                 reg_content['detailed_metrics'] = base
                                 model.setdefault('metadata', {})['pearson_r_test'] = base.get('pearson_r_test')
                                 model['metadata']['pearson_r_training'] = base.get('pearson_r_training')
+                            if base_weights:
+                                reg_content['feature_importance'] = base_weights
                         else:
                             # 对超过 15 的索引进行截断（>=15 视同第15次的指标），支持无限撤销
                             idx = new_index if new_index <= 15 else 15
                             seq_metrics = MOCK_INDICATORS_SEQUENCE[idx]
+                            seq_weights = MOCK_WEIGHTS_SEQUENCE[idx]
                             if isinstance(seq_metrics, dict):
                                 reg_content['detailed_metrics'] = seq_metrics
                                 model.setdefault('metadata', {})['pearson_r_test'] = seq_metrics.get('pearson_r_test')
                                 model['metadata']['pearson_r_training'] = seq_metrics.get('pearson_r_training')
+                            if isinstance(seq_weights, list):
+                                reg_content['feature_importance'] = seq_weights
                         model.setdefault('metadata', {})['expr_tree_op_index'] = new_index
                     else:
                         # 允许直接设置详细指标（不建议在表达式树操作路径外使用）
                         if 'detailed_metrics' in data and isinstance(data['detailed_metrics'], dict):
                             reg_content['detailed_metrics'] = data['detailed_metrics']
+                        if 'feature_importance' in data and isinstance(data['feature_importance'], list):
+                            reg_content['feature_importance'] = data['feature_importance']
                     if 'updated_at' in data:
                         reg_content['updated_at'] = data['updated_at']
                     
@@ -1188,25 +1601,8 @@ def analyze():
             r"\begin{align*} \nonumber HDL & =  \left(  \left(  \left(  \cfrac{  \left( c_{0}  \cdot\text{HYP} +  \left(  \left(  \left( c_{1}  \cdot\text{QA} + c_{2}  \cdot\text{HYP} \right)  + c_{3}  \cdot\text{CA} \right)  - c_{4} \right)  \right)  \cdot  \left( c_{5} + c_{6}  \cdot\text{MA} \cdot  \left(  \left(  \left( c_{7} + c_{8}  \cdot\text{OA} \right)  + c_{9}  \cdot\text{UA} \right)  + c_{10}  \cdot\text{UA} \right)  \right) }{c_{11}  \cdot\text{VR} }  -  \cfrac{ c_{12}}{c_{13}  \cdot\text{HYP} }  \right)  +  \cfrac{ c_{14}  \cdot\text{VR}}{ \left( c_{15} - c_{16}  \cdot\text{HYP} \right)  }  \right)  \cdot c_{17} + c_{18} \right) \end{align*}"
         )
         
-        # 生成特征影响力：从 docs/Impact.json 读取并固定返回，替代随机生成
-        feature_importance = []
-        try:
-            impact_path = os.path.join(DOCS_DIR, 'Impact.json')
-            with open(impact_path, 'r', encoding='utf-8') as f:
-                impact_map = json.load(f)
-            # 仅输出有值的项，按 JSON 中出现的顺序
-            for name, val in impact_map.items():
-                try:
-                    imp = float(val)
-                except Exception:
-                    continue
-                feature_importance.append({
-                    'feature': name,
-                    'importance': round(imp, 6)
-                })
-        except Exception as e:
-            logger.warning(f"读取 docs/Impact.json 失败，使用空的特征影响力: {e}")
-            feature_importance = []
+        # 生成特征影响力：使用基线特征权重数据
+        feature_importance = MOCK_WEIGHTS_BASELINE.copy()
         
         # 生成节点影响力数据（写死到代码中，对应树结构）
         # 注意：从上到下对应树分叉从左到右，同名节点不是同一个，要根据位置分配重要性
@@ -1321,22 +1717,22 @@ def analyze():
             'c{18}': 0.93054,
         }
         
-        # 生成详细的性能指标
+        # 生成详细的性能指标（使用完整精度数据）
         detailed_metrics = {
-            "average_relative_error_test": 2.75,
-            "average_relative_error_training": 2.36,
-            "mean_absolute_error_test": 0.0206,
-            "mean_absolute_error_training": 0.0182,
-            "mean_squared_error_test": 0.000735,
-            "mean_squared_error_training": 0.000537,
+            "average_relative_error_test": 2.74596305113801,
+            "average_relative_error_training": 2.3574806852981,
+            "mean_absolute_error_test": 0.020585454497077455,
+            "mean_absolute_error_training": 0.018182586660249116,
+            "mean_squared_error_test": 0.00073464638025446652,
+            "mean_squared_error_training": 0.00053687909383770213,
             "model_depth": 14,
             "model_length": 39,
-            "normalized_mean_squared_error_test": 0.1436,
-            "normalized_mean_squared_error_training": 0.1267,
-            "pearson_r_test": 0.8678,
-            "pearson_r_training": 0.8733,
-            "root_mean_squared_error_test": 0.0271,
-            "root_mean_squared_error_training": 0.0232
+            "normalized_mean_squared_error_test": 0.14358163045309325,
+            "normalized_mean_squared_error_training": 0.12666355569075077,
+            "pearson_r_test": 0.86776941659869866,
+            "pearson_r_training": 0.87333644430924906,
+            "root_mean_squared_error_test": 0.027104360908430703,
+            "root_mean_squared_error_training": 0.023170651562649292
         }
         
         result = {

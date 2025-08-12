@@ -313,6 +313,12 @@ function setupEventListeners() {
 
     // 随机种子相关事件
     setupSeedControls();
+    
+    // 清空所有通知按钮事件
+    const clearNotificationsBtn = document.getElementById('clear-all-notifications');
+    if (clearNotificationsBtn) {
+        clearNotificationsBtn.addEventListener('click', clearAllNotifications);
+    }
 }
 
 // 切换标签页
@@ -771,7 +777,7 @@ function wireToolbarActions(container, getSvg) {
                     if (updated) {
                         displayExpressionTreeSummary(updated);
                     }
-                } catch (e) {
+    } catch (e) {
                     console.warn('刷新表达式树摘要失败（将继续显示旧指标）:', e);
                 }
 
@@ -864,7 +870,7 @@ async function fetchExpressionTreeSummary(payload) {
     }
 }
 
-// 渲染左/右区域摘要（公式、性能、详细指标、特征影响力）
+// 渲染左/右区域摘要（公式、性能、详细指标、特征权重）
 function displayExpressionTreeSummary(result) {
     const perfContainer = document.getElementById('expr-performance-container');
     const detailedContainer = document.getElementById('expr-detailed-container');
@@ -932,7 +938,7 @@ function displayExpressionTreeSummary(result) {
     // 左侧：详细指标
     if (result.detailed_metrics) {
         detailedContainer.innerHTML = `
-            <div class="metrics-grid">
+                <div class="metrics-grid">
                     <div class="metric-section">
                         <h6>误差指标</h6>
                         <div class="metric-list">
@@ -954,15 +960,15 @@ function displayExpressionTreeSummary(result) {
                         <div class="metric-list">
                             <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">模型深度</span><span class="metric-name-en">Model Depth</span></div><span class="metric-value">${detailed.model_depth}</span></div>
                             <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">模型长度</span><span class="metric-name-en">Model Length</span></div><span class="metric-value">${detailed.model_length}</span></div>
-                        </div>
                     </div>
+                </div>
             </div>
         `;
     } else {
         detailedContainer.innerHTML = '<p class="text-muted">无</p>';
     }
 
-    // 右下：特征影响力
+    // 右下：特征权重
     // 构造中文名映射（无外部函数时降级使用英文名）
     const getCn = (name) => {
         try {
@@ -972,16 +978,22 @@ function displayExpressionTreeSummary(result) {
         } catch (_) {}
         return name || '';
     };
+    
+    // 过滤掉权重为0的特征，并按权重排序
+    const validFeatures = (result.feature_importance || [])
+        .filter(f => Number(f.importance || 0) > 0)
+        .sort((a, b) => Number(b.importance || 0) - Number(a.importance || 0));
+    
     featureContainer.innerHTML = `
         <div class="feature-importance">
-            ${(result.feature_importance || []).map(f => `
+            ${validFeatures.map(f => `
                 <div class="feature-importance-item">
                     <div class="feature-name-container">
                         <div class="feature-name-en">${f.feature ?? ''}</div>
                         <div class="feature-name-cn">${getCn(f.feature ?? '')}</div>
                     </div>
                     <div class="importance-bar"><div class="importance-fill" style="width: ${(Number(f.importance||0)*100).toFixed(1)}%"></div></div>
-                    <div class="importance-value">${(Number(f.importance)||0).toFixed(3)}</div>
+                    <div class="importance-value">${Number(f.importance)||0}</div>
                 </div>
             `).join('')}
         </div>
@@ -1542,7 +1554,7 @@ function displayRegressionResults(result) {
         entries.sort((a, b) => a.idx - b.idx);
         return entries;
     };
-
+    
     container.innerHTML = `
         <div class="result-item">
             <h4>回归表达式</h4>
@@ -1699,20 +1711,23 @@ function displayRegressionResults(result) {
         </div>
         
         <div class="result-item">
-            <h4>特征影响力</h4>
+            <h4>特征权重</h4>
             <div class="feature-importance">
-                ${result.feature_importance.map(f => `
-                    <div class="feature-importance-item">
-                        <div class="feature-name-container">
-                            <div class="feature-name-en">${f.feature}</div>
-                            <div class="feature-name-cn">${getComponentChineseName(f.feature)}</div>
+                ${(result.feature_importance || [])
+                    .filter(f => Number(f.importance || 0) > 0)
+                    .sort((a, b) => Number(b.importance || 0) - Number(a.importance || 0))
+                    .map(f => `
+                        <div class="feature-importance-item">
+                            <div class="feature-name-container">
+                                <div class="feature-name-en">${f.feature}</div>
+                                <div class="feature-name-cn">${getComponentChineseName(f.feature)}</div>
+                            </div>
+                            <div class="importance-bar">
+                                <div class="importance-fill" style="width: ${f.importance * 100}%"></div>
+                            </div>
+                            <div class="importance-value">${f.importance}</div>
                         </div>
-                        <div class="importance-bar">
-                            <div class="importance-fill" style="width: ${f.importance * 100}%"></div>
-                        </div>
-                        <div class="importance-value">${f.importance.toFixed(3)}</div>
-                    </div>
-                `).join('')}
+                    `).join('')}
             </div>
         </div>
         
@@ -2143,6 +2158,7 @@ function updateSetting(key, value) {
 function updateConnectionStatus(status) {
     const element = document.getElementById('connection-status');
     const footerElement = document.getElementById('connection-status-footer');
+    const statusIndicator = document.getElementById('status-indicator');
     
     if (element) {
         element.textContent = `后端服务：${status}`;
@@ -2151,18 +2167,101 @@ function updateConnectionStatus(status) {
     if (footerElement) {
         footerElement.textContent = `后端服务：${status}`;
     }
+    
+    // 更新状态指示灯的样式
+    if (statusIndicator) {
+        // 移除所有状态类
+        statusIndicator.classList.remove('connected', 'disconnected', 'checking');
+        
+        // 根据状态添加相应的类
+        if (status.includes('已连接') || status.includes('连接正常')) {
+            statusIndicator.classList.add('connected');
+        } else if (status.includes('连接失败') || status.includes('失败')) {
+            statusIndicator.classList.add('disconnected');
+        } else if (status.includes('检查中') || status.includes('检查')) {
+            statusIndicator.classList.add('checking');
+        }
+    }
 }
 
 // 更新状态栏
 function updateStatusBar() {
     const timeElement = document.getElementById('current-time');
+    const clockIcon = document.getElementById('clock-icon');
+    
     if (timeElement) {
         const updateTime = () => {
             const now = new Date();
-            timeElement.textContent = now.toLocaleString('zh-CN');
+            
+            // 格式化日期：YYYY-MM-DD
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            
+            // 获取星期几的英文三字母缩写
+            const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const weekday = weekdays[now.getDay()];
+            
+            // 格式化时间：HH:MM:SS
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            
+            // 组合最终格式：YYYY-MM-DD DDD HH:MM:SS
+            const formattedTime = `${year}-${month}-${day} ${weekday} ${hours}:${minutes}:${seconds}`;
+            timeElement.textContent = formattedTime;
+            
+            // 更新时钟图标（根据时间动态变化）
+            if (clockIcon) {
+                updateClockIcon(now);
+            }
         };
+        
         updateTime();
         setInterval(updateTime, 1000);
+    }
+}
+
+// 更新时钟图标
+function updateClockIcon(date) {
+    const clockIcon = document.getElementById('clock-icon');
+    if (!clockIcon) return;
+    
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    
+    // 根据时间选择不同的时钟图标
+    let icon = '🕐'; // 默认图标
+    
+    if (hours >= 5 && hours < 10) {
+        // 上午：5:00-9:59
+        icon = '🌄';
+    } else if (hours >= 10 && hours < 16) {
+        // 下午：10:00-15:59
+        icon = '🌅';
+    } else if (hours >= 16 && hours < 18) {
+        // 傍晚：16:00-17:59
+        icon = '🌇';
+    } else {
+        // 夜晚：18:00-4:59
+        icon = '🌃';
+    }
+    
+    // 添加发光效果类
+    clockIcon.textContent = icon;
+    clockIcon.className = 'clock-icon';
+    
+    // 根据时间段添加不同的发光效果
+    clockIcon.classList.remove('morning', 'afternoon', 'evening', 'night');
+    
+    if (hours >= 6 && hours < 12) {
+        clockIcon.classList.add('morning');
+    } else if (hours >= 12 && hours < 18) {
+        clockIcon.classList.add('afternoon');
+    } else if (hours >= 18 && hours < 22) {
+        clockIcon.classList.add('evening');
+    } else {
+        clockIcon.classList.add('night');
     }
 }
 
@@ -2200,7 +2299,7 @@ function showNotification(message, type = 'info') {
     notification.className = `notification ${type}`;
     notification.innerHTML = `
         <span class="notification-message">${message}</span>
-        <button class="notification-close" onclick="this.parentElement.remove()">×</button>
+        <button class="notification-close" onclick="closeNotification(this.parentElement)">×</button>
     `;
     
     // 添加到通知容器
@@ -2219,9 +2318,77 @@ function showNotification(message, type = 'info') {
                 if (notification.parentElement) {
                     notification.remove();
                 }
+                // 更新通知计数
+                updateNotificationCount();
             }, 300);
         }
     }, 5000);
+    
+    // 更新消息计数并显示/隐藏清空按钮
+    updateNotificationCount();
+}
+
+// 更新通知计数并控制清空按钮显示
+function updateNotificationCount() {
+    const notificationContainer = document.getElementById('notification-container');
+    const clearButton = document.getElementById('clear-all-notifications');
+    
+    if (!notificationContainer || !clearButton) return;
+    
+    const activeNotifications = notificationContainer.querySelectorAll('.notification');
+    const count = activeNotifications.length;
+    
+    // 当消息数量达到5条及以上时显示清空按钮
+    if (count >= 5) {
+        clearButton.style.display = 'inline-block';
+    } else {
+        clearButton.style.display = 'none';
+    }
+}
+
+// 关闭单个通知
+function closeNotification(notification) {
+    if (!notification) return;
+    
+    // 添加退出动画
+    notification.classList.remove('show');
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.remove();
+        }
+        // 更新通知计数
+        updateNotificationCount();
+    }, 300);
+}
+
+// 清空所有通知
+function clearAllNotifications() {
+    const notificationContainer = document.getElementById('notification-container');
+    if (!notificationContainer) return;
+    
+    // 获取所有活动的通知
+    const activeNotifications = notificationContainer.querySelectorAll('.notification');
+    
+    // 为每个通知添加退出动画
+    activeNotifications.forEach(notification => {
+        notification.classList.remove('show');
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.remove();
+            }
+        }, 300);
+    });
+    
+    // 隐藏清空按钮
+    const clearButton = document.getElementById('clear-all-notifications');
+    if (clearButton) {
+        clearButton.style.display = 'none';
+    }
+    
+    // 显示清空成功的通知
+    setTimeout(() => {
+        showNotification('所有消息已清空', 'success');
+    }, 350);
 }
 
 // 显示关于对话框
@@ -2949,13 +3116,16 @@ function renderBeautifiedFileContent(container, content, filename, fileType) {
                 ${featureImportance.length ? `
                 <div class="section-subtitle">特征重要性</div>
                 <div class="importance-table">
-                    ${featureImportance.map(item => `
-                        <div class="importance-row">
-                            <div class="imp-name">${item.feature}</div>
-                            <div class="imp-bar"><span style="width:${Math.min(100, Math.round((item.importance || 0) * 100))}%"></span></div>
-                            <div class="imp-value">${(item.importance ?? 0).toFixed(3)}</div>
-                        </div>
-                    `).join('')}
+                    ${featureImportance
+                        .filter(item => Number(item.importance || 0) > 0)
+                        .sort((a, b) => Number(b.importance || 0) - Number(a.importance || 0))
+                        .map(item => `
+                            <div class="importance-row">
+                                <div class="imp-name">${item.feature}</div>
+                                <div class="imp-bar"><span style="width:${Math.min(100, Math.round((item.importance || 0) * 100))}%"></span></div>
+                                <div class="imp-value">${item.importance ?? 0}</div>
+                            </div>
+                        `).join('')}
                 </div>` : ''}
             </div>
         `;
@@ -3030,13 +3200,16 @@ function renderBeautifiedFileContent(container, content, filename, fileType) {
                     ${top.length ? `
                     <div class="section-subtitle">特征重要性（Top ${top.length}）</div>
                     <div class="importance-table">
-                        ${top.map(item => `
-                            <div class="importance-row">
-                                <div class="imp-name">${item.feature}</div>
-                                <div class="imp-bar"><span style="width:${Math.min(100, Math.round((item.importance || 0) * 100))}%"></span></div>
-                                <div class="imp-value">${(item.importance ?? 0).toFixed(3)}</div>
-                            </div>
-                        `).join('')}
+                        ${top
+                            .filter(item => Number(item.importance || 0) > 0)
+                            .sort((a, b) => Number(b.importance || 0) - Number(a.importance || 0))
+                            .map(item => `
+                                <div class="importance-row">
+                                    <div class="imp-name">${item.feature}</div>
+                                    <div class="imp-bar"><span style="width:${Math.min(100, Math.round((item.importance || 0) * 100))}%"></span></div>
+                                    <div class="imp-value">${item.importance ?? 0}</div>
+                                </div>
+                            `).join('')}
                     </div>` : ''}
                     ${sims.length ? `
                     <div class="section-subtitle">模拟样本（前5条）</div>
