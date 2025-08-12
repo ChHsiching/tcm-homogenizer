@@ -79,7 +79,7 @@ def create_app(config=None):
         """健康检查接口"""
         return jsonify({
             'status': 'healthy',
-            'service': '中药多组分均化分析后端',
+            'service': '本草智配后端',
             'version': '1.0.0'
         })
     
@@ -88,7 +88,7 @@ def create_app(config=None):
     def root():
         """根路径"""
         return jsonify({
-            'message': '中药多组分均化分析后端服务',
+            'message': '本草智配后端服务',
             'version': '1.0.0',
             'endpoints': {
                 'health': '/api/health',

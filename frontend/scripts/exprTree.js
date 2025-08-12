@@ -491,11 +491,57 @@
       const exprA = astToExpression(a);
       const exprB = astToExpression(b);
       if (node.op === 'add') return `${exprA} + ${exprB}`;
-      if (node.op === 'sub') return `${exprA} - ${exprB}`;
+      // 在减法中，如果右孩子本身带有负号（负常数或负系数变量，或-1乘子），
+      // 为避免出现 "A - -B" 的双负号，悬浮窗等文本表达中将其转为 "A - B" 形式。
+      if (node.op === 'sub') {
+        const exprBAdjusted = expressionForSubRight(b);
+        return `${exprA} - ${exprBAdjusted}`;
+      }
       if (node.op === 'mul') return `${maybeParen(a, node.op)} * ${maybeParen(b, node.op)}`;
       if (node.op === 'div') return `${maybeParen(a, node.op)} / ${maybeParen(b, node.op)}`;
     }
     return '0';
+  }
+
+  // 在减法中用于格式化右侧被减数，移除其“自身携带的负号”，保留减法运算符的负号语义
+  function expressionForSubRight(n) {
+    if (!n) return '0';
+    // 常数：输出绝对值
+    if (n.kind === 'constant') {
+      const v = Number(n.value);
+      return formatNumberSci(Math.abs(v), 6);
+    }
+    // 变量：若系数为负，改为其绝对值；-1 则省略为变量本身
+    if (n.kind === 'variable') {
+      const coef = (typeof n.coefficient === 'number') ? n.coefficient : 1;
+      if (coef < 0) {
+        const absCoef = Math.abs(coef);
+        if (absCoef === 1) return String(n.value);
+        return `${formatNumberSci(absCoef, 6)} * ${n.value}`;
+      }
+      if (coef === 1) return String(n.value);
+      if (coef === -1) return String(n.value);
+      return `${formatNumberSci(coef, 6)} * ${n.value}`;
+    }
+    // 乘法：若含负常数因子，去除其负号
+    if (n.kind === 'operator' && n.op === 'mul' && n.children && n.children.length === 2) {
+      const a = n.children[0];
+      const b = n.children[1];
+      if (a && a.kind === 'constant' && Number(a.value) < 0) {
+        const k = Math.abs(Number(a.value));
+        const right = maybeParen(b, 'mul');
+        if (k === 1) return right;
+        return `${formatNumberSci(k, 6)} * ${right}`;
+      }
+      if (b && b.kind === 'constant' && Number(b.value) < 0) {
+        const k = Math.abs(Number(b.value));
+        const left = maybeParen(a, 'mul');
+        if (k === 1) return left;
+        return `${formatNumberSci(k, 6)} * ${left}`;
+      }
+    }
+    // 其他情况：保持原有表达
+    return astToExpression(n);
   }
 
   function maybeParen(node, parentOp) {
@@ -552,23 +598,225 @@
   ExprTree.formatNumberSci = formatNumberSci;
   
   // =============================
-  // 权重计算与颜色映射（V1）
+  // 影响力计算与颜色映射（V3：直接读取tree.json并注入到树结构）
   // =============================
+  // 将tree.json的影响力数据直接注入到AST树结构中
+  function injectImpactData(root, impactTree) {
+    if (!root || !impactTree) return root;
+    
+    console.log('🔍 开始注入影响力数据到树结构');
+    console.log('🔍 影响力数据结构:', impactTree);
+    console.log('🔍 影响力数据结构键:', Object.keys(impactTree));
+    
+    // 运算符映射：AST op → tree.json 键
+    const opMapping = {
+      add: 'Addition',
+      sub: 'Subtraction',
+      mul: 'Multiplication',
+      div: 'Division',
+    };
+
+    // 生成数值字符串候选（用于对齐 tree.json 的小数位与截断）
+    function generateNumberCandidates(num) {
+      const candidates = new Set();
+      try {
+        const raw = String(num);
+        const fixed4 = Number(num).toFixed(4);
+        const fixed5 = Number(num).toFixed(5);
+        const trunc4 = (Math.sign(num) * Math.floor(Math.abs(num) * 1e4) / 1e4).toFixed(4);
+        const strip = (s) => s.replace(/\.0+$/, '').replace(/(\.[0-9]*?)0+$/, '$1');
+        [raw, fixed4, fixed5, trunc4, strip(fixed4), strip(fixed5), strip(trunc4)].forEach(v => candidates.add(v));
+      } catch (_) {
+        candidates.add(String(num));
+      }
+      return Array.from(candidates);
+    }
+
+    // 递归遍历树结构，根据位置注入影响力
+    function injectNode(node, impactPath, depth = 0) {
+      if (!node) return;
+      
+      const indent = '  '.repeat(depth);
+      console.log(`${indent}🔍 处理节点: ${node.kind} ${node.op || ''} ${node.value || ''}`);
+      
+      // 小工具
+      const operatorKeys = ['Addition','Subtraction','Multiplication','Division'];
+      const hasOwn = (obj, k) => Object.prototype.hasOwnProperty.call(obj || {}, k);
+      const listOpKeys = (obj) => Object.keys(obj || {}).filter(k => operatorKeys.includes(k));
+      const findUniqueOpChildForOp = (obj, targetOpKey) => {
+        const candidates = [];
+        for (const k of listOpKeys(obj)) {
+          const sub = obj[k];
+          if (sub && typeof sub === 'object' && hasOwn(sub, targetOpKey)) {
+            candidates.push(sub[targetOpKey]);
+          }
+        }
+        return candidates.length === 1 ? candidates[0] : null;
+      };
+      const findUniqueOpChildForLeaf = (obj, leafKeys) => {
+        const candidates = [];
+        for (const k of listOpKeys(obj)) {
+          const sub = obj[k];
+          if (!sub || typeof sub !== 'object') continue;
+          for (const key of leafKeys) {
+            if (hasOwn(sub, key)) { candidates.push(sub); break; }
+          }
+        }
+        return candidates.length === 1 ? candidates[0] : null;
+      };
+      const anyKeyIn = (obj, keys) => keys.some(key => hasOwn(obj, key));
+      
+      if (node.kind === 'constant') {
+        // 常数节点：尝试多种格式匹配（四舍五入/截断/去零）
+        let matched = null;
+        if (impactPath && typeof impactPath === 'object') {
+          const keys = generateNumberCandidates(node.value);
+          for (const key of keys) {
+            if (hasOwn(impactPath, key) && typeof impactPath[key] === 'number') {
+              matched = impactPath[key];
+              console.log(`${indent}✅ 注入常数影响力: ${key} = ${matched}`);
+              break;
+            }
+          }
+          if (matched === null) {
+            // 尝试在下一跳的唯一运算符子树中匹配
+            const sub = findUniqueOpChildForLeaf(impactPath, generateNumberCandidates(node.value));
+            if (sub) {
+              for (const key of generateNumberCandidates(node.value)) {
+                if (hasOwn(sub, key) && typeof sub[key] === 'number') { matched = sub[key]; break; }
+              }
+              if (matched !== null) console.log(`${indent}✅ 下钻一跳匹配常数: ${matched}`);
+            }
+          }
+        }
+        node.weight = Number(matched || 0);
+        return;
+      }
+      
+      if (node.kind === 'variable') {
+        // 变量节点：查找 "系数 * 变量名" 或 "系数*变量名"，含多种系数候选
+        const coefNum = (typeof node.coefficient === 'number') ? node.coefficient : 1;
+        const varName = String(node.value);
+        let matched = null;
+        if (impactPath && typeof impactPath === 'object') {
+          const coefCandidates = generateNumberCandidates(coefNum);
+          const leafKeys = [];
+          for (const c of coefCandidates) { leafKeys.push(`${c} * ${varName}`); leafKeys.push(`${c}*${varName}`); }
+          // 先在当前层匹配
+          for (const k of leafKeys) {
+            if (hasOwn(impactPath, k) && typeof impactPath[k] === 'number') { matched = impactPath[k]; console.log(`${indent}✅ 注入变量影响力: ${k} = ${matched}`); break; }
+          }
+          // 当前层没命中，尝试下一跳唯一运算符子树
+          if (matched === null) {
+            const sub = findUniqueOpChildForLeaf(impactPath, leafKeys);
+            if (sub) {
+              for (const k of leafKeys) { if (hasOwn(sub, k) && typeof sub[k] === 'number') { matched = sub[k]; break; } }
+              if (matched !== null) console.log(`${indent}✅ 下钻一跳匹配变量: ${matched}`);
+            }
+          }
+        }
+        if (matched === null) {
+          console.log(`${indent}⚠️ 变量影响力未找到: ${coefNum} * ${varName}，设为0`);
+        }
+        node.weight = Number(matched || 0);
+        return;
+      }
+      
+      // 运算符节点：递归处理子节点，然后计算聚合影响力
+      if (node.children && node.children.length > 0) {
+        const opKey = opMapping[node.op];
+        let currentPath = impactPath;
+        console.log(`${indent}🔍 运算符 ${node.op} 映射到键: ${opKey}`);
+        console.log(`${indent}🔍 当前路径键:`, Object.keys(impactPath || {}));
+
+        // 根层：直接按键下钻
+        if (depth === 0 && impactPath && typeof impactPath === 'object' && opKey && hasOwn(impactPath, opKey)) {
+          currentPath = impactPath[opKey];
+          console.log(`${indent}✅ 根层下钻到 ${opKey}，新路径键:`, Object.keys(currentPath || {}));
+        } else if (depth === 0) {
+          console.log(`${indent}⚠️ 根层未找到键 ${opKey}，保持当前路径`);
+        } else {
+          console.log(`${indent}ℹ️ 非根层不按键下钻，沿用父层已选路径`);
+        }
+
+        // 可用的运算符子键
+        const availableOpKeys = listOpKeys(currentPath);
+        console.log(`${indent}🔍 当前层可用运算符键:`, availableOpKeys);
+
+        let totalWeight = 0;
+        for (const child of node.children) {
+          let nextImpactPath = currentPath;
+          if (child.kind === 'operator') {
+            const want = opMapping[child.op];
+            if (nextImpactPath && typeof nextImpactPath === 'object' && want && hasOwn(nextImpactPath, want)) {
+              nextImpactPath = nextImpactPath[want];
+            } else {
+              // 兼容“本层先进入某个运算符分支，再在该分支内才出现子节点的运算符键”的结构
+              const bridged = findUniqueOpChildForOp(nextImpactPath, want);
+              if (bridged) nextImpactPath = bridged;
+              else if (availableOpKeys.length === 1) nextImpactPath = nextImpactPath[availableOpKeys[0]];
+            }
+          } else {
+            // 叶子：若本层没有该叶子键，尝试下一跳唯一运算符子树
+            if (child.kind === 'variable') {
+              const coefNum = (typeof child.coefficient === 'number') ? child.coefficient : 1;
+              const varName = String(child.value);
+              const leafKeys = [];
+              for (const c of generateNumberCandidates(coefNum)) { leafKeys.push(`${c} * ${varName}`); leafKeys.push(`${c}*${varName}`); }
+              if (!(nextImpactPath && anyKeyIn(nextImpactPath, leafKeys))) {
+                const sub = findUniqueOpChildForLeaf(nextImpactPath, leafKeys);
+                if (sub) nextImpactPath = sub;
+              }
+            } else if (child.kind === 'constant') {
+              const leafKeys = generateNumberCandidates(child.value);
+              if (!(nextImpactPath && anyKeyIn(nextImpactPath, leafKeys))) {
+                const sub = findUniqueOpChildForLeaf(nextImpactPath, leafKeys);
+                if (sub) nextImpactPath = sub;
+              }
+            }
+          }
+          injectNode(child, nextImpactPath, depth + 1);
+          totalWeight += child.weight || 0;
+        }
+        node.weight = totalWeight;
+        console.log(`${indent}✅ 计算运算符影响力: ${node.op} = ${totalWeight}`);
+      }
+    }
+    
+    // 开始注入
+    injectNode(root, impactTree);
+    return root;
+  }
+  
   function computeWeights(root, options = {}) {
     const nodeList = [];
+    let impactTree = null;
+
+    // 尝试从全局获取tree.json影响力数据
+    try {
+      if (typeof window !== 'undefined' && window.TREE_IMPACT_DATA) {
+        impactTree = window.TREE_IMPACT_DATA;
+      }
+    } catch (_) {}
+
+    // 如果有影响力数据，直接注入到树结构中
+    if (impactTree) {
+      injectImpactData(root, impactTree);
+    }
 
     function dfs(node) {
       if (!node) return 0;
       nodeList.push(node);
 
       if (node.kind === 'constant') {
-        node.weight = 0;
+        // 影响力已经在injectImpactData中设置
+        if (node.weight === undefined) node.weight = 0;
         return node.weight;
       }
 
       if (node.kind === 'variable') {
-        const coef = (typeof node.coefficient === 'number') ? node.coefficient : 1;
-        node.weight = coef;
+        // 影响力已经在injectImpactData中设置
+        if (node.weight === undefined) node.weight = 0;
         return node.weight;
       }
 
@@ -576,51 +824,16 @@
       const children = node.children || [];
       const childWeights = children.map(ch => dfs(ch));
 
-      if (node.op === 'add') {
-        node.weight = childWeights.reduce((a, b) => a + b, 0);
-        return node.weight;
-      }
-      if (node.op === 'sub') {
-        if (childWeights.length === 0) { node.weight = 0; return node.weight; }
-        if (childWeights.length === 1) { node.weight = childWeights[0]; return node.weight; }
-        node.weight = childWeights[0] - childWeights[1];
-        return node.weight;
-      }
-      if (node.op === 'mul') {
-        // const * expr → 放大/缩小权重；多个非常量子树时，简化为常量积 * 非常量权重和
-        let constProduct = 1;
-        let nonConstChildren = [];
-        for (const ch of children) {
-          if (ch.kind === 'constant') constProduct *= Number(ch.value);
-          else nonConstChildren.push(ch);
+      // 约定：父节点影响力为子节点影响力之和
+      if (node.op === 'add' || node.op === 'sub' || node.op === 'mul' || node.op === 'div') {
+        // 影响力已经在injectImpactData中设置
+        if (node.weight === undefined) {
+          node.weight = childWeights.reduce((a, b) => a + b, 0);
         }
-        if (nonConstChildren.length === 0) {
-          node.weight = 0; // 只有常数相乘
-          return node.weight;
-        }
-        if (nonConstChildren.length === 1) {
-          node.weight = constProduct * (nonConstChildren[0].weight ?? 0);
-          return node.weight;
-        }
-        // 多个非常量：常量积 * 非常量权重之和（近似）
-        const sumNonConst = nonConstChildren.reduce((s, ch) => s + (ch.weight ?? 0), 0);
-        node.weight = constProduct * sumNonConst;
-        return node.weight;
-      }
-      if (node.op === 'div') {
-        const [numerator, denominator] = children;
-        const denomIsConstOnly = denominator && isConstOnlySubtree(denominator);
-        if (denomIsConstOnly) {
-          const denomVal = evalConstSubtree(denominator);
-          node.weight = (numerator ? (numerator.weight ?? 0) : 0) / (denomVal || 1);
-          return node.weight;
-        }
-        // 简化近似：分子权重 − 分母权重（方向性）
-        node.weight = (numerator ? (numerator.weight ?? 0) : 0) - (denominator ? (denominator.weight ?? 0) : 0);
         return node.weight;
       }
 
-      node.weight = 0;
+      if (node.weight === undefined) node.weight = 0;
       return node.weight;
     }
 
@@ -695,6 +908,32 @@
       : op === 'div' ? 'Division'
       : String(op || '?');
   }
+
+  // 将整棵树聚合为“特征影响力”列表（V2：使用真实影响力数据）
+  function computeFeatureImportance(root) {
+    const totals = new Map();
+    (function walk(n) {
+      if (!n) return;
+      if (n.kind === 'variable') {
+        // 使用节点上已计算的真实影响力值
+        const weight = n.weight || 0;
+        const key = String(n.value);
+        const prev = totals.get(key) || 0;
+        totals.set(key, prev + Math.abs(weight));
+      }
+      (n.children || []).forEach(walk);
+    })(root);
+    const arr = Array.from(totals.entries()).map(([feature, s]) => ({ feature, importance: Number(s) }));
+    const total = arr.reduce((acc, x) => acc + x.importance, 0);
+    if (total > 0) {
+      for (const item of arr) {
+        item.importance = Number((item.importance / total).toFixed(6));
+      }
+    }
+    arr.sort((a, b) => b.importance - a.importance);
+    return arr;
+  }
+  ExprTree.computeFeatureImportance = computeFeatureImportance;
 
   // =============================
   // 简化树布局（自顶向下）
@@ -917,6 +1156,28 @@
     svg.style.display = 'block';
     containerEl.appendChild(svg);
 
+    // 自定义 Tooltip 容器（替代浏览器原生 <title> 气泡）
+    const tooltipHost = containerEl.parentElement || containerEl; // #expression-tree-canvas 为相对定位
+    let tooltipEl = tooltipHost.querySelector('.expr-tooltip');
+    if (!tooltipEl) {
+      tooltipEl = document.createElement('div');
+      tooltipEl.className = 'expr-tooltip';
+      tooltipEl.style.display = 'none';
+      tooltipEl.style.position = 'absolute';
+      tooltipEl.style.pointerEvents = 'none';
+      tooltipHost.appendChild(tooltipEl);
+    }
+
+    // 右键菜单容器（统一复用）
+    let ctxMenu = tooltipHost.querySelector('.expr-context-menu');
+    if (!ctxMenu) {
+      ctxMenu = document.createElement('div');
+      ctxMenu.className = 'expr-context-menu';
+      ctxMenu.style.display = 'none';
+      ctxMenu.style.position = 'absolute';
+      tooltipHost.appendChild(ctxMenu);
+    }
+
     // 连线层
     const linksLayer = document.createElementNS(svgNS, 'g');
     linksLayer.setAttribute('fill', 'none');
@@ -1037,18 +1298,133 @@
         }
       }
 
-      // Tooltip
-      const title = document.createElementNS(svgNS, 'title');
+      // 自定义 Tooltip 交互
       const subExpr = safeSubExpr(node);
-      const w = Number(node.weight || 0).toFixed(6);
+      const weightStr = Number(node.weight || 0).toFixed(6);
       const cn = (typeof window !== 'undefined' && window.COMPONENT_NAMES && node.kind === 'variable') ? (window.COMPONENT_NAMES[String(node.value)] || '') : '';
-      title.textContent = `${subExpr}\n权重: ${w}${cn ? `\n${cn}` : ''}`;
-      g.appendChild(title);
+      const dotColor = node.color || '#ffffff';
+
+      const showTooltip = (ev) => {
+        try {
+          const exprHtml = escapeHtml(subExpr || '');
+          const cnHtml = cn ? `<span class="expr-tooltip-name">${escapeHtml(cn)}</span>` : '';
+          tooltipEl.innerHTML = `
+            <div class="expr-tooltip-expr">${exprHtml}</div>
+            <div class="expr-tooltip-meta">
+              <span class="expr-tooltip-dot" style="background:${dotColor}"></span>
+              <span>影响力: ${weightStr}</span>
+              ${cnHtml}
+            </div>
+          `;
+          tooltipEl.style.display = 'block';
+          tooltipEl.style.borderLeft = `4px solid ${dotColor}`;
+          positionTooltip(ev);
+        } catch (_) {}
+      };
+
+      const positionTooltip = (ev) => {
+        try {
+          const hostRect = tooltipHost.getBoundingClientRect();
+          const offset = 12;
+          const desiredLeft = ev.clientX - hostRect.left + offset;
+          const desiredTop = ev.clientY - hostRect.top + offset;
+          // 放置后再进行边界修正
+          tooltipEl.style.left = `${desiredLeft}px`;
+          tooltipEl.style.top = `${desiredTop}px`;
+          const tipRect = tooltipEl.getBoundingClientRect();
+          let left = desiredLeft;
+          let top = desiredTop;
+          const maxLeft = hostRect.width - tipRect.width - 8;
+          const maxTop = hostRect.height - tipRect.height - 8;
+          if (left > maxLeft) left = Math.max(8, maxLeft);
+          if (top > maxTop) top = Math.max(8, maxTop);
+          if (left < 8) left = 8;
+          if (top < 8) top = 8;
+          tooltipEl.style.left = `${left}px`;
+          tooltipEl.style.top = `${top}px`;
+        } catch (_) {}
+      };
+
+      const hideTooltip = () => {
+        tooltipEl.style.display = 'none';
+      };
+
+      g.addEventListener('mouseenter', showTooltip);
+      g.addEventListener('mousemove', positionTooltip);
+      g.addEventListener('mouseleave', hideTooltip);
 
       // 交互回调
       g.addEventListener('contextmenu', (ev) => {
         ev.preventDefault();
-        try { options.onContextMenu && options.onContextMenu(node, { x: ev.clientX, y: ev.clientY }); } catch (_) {}
+        // 隐藏悬浮窗
+        hideTooltip();
+        // 选中该节点
+        try {
+          const old = nodesLayer.querySelector('[data-selected="true"]');
+          if (old) {
+            old.removeAttribute('data-selected');
+            old.setAttribute('stroke', '#1f2937');
+            old.setAttribute('stroke-width', '2');
+            old.setAttribute('filter', '');
+          }
+          const shape = g.querySelector('rect');
+          if (shape) {
+            shape.setAttribute('data-selected', 'true');
+            shape.setAttribute('stroke', '#60a5fa');
+            shape.setAttribute('stroke-width', '3');
+            shape.setAttribute('filter', 'drop-shadow(0 0 6px rgba(96,165,250,0.65)) drop-shadow(0 0 14px rgba(96,165,250,0.35))');
+            selectedNodeId = node.id;
+          }
+        } catch (_) {}
+
+        // 渲染并显示右键菜单
+        try {
+          ctxMenu.innerHTML = '';
+          const item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'context-item danger';
+          item.textContent = '删除节点/子树';
+          item.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            ctxMenu.style.display = 'none';
+            // 触发底部红色“删除节点/子树”按钮（已由外层绑定真实逻辑）
+            const btn = tooltipHost.querySelector('#btn-delete');
+            if (btn && typeof btn.click === 'function') btn.click();
+          };
+          ctxMenu.appendChild(item);
+
+          const hostRect = tooltipHost.getBoundingClientRect();
+          const offset = 2;
+          let left = ev.clientX - hostRect.left + offset;
+          let top = ev.clientY - hostRect.top + offset;
+          ctxMenu.style.display = 'block';
+          // 边界纠正
+          const menuRect = ctxMenu.getBoundingClientRect();
+          const maxLeft = hostRect.width - menuRect.width - 8;
+          const maxTop = hostRect.height - menuRect.height - 8;
+          if (left > maxLeft) left = Math.max(8, maxLeft);
+          if (top > maxTop) top = Math.max(8, maxTop);
+          if (left < 8) left = 8;
+          if (top < 8) top = 8;
+          ctxMenu.style.left = `${left}px`;
+          ctxMenu.style.top = `${top}px`;
+
+          const dismiss = (e2) => {
+            // 点击在菜单外部则关闭
+            try {
+              if (!ctxMenu.contains(e2.target)) {
+                ctxMenu.style.display = 'none';
+                window.removeEventListener('click', dismiss, true);
+                window.removeEventListener('scroll', dismiss, true);
+                window.removeEventListener('resize', dismiss, true);
+              }
+            } catch (_) {}
+          };
+          window.addEventListener('click', dismiss, true);
+          window.addEventListener('scroll', dismiss, true);
+          window.addEventListener('resize', dismiss, true);
+        } catch (_) {}
       });
       g.addEventListener('click', (ev) => {
         // 选中高亮：先清除旧选中
@@ -1118,6 +1494,14 @@
     function getMaxDepth(n) { if (!n) return 0; if (!n.children || n.children.length === 0) return 0; return 1 + Math.max(...n.children.map(getMaxDepth)); }
     function opToText(op) { return op === 'add' ? 'Addition' : op === 'sub' ? 'Subtraction' : op === 'mul' ? 'Multiplication' : op === 'div' ? 'Division' : String(op || '?'); }
     function safeSubExpr(n) { try { return astToExpression(n); } catch (_) { return ''; } }
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
   }
 
   ExprTree.renderSvgTree = renderSvgTree;

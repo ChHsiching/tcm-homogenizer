@@ -160,7 +160,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 应用初始化
 async function initializeApp() {
-    console.log('🚀 初始化中药多组分均化分析客户端...');
+    console.log('🚀 初始化本草智配客户端...');
     
     // 初始化认证系统
     await authManager.initialize();
@@ -184,7 +184,7 @@ async function initializeApp() {
     await testBackendConnection();
     
     // 显示欢迎通知
-    showNotification('欢迎使用中药多组分均化分析客户端', 'success');
+    showNotification('欢迎使用本草智配客户端', 'success');
     
     // 测试用户管理功能
     if (authManager) {
@@ -467,9 +467,12 @@ async function renderExpressionTreePage() {
                                 r2: reg.r2 || 0,
                                 mse: reg.mse || 0,
                                 feature_importance: reg.feature_importance || [],
+                                impact_tree: reg.impact_tree || null,
                                 detailed_metrics: reg.detailed_metrics || {},
                                 created_at: reg.created_at || Date.now()
                             };
+                            console.log('🔍 构造的 summary 对象（当前回归结果）:', summary);
+                            console.log('🔍 reg.impact_tree（当前回归结果）:', reg.impact_tree);
                             console.log('✅ 从数据库获取到当前回归结果的模型数据:', modelId);
                         }
                     }
@@ -503,9 +506,12 @@ async function renderExpressionTreePage() {
                                     r2: reg.r2 || 0,
                                     mse: reg.mse || 0,
                                     feature_importance: reg.feature_importance || [],
+                                    impact_tree: reg.impact_tree || null,
                                     detailed_metrics: reg.detailed_metrics || {},
                                     created_at: reg.created_at || Date.now()
                                 };
+                                console.log('🔍 构造的 summary 对象:', summary);
+                                console.log('🔍 reg.impact_tree:', reg.impact_tree);
                                 console.log('✅ 从数据库获取到最新数据:', modelId);
                             }
                         }
@@ -522,7 +528,7 @@ async function renderExpressionTreePage() {
             perfContainer.innerHTML = '<p class="text-muted">暂无模型</p>';
             detailedContainer.innerHTML = '<p class="text-muted">暂无</p>';
             formulaContainer.innerHTML = '<p class="text-muted">暂无公式</p>';
-            featureContainer.innerHTML = '<p class="text-muted">暂无特征权重</p>';
+            featureContainer.innerHTML = '<p class="text-muted">暂无特征影响力</p>';
             return;
         }
         // 确保数据完整性：验证expression字段
@@ -555,7 +561,7 @@ async function renderExpressionTreePage() {
         displayExpressionTreeSummary(summary);
         // 渲染表达式树
         try {
-            renderExpressionTreeSVG(summary);
+            await renderExpressionTreeSVG(summary);
         } catch (e) {
             const canvas = document.getElementById('expression-tree-canvas');
             if (canvas) canvas.innerHTML = `<p class="text-muted">表达式树渲染失败：${e.message}</p>`;
@@ -650,12 +656,36 @@ function latexToInfix(latex, constantsMap) {
   return s;
 }
 
-function renderExpressionTreeSVG(summary) {
+async function renderExpressionTreeSVG(summary) {
     const canvas = document.getElementById('expression-tree-canvas');
     if (!canvas) return;
     const inner = canvas.querySelector('.expr-tree-inner') || canvas;
     const expression = (summary && summary.expression) || '0';
     inner.innerHTML = '';
+    
+    // 调试信息：显示summary对象的内容
+    console.log('🔍 renderExpressionTreeSVG 接收到的 summary:', summary);
+    console.log('🔍 summary.impact_tree:', summary?.impact_tree);
+    
+    // 使用后端返回的 impact_tree 作为唯一来源（不再从 /docs 读取）
+    try {
+        if (summary && summary.impact_tree) {
+            window.TREE_IMPACT_DATA = summary.impact_tree;
+            console.log('✅ 已从回归模型数据加载影响力数据 (impact_tree)');
+            console.log('🔍 完整的 impact_tree 数据结构:', JSON.stringify(summary.impact_tree, null, 2));
+            console.log('🔍 impact_tree 的键:', Object.keys(summary.impact_tree));
+        } else {
+            // 若本次摘要未包含，则保留内存中的旧值，避免置空导致白色
+            if (!window.TREE_IMPACT_DATA) {
+                console.warn('⚠️ 本次摘要未包含 impact_tree 且内存无缓存，无法着色');
+            } else {
+                console.log('ℹ️ 本次摘要未包含 impact_tree，沿用内存中的影响力数据');
+            }
+        }
+    } catch (error) {
+        console.warn('⚠️ 影响力数据装载失败:', error);
+    }
+    
     try {
         const exprPreview = String(expression).slice(0, 120);
         console.log('[ExprTree] 使用表达式（已规范化）来源:', summary?.id || summary?.data_model_id || 'unknown', '| 预览:', exprPreview);
@@ -669,6 +699,13 @@ function renderExpressionTreeSVG(summary) {
     const layoutInfo = ExprTree.layoutTree(ast, Math.max(rect.width, 900), { siblingGap: 24, vGap: 120, drawScale: 1.5 });
     const svg = ExprTree.renderSvgTree(inner, ast, { width: layoutInfo.width, config: layoutInfo.config, bounds: layoutInfo.bounds });
     wireToolbarActions(inner, () => svg);
+    // 树绘制后，若数据库未提供 feature_importance，则用前端计算并刷新右下卡片
+    try {
+        if (!Array.isArray(summary.feature_importance) || summary.feature_importance.length === 0) {
+            summary.feature_importance = ExprTree.computeFeatureImportance(ast);
+            displayExpressionTreeSummary(summary);
+        }
+    } catch (_) {}
 }
 
 function wireToolbarActions(container, getSvg) {
@@ -717,8 +754,10 @@ function wireToolbarActions(container, getSvg) {
                     body: JSON.stringify({
                         symbolic_regression: {
                             expression_latex: expressionStr,
+                            impact_tree: window.TREE_IMPACT_DATA,
                             updated_at: Date.now()
-                        }
+                        },
+                        feature_importance: ExprTree.computeFeatureImportance(ast)
                     })
                 });
                 
@@ -733,6 +772,8 @@ function wireToolbarActions(container, getSvg) {
                     body: JSON.stringify({
                         expression_latex: expressionStr,
                         expression: expressionStr,
+                        feature_importance: ExprTree.computeFeatureImportance(ast),
+                        impact_tree: window.TREE_IMPACT_DATA,
                         updated_at: Date.now()
                     })
                 });
@@ -803,7 +844,7 @@ async function fetchExpressionTreeSummary(payload) {
     }
 }
 
-// 渲染左/右区域摘要（公式、性能、详细指标、特征权重）
+// 渲染左/右区域摘要（公式、性能、详细指标、特征影响力）
 function displayExpressionTreeSummary(result) {
     const perfContainer = document.getElementById('expr-performance-container');
     const detailedContainer = document.getElementById('expr-detailed-container');
@@ -901,7 +942,7 @@ function displayExpressionTreeSummary(result) {
         detailedContainer.innerHTML = '<p class="text-muted">无</p>';
     }
 
-    // 右下：特征权重
+    // 右下：特征影响力
     // 构造中文名映射（无外部函数时降级使用英文名）
     const getCn = (name) => {
         try {
@@ -1658,7 +1699,7 @@ function displayRegressionResults(result) {
         </div>
         
         <div class="result-item">
-            <h4>特征权重</h4>
+            <h4>特征影响力</h4>
             <div class="feature-importance">
                 ${result.feature_importance.map(f => `
                     <div class="feature-importance-item">
@@ -2185,7 +2226,7 @@ function showNotification(message, type = 'info') {
 
 // 显示关于对话框
 function showAboutDialog() {
-    alert('中药多组分均化分析客户端 v1.0.0\n\n基于Electron + Flask的跨平台桌面应用');
+    alert('本草智配客户端 v1.0.0\n\n基于Electron + Flask的跨平台桌面应用');
 }
 
 // 可视化结果

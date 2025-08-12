@@ -29,6 +29,8 @@ DATA_MODELS_DIR = os.path.join(os.path.dirname(__file__), '..', 'data_models')
 CSV_DATA_DIR = os.path.join(os.path.dirname(__file__), '..', 'csv_data')
 MODELS_DIR = os.path.join(os.path.dirname(__file__), '..', 'models')
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), '..', 'results')
+# docs 目录（用于读取初始的特征影响力）
+DOCS_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..', 'docs'))
 
 os.makedirs(DATA_MODELS_DIR, exist_ok=True)
 os.makedirs(CSV_DATA_DIR, exist_ok=True)
@@ -128,6 +130,7 @@ def expression_tree_summary():
                         'r2': (reg_json or {}).get('r2') or model.get('metadata', {}).get('r2_score', 0.85),
                         'mse': (reg_json or {}).get('mse') or model.get('metadata', {}).get('mse_score', 0.12),
                         'feature_importance': (reg_json or {}).get('feature_importance') or model.get('feature_importance') or [],
+                        'impact_tree': (reg_json or {}).get('impact_tree') or model.get('symbolic_regression', {}).get('impact_tree') or None,
                         'detailed_metrics': (reg_json or {}).get('detailed_metrics') or model.get('detailed_metrics') or {
                             "average_relative_error_test": 12.3,
                             "average_relative_error_training": 10.8,
@@ -193,6 +196,63 @@ def expression_tree_summary():
                     {'feature': 'UA', 'importance': 0.45},
                     {'feature': 'MA', 'importance': 0.4},
                 ],
+                'impact_tree': {
+                    "Addition": {
+                        "Multiplication": {
+                            "Addition": {
+                                "Subtraction": {
+                                    "Division": {
+                                        "Multiplication": {
+                                            "Addition": {
+                                                "1.9105 * HYP": 0.0157069022188682,
+                                                "Subtraction": {
+                                                    "Addition": {
+                                                        "Addition": {
+                                                            "0.6015 * QA": 0.011758459632117,
+                                                            "0.4274 * HYP": 0.00120390671170711
+                                                        },
+                                                        "1.2977 * CA": 0.113928459255378
+                                                    },
+                                                    "-10.458": 0
+                                                }
+                                            },
+                                            "Addition": {
+                                                "-1.9323": 0,
+                                                "Multiplication": {
+                                                    "-0.0781 * MA": 0.108972688038807,
+                                                    "Addition": {
+                                                        "Addition": {
+                                                            "Addition": {
+                                                                "-1.9323": 0,
+                                                                "1.4812 * OA": 0.00688842480665608
+                                                            },
+                                                            "0.5974 * UA": 0.0111402882791509
+                                                        },
+                                                        "0.6078 * UA": 0.0120783966067667
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "2.9628 * VR": 0.279624923755846
+                                    },
+                                    "Division": {
+                                        "2.6756": 0,
+                                        "0.4083 * HYP": 0.0763517896756712
+                                    }
+                                },
+                                "Division": {
+                                    "1.2192 * VR": 0.0208902884673905,
+                                    "Subtraction": {
+                                        "5.4189": 0,
+                                        "1.9105 * HYP": 0.21010236004585
+                                    }
+                                }
+                            },
+                            "0.0054": 0
+                        },
+                        "0.9305": 0
+                    }
+                },
                 'detailed_metrics': {
                     "average_relative_error_test": 12.3,
                     "average_relative_error_training": 10.8,
@@ -500,6 +560,8 @@ def update_data_model_file(model_id, file_type):
                         reg_content['expression_latex'] = data['expression_latex']
                     if 'expression' in data:
                         reg_content['expression'] = data['expression']
+                    if 'feature_importance' in data and isinstance(data['feature_importance'], list):
+                        reg_content['feature_importance'] = data['feature_importance']
                     if 'updated_at' in data:
                         reg_content['updated_at'] = data['updated_at']
                     
@@ -657,7 +719,7 @@ def import_models_zip():
         with zipfile.ZipFile(in_mem, 'r') as zf:
             imported = process_zip(zf)
             if imported == 0:
-                # 兼容“总ZIP内嵌子ZIP”的情况
+                # 兼容"总ZIP内嵌子ZIP"的情况
                 for n in zf.namelist():
                     if n.lower().endswith('.zip'):
                         try:
@@ -747,7 +809,7 @@ def update_data_model(model_id):
             model = json.load(f)
         
         # 更新模型数据（允许写入/更新 MathJax 公式）
-        allowed_fields = ['name', 'description', 'status', 'symbolic_regression', 'monte_carlo', 'metadata']
+        allowed_fields = ['name', 'description', 'status', 'symbolic_regression', 'monte_carlo', 'metadata', 'feature_importance']
         for field in allowed_fields:
             if field in data:
                 model[field] = data[field]
@@ -841,14 +903,103 @@ def analyze():
             r"\begin{align*} \nonumber HDL & =  \left(  \left(  \left(  \cfrac{  \left( c_{0}  \cdot\text{HYP} +  \left(  \left(  \left( c_{1}  \cdot\text{QA} + c_{2}  \cdot\text{HYP} \right)  + c_{3}  \cdot\text{CA} \right)  - c_{4} \right)  \right)  \cdot  \left( c_{5} + c_{6}  \cdot\text{MA} \cdot  \left(  \left(  \left( c_{7} + c_{8}  \cdot\text{OA} \right)  + c_{9}  \cdot\text{UA} \right)  + c_{10}  \cdot\text{UA} \right)  \right) }{c_{11}  \cdot\text{VR} }  -  \cfrac{ c_{12}}{c_{13}  \cdot\text{HYP} }  \right)  +  \cfrac{ c_{14}  \cdot\text{VR}}{ \left( c_{15} - c_{16}  \cdot\text{HYP} \right)  }  \right)  \cdot c_{17} + c_{18} \right) \end{align*}"
         )
         
-        # 生成特征重要性
+        # 生成特征影响力：从 docs/Impact.json 读取并固定返回，替代随机生成
         feature_importance = []
-        for i, feature in enumerate(feature_columns):
-            importance = max(0.1, 0.8 - i * 0.2)
-            feature_importance.append({
-                "feature": feature,
-                "importance": round(importance, 3)
-            })
+        try:
+            impact_path = os.path.join(DOCS_DIR, 'Impact.json')
+            with open(impact_path, 'r', encoding='utf-8') as f:
+                impact_map = json.load(f)
+            # 仅输出有值的项，按 JSON 中出现的顺序
+            for name, val in impact_map.items():
+                try:
+                    imp = float(val)
+                except Exception:
+                    continue
+                feature_importance.append({
+                    'feature': name,
+                    'importance': round(imp, 6)
+                })
+        except Exception as e:
+            logger.warning(f"读取 docs/Impact.json 失败，使用空的特征影响力: {e}")
+            feature_importance = []
+        
+        # 生成节点影响力数据（写死到代码中，对应树结构）
+        # 注意：从上到下对应树分叉从左到右，同名节点不是同一个，要根据位置分配重要性
+        # 使用逐步构建的方法，避免语法错误
+        impact_tree = {}
+        
+        # 第一步：创建根节点
+        impact_tree["Addition"] = {}
+        
+        # 第二步：添加第二层
+        impact_tree["Addition"]["Multiplication"] = {}
+        
+        # 第三步：添加第三层
+        impact_tree["Addition"]["Multiplication"]["Addition"] = {}
+        
+        # 第四步：添加第四层
+        impact_tree["Addition"]["Multiplication"]["Addition"]["Subtraction"] = {}
+        
+        # 第五步：添加第五层
+        impact_tree["Addition"]["Multiplication"]["Addition"]["Subtraction"]["Division"] = {}
+        
+        # 第六步：添加第六层 - 这是缺失的关键层
+        impact_tree["Addition"]["Multiplication"]["Addition"]["Subtraction"]["Division"]["Multiplication"] = {}
+        
+        # 第七步：添加左侧子树
+        impact_tree["Addition"]["Multiplication"]["Addition"]["Subtraction"]["Division"]["Multiplication"]["Addition"] = {
+            "1.9105 * HYP": 0.0157069022188682,
+            "Subtraction": {
+                "Addition": {
+                    "Addition": {
+                        "0.6015 * QA": 0.011758459632117,
+                        "0.4274 * HYP": 0.00120390671170711
+                    },
+                    "1.2977 * CA": 0.113928459255378
+                },
+                "-10.458": 0
+            }
+        }
+        
+        # 第八步：添加右侧子树
+        impact_tree["Addition"]["Multiplication"]["Addition"]["Subtraction"]["Division"]["Multiplication"]["Addition"]["Addition"] = {
+            "-1.9323": 0,
+            "Multiplication": {
+                "-0.0781 * MA": 0.108972688038807,
+                "Addition": {
+                    "Addition": {
+                        "Addition": {
+                            "-1.9323": 0,
+                            "1.4812 * OA": 0.00688842480665608
+                        },
+                        "0.5974 * UA": 0.0111402882791509
+                    },
+                    "0.6078 * UA": 0.0120783966067667
+                }
+            }
+        }
+        
+        # 第九步：添加VR节点
+        impact_tree["Addition"]["Multiplication"]["Addition"]["Subtraction"]["Division"]["2.9628 * VR"] = 0.279624923755846
+        
+        # 第十步：添加其他Division节点
+        impact_tree["Addition"]["Multiplication"]["Addition"]["Subtraction"]["Division"]["Division"] = {
+            "2.6756": 0,
+            "0.4083 * HYP": 0.0763517896756712
+        }
+        
+        # 第十一步：添加其他Division节点
+        impact_tree["Addition"]["Multiplication"]["Addition"]["Division"] = {
+            "1.2192 * VR": 0.0208902884673905,
+            "Subtraction": {
+                "5.4189": 0,
+                "1.9105 * HYP": 0.21010236004585
+            }
+        }
+        
+        # 最后：添加常数节点
+        impact_tree["Addition"]["Multiplication"]["0.0054"] = 0
+        impact_tree["Addition"]["0.9305"] = 0
         
         # 生成预测结果
         predictions = []
@@ -912,6 +1063,7 @@ def analyze():
             "r2": round(random.uniform(0.7, 0.95), 3),
             "mse": round(random.uniform(0.05, 0.25), 3),
             "feature_importance": feature_importance,
+            "impact_tree": impact_tree,
             "predictions": predictions,
             "training_time": round(random.uniform(3.0, 8.0), 1),
             "model_complexity": len(feature_columns[:min(3, len(feature_columns))]),
@@ -974,6 +1126,7 @@ def analyze():
                 'r2': result['r2'],
                 'mse': result['mse'],
                 'feature_importance': result['feature_importance'],
+                'impact_tree': result['impact_tree'],
                 'predictions': result['predictions'],
                 'training_time': result['training_time'],
                 'model_complexity': result['model_complexity'],
@@ -1017,6 +1170,11 @@ def analyze():
                 'created_at': time.time(),
                 'updated_at': time.time(),
                 'status': 'active',
+                'symbolic_regression': {
+                    'expression_latex': _to_latex(expression, target_column or 'Y'),
+                    'feature_importance': result['feature_importance'],
+                    'impact_tree': result['impact_tree']
+                },
                 'analysis_params': {
                     'population_size': population_size,
                     'generations': generations,

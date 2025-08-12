@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-中药多组分均化分析后端服务
+本草智配后端服务
 主入口文件
 """
 
@@ -21,7 +21,7 @@ def main():
     """主函数"""
     # 设置日志
     logger = setup_logger()
-    logger.info("🚀 启动中药多组分均化分析后端服务...")
+    logger.info("🚀 启动本草智配后端服务...")
     
     # 加载配置
     config = load_config()
