@@ -865,15 +865,6 @@ def analyze():
             logger.warning(f"读取 docs/Impact.json 失败，使用空的特征影响力: {e}")
             feature_importance = []
         
-        # 读取节点级影响力树：docs/tree.json（用于前端渲染节点颜色/影响力）
-        node_impacts_tree = None
-        try:
-            tree_path = os.path.join(DOCS_DIR, 'tree.json')
-            with open(tree_path, 'r', encoding='utf-8') as f:
-                node_impacts_tree = json.load(f)
-        except Exception as e:
-            logger.warning(f"读取 docs/tree.json 失败: {e}")
-
         # 生成预测结果
         predictions = []
         for i, row in enumerate(input_data):  # 处理所有数据行
@@ -936,7 +927,6 @@ def analyze():
             "r2": round(random.uniform(0.7, 0.95), 3),
             "mse": round(random.uniform(0.05, 0.25), 3),
             "feature_importance": feature_importance,
-            "node_impacts_tree": node_impacts_tree,
             "predictions": predictions,
             "training_time": round(random.uniform(3.0, 8.0), 1),
             "model_complexity": len(feature_columns[:min(3, len(feature_columns))]),
@@ -999,7 +989,8 @@ def analyze():
                 'r2': result['r2'],
                 'mse': result['mse'],
                 'feature_importance': result['feature_importance'],
-                'node_impacts_tree': node_impacts_tree,
+                # 可选：把节点级影响力树写进回归文件，供前端读用
+                # 'node_impacts_tree': node_impacts_tree,
                 'predictions': result['predictions'],
                 'training_time': result['training_time'],
                 'model_complexity': result['model_complexity'],
@@ -1099,6 +1090,20 @@ def analyze():
             'message': str(e),
             'details': traceback.format_exc()
         }), 500
+
+@symbolic_regression_bp.route('/node-impacts-tree', methods=['GET'])
+def get_node_impacts_tree():
+    """返回 docs/tree.json 的节点级影响力树（用于前端渲染表达式树节点影响力）。"""
+    try:
+        tree_path = os.path.join(DOCS_DIR, 'tree.json')
+        if not os.path.exists(tree_path):
+            return jsonify({'success': False, 'error': 'tree.json 不存在'}), 404
+        with open(tree_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return jsonify({'success': True, 'tree': data})
+    except Exception as e:
+        logger.error(f"读取节点影响力树失败: {e}")
+        return jsonify({'success': False, 'error': '读取节点影响力树失败', 'message': str(e)}), 500
 
 def _generate_model_name(target_column, feature_columns, data_source=None, analysis_type="符号回归", model_id=None):
     """生成有区分度的模型名称"""

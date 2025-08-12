@@ -603,40 +603,28 @@
   function computeWeights(root, options = {}) {
     const nodeList = [];
 
-    // 若全局提供节点级影响力树（来自数据库/后端），优先用其覆盖叶子影响力
-    let externalImpactTree = null;
-    try {
-      if (typeof window !== 'undefined' && window.currentNodeImpactsTree) {
-        externalImpactTree = window.currentNodeImpactsTree;
-      }
-    } catch (_) {}
-
-    // 将外部树结构拍平为“叶子表达式字符串 → 影响力”的映射
-    const externalMap = new Map();
-    if (externalImpactTree) {
-      (function flatten(obj) {
-        if (!obj || typeof obj !== 'object') return;
-        for (const [k, v] of Object.entries(obj)) {
-          if (v !== null && typeof v === 'object') flatten(v);
-          else externalMap.set(String(k), Number(v) || 0);
-        }
-      })(externalImpactTree);
-    }
+    // 若提供了节点级影响力树（docs/tree.json 的结构），使用它来覆盖叶子节点的影响力
+    const externalMap = buildLeafImpactMapFromTree(GLOBAL.currentNodeImpactsTree);
 
     function dfs(node) {
       if (!node) return 0;
       nodeList.push(node);
 
       if (node.kind === 'constant') {
-        const key = formatLeafLabel(node);
-        if (externalMap.has(key)) node.weight = externalMap.get(key);
-        else node.weight = 0;
+        // 常数叶子优先使用外部映射（若存在精确匹配的格式化文本）
+        const key = formatLeafKey(node);
+        if (externalMap && externalMap.has(key)) {
+          node.weight = externalMap.get(key);
+        } else {
+          node.weight = 0;
+        }
         return node.weight;
       }
 
       if (node.kind === 'variable') {
-        const key = formatLeafLabel(node);
-        if (externalMap.has(key)) {
+        // 变量叶子优先使用外部映射；否则按系数估计
+        const key = formatLeafKey(node);
+        if (externalMap && externalMap.has(key)) {
           node.weight = externalMap.get(key);
         } else {
           const coef = (typeof node.coefficient === 'number') ? node.coefficient : 1;
@@ -668,8 +656,7 @@
           else nonConstChildren.push(ch);
         }
         if (nonConstChildren.length === 0) {
-          // 只有常数相乘，若外部映射叶子定义了该常数叶子的值，上面已覆盖；此处整枝为0
-          node.weight = 0;
+          node.weight = 0; // 只有常数相乘
           return node.weight;
         }
         if (nonConstChildren.length === 1) {
@@ -729,6 +716,20 @@
     return { scale, nodes: nodeList };
   }
 
+  // 将 docs/tree.json 的嵌套对象拍平成 叶子表达式文本 → 影响力 的 Map
+  function buildLeafImpactMapFromTree(treeObj) {
+    if (!treeObj || typeof treeObj !== 'object') return null;
+    const map = new Map();
+    (function walk(obj) {
+      if (!obj || typeof obj !== 'object') return;
+      for (const [k, v] of Object.entries(obj)) {
+        if (v !== null && typeof v === 'object') walk(v);
+        else map.set(String(k), Number(v) || 0);
+      }
+    })(treeObj);
+    return map;
+  }
+
   function quantile(arr, q) {
     if (!arr || arr.length === 0) return 0;
     const a = [...arr].sort((x, y) => x - y);
@@ -761,20 +762,6 @@
   ExprTree.computeWeights = computeWeights;
   ExprTree.weightToColor = weightToColor;
 
-  // 生成叶子节点显示标签（用于 externalMap 匹配）
-  function formatLeafLabel(n) {
-    if (!n) return '';
-    if (n.kind === 'constant') {
-      return String(formatNumberSci(Number(n.value), 4));
-    }
-    if (n.kind === 'variable') {
-      const coef = (typeof n.coefficient === 'number') ? n.coefficient : 1;
-      if (coef === 1) return String(n.value);
-      return `${formatNumberSci(coef, 4)} * ${n.value}`;
-    }
-    return '';
-  }
-
   // 将整棵树聚合为“特征影响力”列表（V1：按变量系数的绝对值累加并做归一化）
   function computeFeatureImportance(root) {
     const totals = new Map();
@@ -799,6 +786,20 @@
     return arr;
   }
   ExprTree.computeFeatureImportance = computeFeatureImportance;
+  // 生成叶子表达式的匹配键：与 docs/tree.json 的叶子键一致
+  function formatLeafKey(n) {
+    if (!n) return '';
+    if (n.kind === 'constant') {
+      // docs/tree.json 中常数多以固定小数位，例如 "-10.458" 或 "0.0054"
+      return String(formatNumberSci(Number(n.value), 4));
+    }
+    if (n.kind === 'variable') {
+      const coef = (typeof n.coefficient === 'number') ? n.coefficient : 1;
+      if (coef === 1) return String(n.value);
+      return `${formatNumberSci(coef, 4)} * ${n.value}`;
+    }
+    return '';
+  }
 
   // 运算符显示标签（布局与渲染共享）
   function operatorLabel(op) {
