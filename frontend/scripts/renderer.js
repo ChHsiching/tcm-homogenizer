@@ -54,16 +54,21 @@ async function openRangeConfigDialog() {
             return;
         }
         
+        showNotification('正在加载模型信息...', 'info');
+        
         const resp = await fetch(`${API_BASE_URL}/api/data-models/models/${dataModelId}`);
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const { success, model } = await resp.json();
         if (!success) throw new Error('无法获取模型信息');
-        
-        // 从数据模型中获取特征变量列表
         const features = model.feature_columns || [];
-        if (features.length === 0) {
-            showNotification('所选数据模型中没有找到特征变量', 'warning');
-            return;
+        
+        // 添加调试信息
+        console.log('🔍 从数据模型读取的特征列:', features);
+        console.log('🔍 数据模型信息:', model);
+        
+        // 检查特征列是否为空
+        if (!features.length) {
+            showNotification('警告：选择的模型没有特征列信息，将使用默认变量', 'warning');
         }
 
         const modalTitle = document.getElementById('modal-title');
@@ -71,26 +76,33 @@ async function openRangeConfigDialog() {
         const modalOverlay = document.getElementById('modal-overlay');
         const confirmBtn = document.getElementById('modal-confirm');
         const cancelBtn = document.getElementById('modal-cancel');
-        
         if (modalTitle) modalTitle.textContent = '设置变量范围';
-        
         if (modalBody) {
             const ranges = (window.__mcRanges__ && typeof window.__mcRanges__ === 'object') ? window.__mcRanges__ : {};
+            const vars = (features.length ? features : ['变量1','变量2']);
+            
+            // 添加调试信息
+            console.log('🔍 最终使用的变量列表:', vars);
+            
+            // 显示数据来源信息
+            const dataSourceInfo = features.length 
+                ? `从数据模型 "${model.name}" 读取到 ${features.length} 个特征变量`
+                : '使用默认变量（建议先选择包含特征列的数据模型）';
             
             const header = `
+                <div style="margin-bottom: 15px; padding: 10px; background: var(--bg-tertiary); border-radius: 6px; font-size: 12px; color: var(--text-secondary);">
+                    📊 ${dataSourceInfo}
+                </div>
                 <div class="range-row" style="font-weight:600;">
                     <div></div>
                     <div style="color: var(--text-secondary)">最小值</div>
                     <div style="color: var(--text-secondary)">最大值</div>
                 </div>`;
-            
-            const rows = features.map(name => {
+            const rows = vars.map(name => {
                 const prev = ranges[name] || {};
                 const minVal = (prev.min !== undefined && prev.min !== null) ? String(prev.min) : '';
                 const maxVal = (prev.max !== undefined && prev.max !== null) ? String(prev.max) : '';
-                // 简化中文名称显示，直接使用变量名
-                const cnName = name;
-                
+                const cnName = (typeof getComponentChineseName === 'function') ? getComponentChineseName(name) : name;
                 return `
                     <div class="range-row">
                         <div class="var-name"><span class="primary">${name}</span><span class="secondary">${cnName}</span></div>
@@ -99,57 +111,44 @@ async function openRangeConfigDialog() {
                     </div>
                 `;
             }).join('');
-            
             modalBody.innerHTML = `<div>${header}${rows}</div>`;
         }
-        
         if (modalOverlay) {
             modalOverlay.style.display = 'flex';
-        }
-        
         // 右上角叉号关闭（取消）
         const closeBtn = document.querySelector('.modal-close');
         if (closeBtn) closeBtn.onclick = () => authManager.hideModal();
-        
-        if (confirmBtn) {
-            confirmBtn.onclick = () => {
-                const inputs = modalBody.querySelectorAll('input[data-var]');
-                const ranges = {};
-                
-                inputs.forEach(inp => {
-                    const varName = inp.getAttribute('data-var');
-                    const t = inp.getAttribute('data-type');
-                    ranges[varName] = ranges[varName] || { min: 0, max: null };
-                    const v = inp.value.trim();
-                    
-                    if (t === 'min') {
-                        ranges[varName].min = (v === '') ? 0 : Number(v);
-                    } else {
-                        ranges[varName].max = (v === '') ? null : Number(v);
-                    }
-                });
-                
-                // 与模型ID绑定存储，避免换模型时串扰
-                window.__mcRanges__ = window.__mcRanges__ || {};
-                window.__mcRanges__.__model__ = dataModelId;
-                
-                Object.keys(ranges).forEach(k => {
-                    if (!k.startsWith('__')) {
+            if (confirmBtn) {
+                confirmBtn.onclick = () => {
+                    const inputs = modalBody.querySelectorAll('input[data-var]');
+                    const ranges = {};
+                    inputs.forEach(inp => {
+                        const varName = inp.getAttribute('data-var');
+                        const t = inp.getAttribute('data-type');
+                        ranges[varName] = ranges[varName] || { min: 0, max: null };
+                        const v = inp.value.trim();
+                        if (t === 'min') {
+                            ranges[varName].min = (v === '') ? 0 : Number(v);
+                        } else {
+                            ranges[varName].max = (v === '') ? null : Number(v);
+                        }
+                    });
+                    // 与模型ID绑定存储，避免换模型时串扰
+                    window.__mcRanges__ = window.__mcRanges__ || {};
+                    window.__mcRanges__.__model__ = dataModelId;
+                    Object.keys(ranges).forEach(k => {
                         window.__mcRanges__[k] = ranges[k];
-                    }
-                });
-                
-                authManager.hideModal();
-                showNotification('变量范围已设置', 'success');
-            };
+                    });
+                    authManager.hideModal();
+                    showNotification('变量范围已设置', 'success');
+                };
+            }
+            if (cancelBtn) {
+                cancelBtn.onclick = () => {
+                    authManager.hideModal();
+                };
+            }
         }
-        
-        if (cancelBtn) {
-            cancelBtn.onclick = () => {
-                authManager.hideModal();
-            };
-        }
-        
     } catch (e) {
         console.error('打开范围配置失败:', e);
         showNotification('打开范围配置失败: ' + e.message, 'error');
@@ -2541,6 +2540,9 @@ async function loadDataModelsForMonteCarlo() {
         return;
     }
     
+    // 显示加载状态
+    dataModelSelect.innerHTML = '<option value="">正在加载数据模型...</option>';
+    
     try {
         const response = await fetch(`${API_BASE_URL}/api/data-models/models`, {
             method: 'GET',
@@ -2561,21 +2563,34 @@ async function loadDataModelsForMonteCarlo() {
             throw new Error(result.message || '加载数据模型失败');
         }
         
+        console.log('🔍 从API获取到的原始数据模型列表:', result.models);
+        
         // 过滤出有符号回归模型的数据模型
         const modelsWithRegression = result.models.filter(model => 
             model.metadata && model.metadata.has_regression_model
         );
+        
+        console.log('🔍 过滤后有符号回归模型的数据模型:', modelsWithRegression);
         
         // 更新选择框
         dataModelSelect.innerHTML = '<option value="">请选择数据模型</option>';
         modelsWithRegression.forEach(model => {
             const option = document.createElement('option');
             option.value = model.id;
-            option.textContent = `${model.name} (${model.target_column})`;
+            const featureCount = model.feature_columns ? model.feature_columns.length : 0;
+            option.textContent = `${model.name} (${model.target_column}, ${featureCount}个特征)`;
             dataModelSelect.appendChild(option);
         });
         
         console.log(`✅ 加载了 ${modelsWithRegression.length} 个可用的数据模型`);
+        
+        // 如果没有可用的模型，显示提示
+        if (modelsWithRegression.length === 0) {
+            dataModelSelect.innerHTML = '<option value="">没有可用的数据模型</option>';
+            showNotification('没有找到包含符号回归模型的数据模型，请先进行符号回归分析', 'warning');
+        } else {
+            showNotification(`成功加载 ${modelsWithRegression.length} 个数据模型`, 'success');
+        }
         
     } catch (error) {
         console.error('❌ 加载数据模型失败:', error);
