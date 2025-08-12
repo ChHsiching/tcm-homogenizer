@@ -963,6 +963,18 @@
     svg.style.display = 'block';
     containerEl.appendChild(svg);
 
+    // 自定义 Tooltip 容器（替代浏览器原生 <title> 气泡）
+    const tooltipHost = containerEl.parentElement || containerEl; // #expression-tree-canvas 为相对定位
+    let tooltipEl = tooltipHost.querySelector('.expr-tooltip');
+    if (!tooltipEl) {
+      tooltipEl = document.createElement('div');
+      tooltipEl.className = 'expr-tooltip';
+      tooltipEl.style.display = 'none';
+      tooltipEl.style.position = 'absolute';
+      tooltipEl.style.pointerEvents = 'none';
+      tooltipHost.appendChild(tooltipEl);
+    }
+
     // 连线层
     const linksLayer = document.createElementNS(svgNS, 'g');
     linksLayer.setAttribute('fill', 'none');
@@ -1083,13 +1095,60 @@
         }
       }
 
-      // Tooltip
-      const title = document.createElementNS(svgNS, 'title');
+      // 自定义 Tooltip 交互
       const subExpr = safeSubExpr(node);
-      const w = Number(node.weight || 0).toFixed(6);
+      const weightStr = Number(node.weight || 0).toFixed(6);
       const cn = (typeof window !== 'undefined' && window.COMPONENT_NAMES && node.kind === 'variable') ? (window.COMPONENT_NAMES[String(node.value)] || '') : '';
-      title.textContent = `${subExpr}\n权重: ${w}${cn ? `\n${cn}` : ''}`;
-      g.appendChild(title);
+      const dotColor = node.color || '#ffffff';
+
+      const showTooltip = (ev) => {
+        try {
+          const exprHtml = escapeHtml(subExpr || '');
+          const cnHtml = cn ? `<span class="expr-tooltip-name">${escapeHtml(cn)}</span>` : '';
+          tooltipEl.innerHTML = `
+            <div class="expr-tooltip-expr">${exprHtml}</div>
+            <div class="expr-tooltip-meta">
+              <span class="expr-tooltip-dot" style="background:${dotColor}"></span>
+              <span>权重: ${weightStr}</span>
+              ${cnHtml}
+            </div>
+          `;
+          tooltipEl.style.display = 'block';
+          tooltipEl.style.borderLeft = `4px solid ${dotColor}`;
+          positionTooltip(ev);
+        } catch (_) {}
+      };
+
+      const positionTooltip = (ev) => {
+        try {
+          const hostRect = tooltipHost.getBoundingClientRect();
+          const offset = 12;
+          const desiredLeft = ev.clientX - hostRect.left + offset;
+          const desiredTop = ev.clientY - hostRect.top + offset;
+          // 放置后再进行边界修正
+          tooltipEl.style.left = `${desiredLeft}px`;
+          tooltipEl.style.top = `${desiredTop}px`;
+          const tipRect = tooltipEl.getBoundingClientRect();
+          let left = desiredLeft;
+          let top = desiredTop;
+          const maxLeft = hostRect.width - tipRect.width - 8;
+          const maxTop = hostRect.height - tipRect.height - 8;
+          if (left > maxLeft) left = Math.max(8, maxLeft);
+          if (top > maxTop) top = Math.max(8, maxTop);
+          if (left < 8) left = 8;
+          if (top < 8) top = 8;
+          tooltipEl.style.left = `${left}px`;
+          tooltipEl.style.top = `${top}px`;
+        } catch (_) {}
+      };
+
+      const hideTooltip = () => {
+        tooltipEl.style.display = 'none';
+      };
+
+      g.addEventListener('mouseenter', showTooltip);
+      g.addEventListener('mousemove', positionTooltip);
+      g.addEventListener('mouseleave', hideTooltip);
 
       // 交互回调
       g.addEventListener('contextmenu', (ev) => {
@@ -1164,6 +1223,14 @@
     function getMaxDepth(n) { if (!n) return 0; if (!n.children || n.children.length === 0) return 0; return 1 + Math.max(...n.children.map(getMaxDepth)); }
     function opToText(op) { return op === 'add' ? 'Addition' : op === 'sub' ? 'Subtraction' : op === 'mul' ? 'Multiplication' : op === 'div' ? 'Division' : String(op || '?'); }
     function safeSubExpr(n) { try { return astToExpression(n); } catch (_) { return ''; } }
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
   }
 
   ExprTree.renderSvgTree = renderSvgTree;
