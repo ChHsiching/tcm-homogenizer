@@ -53,32 +53,44 @@ async function openRangeConfigDialog() {
             showNotification('请先选择数据模型', 'warning');
             return;
         }
+        
         const resp = await fetch(`${API_BASE_URL}/api/data-models/models/${dataModelId}`);
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const { success, model } = await resp.json();
         if (!success) throw new Error('无法获取模型信息');
+        
+        // 从数据模型中获取特征变量列表
         const features = model.feature_columns || [];
+        if (features.length === 0) {
+            showNotification('所选数据模型中没有找到特征变量', 'warning');
+            return;
+        }
 
         const modalTitle = document.getElementById('modal-title');
         const modalBody = document.getElementById('modal-body');
         const modalOverlay = document.getElementById('modal-overlay');
         const confirmBtn = document.getElementById('modal-confirm');
         const cancelBtn = document.getElementById('modal-cancel');
+        
         if (modalTitle) modalTitle.textContent = '设置变量范围';
+        
         if (modalBody) {
             const ranges = (window.__mcRanges__ && typeof window.__mcRanges__ === 'object') ? window.__mcRanges__ : {};
-            const vars = (features.length ? features : ['变量1','变量2']);
+            
             const header = `
                 <div class="range-row" style="font-weight:600;">
                     <div></div>
                     <div style="color: var(--text-secondary)">最小值</div>
                     <div style="color: var(--text-secondary)">最大值</div>
                 </div>`;
-            const rows = vars.map(name => {
+            
+            const rows = features.map(name => {
                 const prev = ranges[name] || {};
                 const minVal = (prev.min !== undefined && prev.min !== null) ? String(prev.min) : '';
                 const maxVal = (prev.max !== undefined && prev.max !== null) ? String(prev.max) : '';
-                const cnName = (typeof getComponentChineseName === 'function') ? getComponentChineseName(name) : name;
+                // 简化中文名称显示，直接使用变量名
+                const cnName = name;
+                
                 return `
                     <div class="range-row">
                         <div class="var-name"><span class="primary">${name}</span><span class="secondary">${cnName}</span></div>
@@ -87,44 +99,57 @@ async function openRangeConfigDialog() {
                     </div>
                 `;
             }).join('');
+            
             modalBody.innerHTML = `<div>${header}${rows}</div>`;
         }
+        
         if (modalOverlay) {
             modalOverlay.style.display = 'flex';
+        }
+        
         // 右上角叉号关闭（取消）
         const closeBtn = document.querySelector('.modal-close');
         if (closeBtn) closeBtn.onclick = () => authManager.hideModal();
-            if (confirmBtn) {
-                confirmBtn.onclick = () => {
-                    const inputs = modalBody.querySelectorAll('input[data-var]');
-                    const ranges = {};
-                    inputs.forEach(inp => {
-                        const varName = inp.getAttribute('data-var');
-                        const t = inp.getAttribute('data-type');
-                        ranges[varName] = ranges[varName] || { min: 0, max: null };
-                        const v = inp.value.trim();
-                        if (t === 'min') {
-                            ranges[varName].min = (v === '') ? 0 : Number(v);
-                        } else {
-                            ranges[varName].max = (v === '') ? null : Number(v);
-                        }
-                    });
-                    // 与模型ID绑定存储，避免换模型时串扰
-                    window.__mcRanges__ = window.__mcRanges__ || {};
-                    window.__mcRanges__.__model__ = dataModelId;
-                    Object.keys(ranges).forEach(k => {
+        
+        if (confirmBtn) {
+            confirmBtn.onclick = () => {
+                const inputs = modalBody.querySelectorAll('input[data-var]');
+                const ranges = {};
+                
+                inputs.forEach(inp => {
+                    const varName = inp.getAttribute('data-var');
+                    const t = inp.getAttribute('data-type');
+                    ranges[varName] = ranges[varName] || { min: 0, max: null };
+                    const v = inp.value.trim();
+                    
+                    if (t === 'min') {
+                        ranges[varName].min = (v === '') ? 0 : Number(v);
+                    } else {
+                        ranges[varName].max = (v === '') ? null : Number(v);
+                    }
+                });
+                
+                // 与模型ID绑定存储，避免换模型时串扰
+                window.__mcRanges__ = window.__mcRanges__ || {};
+                window.__mcRanges__.__model__ = dataModelId;
+                
+                Object.keys(ranges).forEach(k => {
+                    if (!k.startsWith('__')) {
                         window.__mcRanges__[k] = ranges[k];
-                    });
-                    authManager.hideModal();
-                    showNotification('变量范围已设置', 'success');
-                };
-            }
-            if (cancelBtn) {
-                cancelBtn.onclick = () => {
-                    authManager.hideModal();
-                };
-            }
+                    }
+                });
+                
+                authManager.hideModal();
+                showNotification('变量范围已设置', 'success');
+            };
         }
+        
+        if (cancelBtn) {
+            cancelBtn.onclick = () => {
+                authManager.hideModal();
+            };
+        }
+        
     } catch (e) {
         console.error('打开范围配置失败:', e);
         showNotification('打开范围配置失败: ' + e.message, 'error');
