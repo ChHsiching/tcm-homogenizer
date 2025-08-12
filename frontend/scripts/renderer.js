@@ -62,7 +62,7 @@ async function openRangeConfigDialog() {
         const { success: modelSuccess, model } = await modelResp.json();
         if (!modelSuccess) throw new Error('无法获取模型信息');
         
-        // 然后获取回归模型文件，从中解析公式中的特征变量
+        // 然后获取回归模型文件，从中获取特征重要性数据
         const regFileName = model.data_files?.regression_model;
         if (!regFileName) {
             throw new Error('该数据模型没有回归模型文件');
@@ -75,23 +75,19 @@ async function openRangeConfigDialog() {
         
         // 解析回归模型文件内容
         const regModel = JSON.parse(content);
-        const expressionText = regModel.expression_text || regModel.expression || '';
+        const featureImportance = regModel.feature_importance || [];
         
-        if (!expressionText) {
-            throw new Error('回归模型中没有找到公式表达式');
-        }
-        
-        // 从公式表达式中解析特征变量
-        const features = extractFeaturesFromExpression(expressionText);
+        // 从特征重要性数据中提取特征变量名称
+        const features = featureImportance.map(f => f.feature || f.name || f).filter(Boolean);
         
         // 添加调试信息
-        console.log('🔍 从公式表达式中解析的特征变量:', features);
-        console.log('🔍 原始公式表达式:', expressionText);
+        console.log('🔍 从回归模型读取的特征重要性数据:', featureImportance);
+        console.log('🔍 提取的特征变量名称:', features);
         console.log('🔍 回归模型信息:', regModel);
         
         // 检查特征变量是否为空
         if (!features.length) {
-            showNotification('警告：无法从公式中解析出特征变量，将使用默认变量', 'warning');
+            showNotification('警告：回归模型中没有找到特征重要性数据，将使用默认变量', 'warning');
         }
 
         const modalTitle = document.getElementById('modal-title');
@@ -109,7 +105,7 @@ async function openRangeConfigDialog() {
             
             // 显示数据来源信息
             const dataSourceInfo = features.length 
-                ? `从公式表达式中解析出 ${features.length} 个特征变量`
+                ? `从回归模型公式中提取出 ${features.length} 个特征变量`
                 : '使用默认变量（建议检查回归模型文件）';
             
             const header = `
@@ -3390,39 +3386,3 @@ window.refreshExpressionTreeData = async function() {
         showNotification('刷新数据失败: ' + error.message, 'error');
     }
 };
-
-// 从公式表达式中解析特征变量
-function extractFeaturesFromExpression(expression) {
-    if (!expression || typeof expression !== 'string') {
-        return [];
-    }
-    
-    // 移除 LaTeX 标记和数学符号，保留变量名
-    let cleanExpr = expression
-        .replace(/\\[a-zA-Z]+/g, '') // 移除 LaTeX 命令
-        .replace(/\\[{}[\]]/g, '')   // 移除 LaTeX 括号
-        .replace(/\\text\{([^}]+)\}/g, '$1') // 提取 \text{} 中的内容
-        .replace(/[+\-*/(){}[\]]/g, ' ')     // 将数学运算符替换为空格
-        .replace(/[0-9.]+/g, ' ')            // 将数字替换为空格
-        .replace(/c\{[0-9]+\}/g, ' ')        // 将常数 c{0}, c{1} 等替换为空格
-        .replace(/\s+/g, ' ')                // 合并多个空格
-        .trim();
-    
-    // 分割并过滤出有效的变量名
-    const words = cleanExpr.split(' ').filter(word => {
-        // 变量名应该是2-6个字符的大写字母组合
-        return word.length >= 2 && word.length <= 6 && /^[A-Z]+$/.test(word);
-    });
-    
-    // 去重并排序
-    const uniqueFeatures = [...new Set(words)].sort();
-    
-    console.log('🔍 公式清理过程:', {
-        original: expression,
-        cleaned: cleanExpr,
-        words: words,
-        uniqueFeatures: uniqueFeatures
-    });
-    
-    return uniqueFeatures;
-}
