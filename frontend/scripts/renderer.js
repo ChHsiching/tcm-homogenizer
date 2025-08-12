@@ -464,8 +464,8 @@ async function renderExpressionTreePage() {
                                 expression_latex: reg.expression_latex || '',
                                 target_variable: reg.target_variable || 'HDL',
                                 constants: reg.constants || {},
-                                r2: reg.r2 || 0,
-                                mse: reg.mse || 0,
+                                pearson_r_test: reg.detailed_metrics?.pearson_r_test || 0,
+                                pearson_r_training: reg.detailed_metrics?.pearson_r_training || 0,
                                 feature_importance: reg.feature_importance || [],
                                 impact_tree: reg.impact_tree || null,
                                 detailed_metrics: reg.detailed_metrics || {},
@@ -503,8 +503,8 @@ async function renderExpressionTreePage() {
                                     expression_latex: reg.expression_latex || '',
                                     target_variable: reg.target_variable || 'HDL',
                                     constants: reg.constants || {},
-                                    r2: reg.r2 || 0,
-                                    mse: reg.mse || 0,
+                                    pearson_r_test: reg.detailed_metrics?.pearson_r_test || 0,
+                                    pearson_r_training: reg.detailed_metrics?.pearson_r_training || 0,
                                     feature_importance: reg.feature_importance || [],
                                     impact_tree: reg.impact_tree || null,
                                     detailed_metrics: reg.detailed_metrics || {},
@@ -720,7 +720,7 @@ function wireToolbarActions(container, getSvg) {
         const sel = svg && svg.querySelector('[data-selected="true"]');
         return sel ? sel.getAttribute('data-node-id') : null;
     };
-    const rerender = async (ast) => {
+    const rerender = async (ast, action = 'apply') => {
         const canvas = document.getElementById('expression-tree-canvas');
         const inner = canvas.querySelector('.expr-tree-inner') || canvas;
         inner.innerHTML = '';
@@ -800,7 +800,7 @@ function wireToolbarActions(container, getSvg) {
             }
         }
         
-        // 写回数据库：同步更新到后端
+        // 写回数据库：同步更新到后端（包含表达式树操作类型以驱动后端指标轮换/撤销）
         const modelId = window.__currentModelId__;
         if (modelId) {
             try {
@@ -814,7 +814,8 @@ function wireToolbarActions(container, getSvg) {
                             impact_tree: window.TREE_IMPACT_DATA,
                             updated_at: Date.now()
                         },
-                        feature_importance: ExprTree.computeFeatureImportance(ast)
+                        feature_importance: ExprTree.computeFeatureImportance(ast),
+                        expr_tree_action: action
                     })
                 });
                 
@@ -822,7 +823,7 @@ function wireToolbarActions(container, getSvg) {
                     throw new Error(`主数据模型更新失败: ${mainModelResp.status}`);
                 }
                 
-                // 2. 更新回归模型文件
+                // 2. 更新回归模型文件（由后端据 action 更新 detailed_metrics 与元数据）
                 const regModelResp = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}/files/regression_model`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
@@ -832,7 +833,8 @@ function wireToolbarActions(container, getSvg) {
                         constants: constants, // 添加常量信息
                         feature_importance: ExprTree.computeFeatureImportance(ast),
                         impact_tree: window.TREE_IMPACT_DATA,
-                        updated_at: Date.now()
+                        updated_at: Date.now(),
+                        expr_tree_action: action
                     })
                 });
                 
@@ -840,8 +842,18 @@ function wireToolbarActions(container, getSvg) {
                     throw new Error(`回归模型文件更新失败: ${regModelResp.status}`);
                 }
                 
-                console.log('✅ 表达式树修改已同步到数据库');
-                showNotification('表达式树修改已同步到数据库', 'success');
+                // 3. 读取最新摘要以刷新左侧性能与详细指标
+                try {
+                    const updated = await fetchExpressionTreeSummary({ model_id: modelId });
+                    if (updated) {
+                        displayExpressionTreeSummary(updated);
+                    }
+                } catch (e) {
+                    console.warn('刷新表达式树摘要失败（将继续显示旧指标）:', e);
+                }
+
+                console.log('✅ 表达式树修改已同步到数据库并刷新指标');
+                showNotification('表达式树修改已同步到数据库并刷新指标', 'success');
                 
             } catch (error) {
                 console.error('❌ 数据库同步失败:', error);
@@ -859,26 +871,26 @@ function wireToolbarActions(container, getSvg) {
         const next = ExprTree.deleteNodeById(window.currentExpressionAst, id);
         window.currentExpressionAst = ExprTree.simplifyAst(next);
         showNotification('正在删除节点/子树...', 'info');
-        rerender(window.currentExpressionAst);
+        rerender(window.currentExpressionAst, 'delete');
     };
     if (btnUndo) btnUndo.onclick = () => {
         if (!window.__exprTreeUndo__ || window.__exprTreeUndo__.length === 0) return;
         const prev = window.__exprTreeUndo__.pop();
         window.currentExpressionAst = prev;
         showNotification('正在撤销操作...', 'info');
-        rerender(window.currentExpressionAst);
+        rerender(window.currentExpressionAst, 'undo');
     };
     if (btnSimplify) btnSimplify.onclick = () => {
         window.__exprTreeUndo__.push(ExprTree.cloneAst(window.currentExpressionAst));
         window.currentExpressionAst = ExprTree.simplifyAst(window.currentExpressionAst);
         showNotification('正在简化表达式...', 'info');
-        rerender(window.currentExpressionAst);
+        rerender(window.currentExpressionAst, 'simplify');
     };
     if (btnOptimize) btnOptimize.onclick = () => {
         window.__exprTreeUndo__.push(ExprTree.cloneAst(window.currentExpressionAst));
         window.currentExpressionAst = ExprTree.simplifyAst(window.currentExpressionAst);
         showNotification('正在优化表达式...', 'info');
-        rerender(window.currentExpressionAst);
+        rerender(window.currentExpressionAst, 'optimize');
     };
 }
 
@@ -954,8 +966,8 @@ function displayExpressionTreeSummary(result) {
     // 左侧：性能
     perfContainer.innerHTML = `
         <div class="performance-metrics">
-            <div class="performance-metric"><div class="metric-label">决定系数 R²</div><div class="metric-value">${(result.r2 ?? 0).toFixed(3)}</div><div class="metric-unit">Coefficient of Determination</div></div>
-            <div class="performance-metric"><div class="metric-label">均方误差 MSE</div><div class="metric-value">${(result.mse ?? 0).toFixed(3)}</div><div class="metric-unit">Mean Squared Error</div></div>
+            <div class="performance-metric"><div class="metric-label">皮尔逊相关系数</div><div class="metric-value">${(result.pearson_r_test ?? 0).toFixed(3)}</div><div class="metric-unit">(测试)</div></div>
+            <div class="performance-metric"><div class="metric-label">皮尔逊相关系数</div><div class="metric-value">${(result.pearson_r_training ?? 0).toFixed(3)}</div><div class="metric-unit">(训练)</div></div>
         </div>
     `;
 
@@ -979,13 +991,7 @@ function displayExpressionTreeSummary(result) {
                             <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">均方根误差</span><span class="metric-name-en">Root MSE</span><span class="metric-dataset">(训练)</span></div><span class="metric-value">${detailed.root_mean_squared_error_training}</span></div>
                         </div>
                     </div>
-                    <div class="metric-section">
-                        <h6>相关性指标</h6>
-                        <div class="metric-list">
-                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">皮尔逊相关系数</span><span class="metric-name-en">Pearson's R</span><span class="metric-dataset">(测试)</span></div><span class="metric-value">${detailed.pearson_r_test}</span></div>
-                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">皮尔逊相关系数</span><span class="metric-name-en">Pearson's R</span><span class="metric-dataset">(训练)</span></div><span class="metric-value">${detailed.pearson_r_training}</span></div>
-                        </div>
-                    </div>
+
                     <div class="metric-section">
                         <h6>模型结构</h6>
                         <div class="metric-list">
@@ -1609,14 +1615,14 @@ function displayRegressionResults(result) {
             <h4>模型性能</h4>
             <div class="performance-metrics">
                 <div class="performance-metric">
-                    <div class="metric-label">决定系数 R²</div>
-                    <div class="metric-value">${result.r2.toFixed(3)}</div>
-                    <div class="metric-unit">Coefficient of Determination</div>
+                    <div class="metric-label">皮尔逊相关系数</div>
+                    <div class="metric-value">${result.detailed_metrics.pearson_r_test.toFixed(3)}</div>
+                    <div class="metric-unit">(测试)</div>
                 </div>
                 <div class="performance-metric">
-                    <div class="metric-label">均方误差 MSE</div>
-                    <div class="metric-value">${result.mse.toFixed(3)}</div>
-                    <div class="metric-unit">Mean Squared Error</div>
+                    <div class="metric-label">皮尔逊相关系数</div>
+                    <div class="metric-value">${result.detailed_metrics.pearson_r_training.toFixed(3)}</div>
+                    <div class="metric-unit">(训练)</div>
                 </div>
             </div>
             
@@ -1710,27 +1716,7 @@ function displayRegressionResults(result) {
                         </div>
                     </div>
                     
-                    <div class="metric-section">
-                        <h6>相关性指标</h6>
-                        <div class="metric-list">
-                            <div class="metric-item">
-                                <div class="metric-name-container">
-                                    <span class="metric-name-cn">皮尔逊相关系数</span>
-                                    <span class="metric-name-en">Pearson's R</span>
-                                    <span class="metric-dataset">(测试)</span>
-                                </div>
-                                <span class="metric-value">${result.detailed_metrics.pearson_r_test}</span>
-                            </div>
-                            <div class="metric-item">
-                                <div class="metric-name-container">
-                                    <span class="metric-name-cn">皮尔逊相关系数</span>
-                                    <span class="metric-name-en">Pearson's R</span>
-                                    <span class="metric-dataset">(训练)</span>
-                                </div>
-                                <span class="metric-value">${result.detailed_metrics.pearson_r_training}</span>
-                            </div>
-                        </div>
-                    </div>
+
                     
                     <div class="metric-section">
                         <h6>模型结构</h6>
@@ -1913,8 +1899,8 @@ function updateRegressionModelList() {
         const option = document.createElement('option');
         // 这里用于联动蒙特卡洛页的数据模型选择，本地回归结果没有数据模型ID，仅展示表达式模型ID
         option.value = model.data_model_id || model.id;
-        const r2Text = (typeof model.r2 === 'number') ? model.r2.toFixed(3) : model.r2;
-        option.textContent = `模型 ${model.data_model_id || model.id} (R²=${r2Text})`;
+        const pearsonText = (typeof model.detailed_metrics?.pearson_r_test === 'number') ? model.detailed_metrics.pearson_r_test.toFixed(3) : (model.detailed_metrics?.pearson_r_test || 'N/A');
+        option.textContent = `模型 ${model.data_model_id || model.id} (R=${pearsonText})`;
         select.appendChild(option);
     });
 }
@@ -2360,6 +2346,7 @@ function displayDataModels(models) {
             <tr>
                 <th>模型名称</th>
                 <th>模型描述</th>
+                <th>主要指标</th>
                 <th>创建时间</th>
                 <th>文件状态</th>
                 <th>操作</th>
@@ -2378,9 +2365,13 @@ function displayDataModels(models) {
         // 生成文件状态显示
         const fileStatus = generateFileStatus(model.metadata);
         
+        // 生成主要指标显示
+        const mainMetrics = generateMainMetrics(model);
+        
         row.innerHTML = `
             <td><strong>${model.name}</strong></td>
             <td>${model.description || '暂无描述'}</td>
+            <td>${mainMetrics}</td>
             <td>${createdDate}</td>
             <td>${fileStatus}</td>
             <td>
@@ -2395,6 +2386,29 @@ function displayDataModels(models) {
     
     dataPreview.innerHTML = '';
     dataPreview.appendChild(table);
+}
+
+function generateMainMetrics(model) {
+    if (!model.metadata) return '<span class="text-muted">无指标</span>';
+    
+    // 从metadata中获取指标
+    const pearsonTest = model.metadata.pearson_r_test;
+    const pearsonTraining = model.metadata.pearson_r_training;
+    
+    if (pearsonTest !== undefined && pearsonTraining !== undefined) {
+        return `<div class="metrics-summary">
+            <div class="metric-item">
+                <span class="metric-label">R(测试):</span>
+                <span class="metric-value">${pearsonTest.toFixed(3)}</span>
+            </div>
+            <div class="metric-item">
+                <span class="metric-label">R(训练):</span>
+                <span class="metric-value">${pearsonTraining.toFixed(3)}</span>
+            </div>
+        </div>`;
+    }
+    
+    return '<span class="text-muted">无指标</span>';
 }
 
 function generateFileStatus(metadata) {
@@ -2922,8 +2936,8 @@ function renderBeautifiedFileContent(container, content, filename, fileType) {
             <div class="beautified-json">
                 <div class="metric-cards">
                     <div class="metric-card"><div class="metric-label">目标变量</div><div class="metric-value">${json.target_column || '-'}</div></div>
-                    <div class="metric-card"><div class="metric-label">R²</div><div class="metric-value">${json.r2 ?? '-'}</div></div>
-                    <div class="metric-card"><div class="metric-label">MSE</div><div class="metric-value">${json.mse ?? '-'}</div></div>
+                    <div class="metric-card"><div class="metric-label">皮尔逊相关系数(测试)</div><div class="metric-value">${json.detailed_metrics?.pearson_r_test ?? '-'}</div></div>
+                    <div class="metric-card"><div class="metric-label">皮尔逊相关系数(训练)</div><div class="metric-value">${json.detailed_metrics?.pearson_r_training ?? '-'}</div></div>
                     <div class="metric-card"><div class="metric-label">复杂度</div><div class="metric-value">${json.model_complexity ?? '-'}</div></div>
                 </div>
                 ${json.expression_latex ? `<div class="expression-box"><div class="expression-label">模型表达式（MathJax）</div><div class="expression-value">$${json.expression_latex}$</div></div>` : (json.expression ? `<div class="expression-box"><div class="expression-label">模型表达式（MathJax）</div><div class="expression-value">$${json.expression}$</div></div>` : (json.expression_text ? `<div class="expression-box"><div class="expression-label">模型表达式（文本）</div><div class="expression-value">${json.expression_text}</div></div>` : ''))}
