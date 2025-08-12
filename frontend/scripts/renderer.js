@@ -1717,17 +1717,17 @@ function displayRegressionResults(result) {
                     .filter(f => Number(f.importance || 0) > 0)
                     .sort((a, b) => Number(b.importance || 0) - Number(a.importance || 0))
                     .map(f => `
-                        <div class="feature-importance-item">
-                            <div class="feature-name-container">
-                                <div class="feature-name-en">${f.feature}</div>
-                                <div class="feature-name-cn">${getComponentChineseName(f.feature)}</div>
-                            </div>
-                            <div class="importance-bar">
-                                <div class="importance-fill" style="width: ${f.importance * 100}%"></div>
-                            </div>
-                            <div class="importance-value">${f.importance}</div>
+                    <div class="feature-importance-item">
+                        <div class="feature-name-container">
+                            <div class="feature-name-en">${f.feature}</div>
+                            <div class="feature-name-cn">${getComponentChineseName(f.feature)}</div>
                         </div>
-                    `).join('')}
+                        <div class="importance-bar">
+                            <div class="importance-fill" style="width: ${f.importance * 100}%"></div>
+                        </div>
+                            <div class="importance-value">${f.importance}</div>
+                    </div>
+                `).join('')}
             </div>
         </div>
         
@@ -3120,12 +3120,12 @@ function renderBeautifiedFileContent(container, content, filename, fileType) {
                         .filter(item => Number(item.importance || 0) > 0)
                         .sort((a, b) => Number(b.importance || 0) - Number(a.importance || 0))
                         .map(item => `
-                            <div class="importance-row">
-                                <div class="imp-name">${item.feature}</div>
-                                <div class="imp-bar"><span style="width:${Math.min(100, Math.round((item.importance || 0) * 100))}%"></span></div>
+                        <div class="importance-row">
+                            <div class="imp-name">${item.feature}</div>
+                            <div class="imp-bar"><span style="width:${Math.min(100, Math.round((item.importance || 0) * 100))}%"></span></div>
                                 <div class="imp-value">${item.importance ?? 0}</div>
-                            </div>
-                        `).join('')}
+                        </div>
+                    `).join('')}
                 </div>` : ''}
             </div>
         `;
@@ -3204,12 +3204,12 @@ function renderBeautifiedFileContent(container, content, filename, fileType) {
                             .filter(item => Number(item.importance || 0) > 0)
                             .sort((a, b) => Number(b.importance || 0) - Number(a.importance || 0))
                             .map(item => `
-                                <div class="importance-row">
-                                    <div class="imp-name">${item.feature}</div>
-                                    <div class="imp-bar"><span style="width:${Math.min(100, Math.round((item.importance || 0) * 100))}%"></span></div>
+                            <div class="importance-row">
+                                <div class="imp-name">${item.feature}</div>
+                                <div class="imp-bar"><span style="width:${Math.min(100, Math.round((item.importance || 0) * 100))}%"></span></div>
                                     <div class="imp-value">${item.importance ?? 0}</div>
-                                </div>
-                            `).join('')}
+                            </div>
+                        `).join('')}
                     </div>` : ''}
                     ${sims.length ? `
                     <div class="section-subtitle">模拟样本（前5条）</div>
