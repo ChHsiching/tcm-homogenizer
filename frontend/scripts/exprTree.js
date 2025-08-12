@@ -1070,9 +1070,9 @@
 
     function operatorHalfWidthEstimate(op) {
       // 动态估计胶囊宽度的一半（考虑文本长度与放大倍率），单位：布局坐标
-      const fontSize = 12 * (cfg.textScale || 1);
+      const fontSize = 12 * (cfg.textScale || 1.15); // 默认文字整体放大约15%
       const text = operatorLabel(op);
-      const pad = 12 * (cfg.textScale || 1);
+      const pad = 12 * (cfg.textScale || 1.15);
       const estWidth = text.length * fontSize * 0.6 + 2 * pad; // 经验系数 0.6
       const minWidth = cfg.nodeRadius * 2 * (cfg.drawScale || 1);
       return Math.max(minWidth / 2, estWidth / 2);
@@ -1187,9 +1187,9 @@
     const baseH2 = Math.max(cfg.nodeRadius * 2, cfg.leafH);
     if (!cfg.vGap || cfg.vGap < baseH2 * 2) cfg.vGap = baseH2 * 2;
 
-    // 显示放大倍率：节点尺寸 1.5x，字体 2x
+    // 显示放大倍率：节点尺寸 1.5x，字体 2.15x（略增）
     const NODE_SCALE = 1.5;
-    const TEXT_SCALE = 2.0;
+    const TEXT_SCALE = 2.15;
     const rDraw = cfg.nodeRadius * NODE_SCALE;
     const leafWDraw = cfg.leafW * NODE_SCALE;
     const leafHDraw = cfg.leafH * NODE_SCALE;
