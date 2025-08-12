@@ -56,19 +56,42 @@ async function openRangeConfigDialog() {
         
         showNotification('正在加载模型信息...', 'info');
         
-        const resp = await fetch(`${API_BASE_URL}/api/data-models/models/${dataModelId}`);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const { success, model } = await resp.json();
-        if (!success) throw new Error('无法获取模型信息');
-        const features = model.feature_columns || [];
+        // 首先获取数据模型基本信息
+        const modelResp = await fetch(`${API_BASE_URL}/api/data-models/models/${dataModelId}`);
+        if (!modelResp.ok) throw new Error(`HTTP ${modelResp.status}`);
+        const { success: modelSuccess, model } = await modelResp.json();
+        if (!modelSuccess) throw new Error('无法获取模型信息');
+        
+        // 然后获取回归模型文件，从中解析公式中的特征变量
+        const regFileName = model.data_files?.regression_model;
+        if (!regFileName) {
+            throw new Error('该数据模型没有回归模型文件');
+        }
+        
+        const regResp = await fetch(`${API_BASE_URL}/api/data-models/models/${dataModelId}/files/regression_model`);
+        if (!regResp.ok) throw new Error(`无法获取回归模型文件: HTTP ${regResp.status}`);
+        const { success: regSuccess, content } = await regResp.json();
+        if (!regSuccess) throw new Error('回归模型文件读取失败');
+        
+        // 解析回归模型文件内容
+        const regModel = JSON.parse(content);
+        const expressionText = regModel.expression_text || regModel.expression || '';
+        
+        if (!expressionText) {
+            throw new Error('回归模型中没有找到公式表达式');
+        }
+        
+        // 从公式表达式中解析特征变量
+        const features = extractFeaturesFromExpression(expressionText);
         
         // 添加调试信息
-        console.log('🔍 从数据模型读取的特征列:', features);
+        console.log('🔍 从公式表达式中解析的特征变量:', features);
+        console.log('🔍 原始公式表达式:', expressionText);
         console.log('🔍 数据模型信息:', model);
         
-        // 检查特征列是否为空
+        // 检查特征变量是否为空
         if (!features.length) {
-            showNotification('警告：选择的模型没有特征列信息，将使用默认变量', 'warning');
+            showNotification('警告：无法从公式中解析出特征变量，将使用默认变量', 'warning');
         }
 
         const modalTitle = document.getElementById('modal-title');
@@ -86,8 +109,8 @@ async function openRangeConfigDialog() {
             
             // 显示数据来源信息
             const dataSourceInfo = features.length 
-                ? `从数据模型 "${model.name}" 读取到 ${features.length} 个特征变量`
-                : '使用默认变量（建议先选择包含特征列的数据模型）';
+                ? `从公式表达式中解析出 ${features.length} 个特征变量`
+                : '使用默认变量（建议检查回归模型文件）';
             
             const header = `
                 <div style="margin-bottom: 15px; padding: 10px; background: var(--bg-tertiary); border-radius: 6px; font-size: 12px; color: var(--text-secondary);">
@@ -3367,3 +3390,39 @@ window.refreshExpressionTreeData = async function() {
         showNotification('刷新数据失败: ' + error.message, 'error');
     }
 };
+
+// 从公式表达式中解析特征变量
+function extractFeaturesFromExpression(expression) {
+    if (!expression || typeof expression !== 'string') {
+        return [];
+    }
+    
+    // 移除 LaTeX 标记和数学符号，保留变量名
+    let cleanExpr = expression
+        .replace(/\\[a-zA-Z]+/g, '') // 移除 LaTeX 命令
+        .replace(/\\[{}[\]]/g, '')   // 移除 LaTeX 括号
+        .replace(/\\text\{([^}]+)\}/g, '$1') // 提取 \text{} 中的内容
+        .replace(/[+\-*/(){}[\]]/g, ' ')     // 将数学运算符替换为空格
+        .replace(/[0-9.]+/g, ' ')            // 将数字替换为空格
+        .replace(/c\{[0-9]+\}/g, ' ')        // 将常数 c{0}, c{1} 等替换为空格
+        .replace(/\s+/g, ' ')                // 合并多个空格
+        .trim();
+    
+    // 分割并过滤出有效的变量名
+    const words = cleanExpr.split(' ').filter(word => {
+        // 变量名应该是2-6个字符的大写字母组合
+        return word.length >= 2 && word.length <= 6 && /^[A-Z]+$/.test(word);
+    });
+    
+    // 去重并排序
+    const uniqueFeatures = [...new Set(words)].sort();
+    
+    console.log('🔍 公式清理过程:', {
+        original: expression,
+        cleaned: cleanExpr,
+        words: words,
+        uniqueFeatures: uniqueFeatures
+    });
+    
+    return uniqueFeatures;
+}
