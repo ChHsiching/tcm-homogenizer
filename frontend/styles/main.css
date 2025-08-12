@@ -1604,6 +1604,10 @@ input[type="checkbox"]:focus {
 }
 
 /* 表达式树左侧-详细指标：直接让栅格容器居中且更宽 */
+#expr-detailed-container {
+    padding: 0 !important; /* 去掉周围多余 padding */
+}
+
 #expr-detailed-container .metrics-grid {
     width: 96%;
     max-width: 980px;
