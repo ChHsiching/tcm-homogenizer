@@ -1,11 +1,10 @@
-#!/usr/bin/env bash
+#!/bin/bash
+
 # 本草智配客户端 - 测试环境启动脚本
 
 set -e
 
 echo "🚀 启动本草智配客户端测试环境..."
-
-# 预留：这里可以启动测试所需的服务或脚本
 
 # 获取项目根目录
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
