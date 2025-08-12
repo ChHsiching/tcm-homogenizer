@@ -2,7 +2,7 @@
 
 ## 概述
 
-本指南详细说明如何在Windows虚拟机中将中药多组分均化分析客户端打包成独立的exe安装程序。
+本指南详细说明如何在Windows虚拟机中将本草智配客户端打包成独立的exe安装程序。
 
 ## 准备工作
 
@@ -221,7 +221,7 @@ cd build-temp
 {
   "name": "tcm-homogenizer",
   "version": "1.0.0",
-  "description": "中药多组分均化分析客户端",
+  "description": "本草智配客户端",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -238,7 +238,7 @@ cd build-temp
   },
   "build": {
     "appId": "com.tcm.homogenizer",
-    "productName": "中药多组分均化分析客户端",
+    "productName": "本草智配客户端",
     "directories": {
       "output": "../dist"
     },
@@ -272,7 +272,7 @@ cd build-temp
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "中药多组分均化分析客户端",
+      "shortcutName": "本草智配客户端",
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico",
       "installerHeaderIcon": "assets/icon.ico"
@@ -306,7 +306,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js')
     },
     icon: path.join(__dirname, 'assets/icon.png'),
-    title: '中药多组分均化分析客户端',
+    title: '本草智配客户端',
     show: false
   });
 
@@ -627,7 +627,7 @@ npm run build:win
 
 打包完成后，在 `dist/` 目录下会生成：
 
-- `中药多组分均化分析客户端 Setup.exe` - Windows安装程序
+- `本草智配客户端 Setup.exe` - Windows安装程序
 - `win-unpacked/` - 解压版本（用于测试）
 
 ### 测试安装程序
@@ -673,7 +673,7 @@ npm run build:win
 #### 1. 手动测试后端
 ```cmd
 # 在命令行中手动运行后端exe
-cd "C:\Program Files\中药多组分均化分析客户端\resources"
+cd "C:\Program Files\本草智配客户端\resources"
 tcm-backend.exe
 
 # 在另一个命令行中测试API

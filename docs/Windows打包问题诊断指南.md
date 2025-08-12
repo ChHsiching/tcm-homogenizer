@@ -10,17 +10,17 @@ Windows虚拟机打包后，应用可以安装和启动，但后端服务启动�
 
 ```cmd
 # 检查后端exe是否存在
-dir "C:\Program Files\中药多组分均化分析客户端\resources\tcm-backend.exe"
+dir "C:\Program Files\本草智配客户端\resources\tcm-backend.exe"
 
 # 如果不存在，检查安装目录
-dir "C:\Program Files\中药多组分均化分析客户端\"
+dir "C:\Program Files\本草智配客户端\"
 ```
 
 ### 2. 手动测试后端exe
 
 ```cmd
 # 以管理员身份打开命令提示符
-cd "C:\Program Files\中药多组分均化分析客户端\resources"
+cd "C:\Program Files\本草智配客户端\resources"
 
 # 手动运行后端exe
 tcm-backend.exe
@@ -125,10 +125,10 @@ node --version
 
 ```cmd
 # 检查安装目录结构
-tree "C:\Program Files\中药多组分均化分析客户端\" /F
+tree "C:\Program Files\本草智配客户端\" /F
 
 # 检查文件大小
-dir "C:\Program Files\中药多组分均化分析客户端\resources\tcm-backend.exe"
+dir "C:\Program Files\本草智配客户端\resources\tcm-backend.exe"
 ```
 
 ### 步骤3：进程监控
