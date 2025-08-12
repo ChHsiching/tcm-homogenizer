@@ -1939,7 +1939,7 @@ input[type="checkbox"]:focus {
         font-size: 10px;
     }
     
-    /* 特征权重响应式设计 */
+    /* 特征影响力响应式设计 */
     .feature-importance-item {
         grid-template-columns: 1fr;
         gap: 8px;
