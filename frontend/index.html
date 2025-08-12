@@ -539,7 +539,7 @@
                             </div>
                         </div>
                         <div class="expr-card expr-feature-card">
-                            <h3>特征影响力</h3>
+                            <h3>特征权重</h3>
                             <div id="expr-feature-container" class="results-container">
                                 <p>加载中...</p>
                             </div>
@@ -900,10 +900,21 @@
         <!-- 状态栏 -->
         <footer class="status-bar">
             <div class="status-left">
-                <span id="connection-status-footer">后端服务：检查中...</span>
+                <div class="connection-status">
+                    <span class="status-indicator" id="status-indicator"></span>
+                    <span id="connection-status-footer">后端服务：检查中...</span>
+                </div>
+            </div>
+            <div class="status-center">
+                <button id="clear-all-notifications" class="btn-clear-notifications" style="display: none;">
+                    🗑️ 清空所有消息
+                </button>
             </div>
             <div class="status-right">
-                <span id="current-time">2025-08-03 19:00:00</span>
+                <div class="time-display">
+                    <span class="clock-icon" id="clock-icon">🕐</span>
+                    <span id="current-time">2025-08-03 19:00:00</span>
+                </div>
             </div>
         </footer>
     </div>
