@@ -1620,12 +1620,12 @@ function displayRegressionResults(result) {
             <div class="performance-metrics">
                 <div class="performance-metric">
                     <div class="metric-label">皮尔逊相关系数</div>
-                    <div class="metric-value">${result.detailed_metrics.pearson_r_test.toFixed(3)}</div>
+                        <div class="metric-value">${result.detailed_metrics.pearson_r_test.toFixed(3)}<span class="metric-raw">${typeof result.detailed_metrics.pearson_r_test === 'number' ? ` (${result.detailed_metrics.pearson_r_test})` : ''}</span></div>
                     <div class="metric-unit">(测试)</div>
                 </div>
                 <div class="performance-metric">
                     <div class="metric-label">皮尔逊相关系数</div>
-                    <div class="metric-value">${result.detailed_metrics.pearson_r_training.toFixed(3)}</div>
+                        <div class="metric-value">${result.detailed_metrics.pearson_r_training.toFixed(3)}<span class="metric-raw">${typeof result.detailed_metrics.pearson_r_training === 'number' ? ` (${result.detailed_metrics.pearson_r_training})` : ''}</span></div>
                     <div class="metric-unit">(训练)</div>
                 </div>
             </div>

@@ -1579,6 +1579,13 @@ input[type="checkbox"]:focus {
     font-weight: bold;
     color: var(--accent-primary);
 }
+.performance-metric .metric-value .metric-raw {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
 
 .performance-metric .metric-unit {
     font-size: var(--font-size-xs);
