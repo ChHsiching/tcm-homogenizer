@@ -87,7 +87,7 @@ async function openRangeConfigDialog() {
         // 添加调试信息
         console.log('🔍 从公式表达式中解析的特征变量:', features);
         console.log('🔍 原始公式表达式:', expressionText);
-        console.log('🔍 数据模型信息:', model);
+        console.log('🔍 回归模型信息:', regModel);
         
         // 检查特征变量是否为空
         if (!features.length) {
