@@ -1990,6 +1990,27 @@ input[type="checkbox"]:focus {
     overflow: hidden;
 }
 
+/* 表达式树工具条按钮（统一发光效果尺寸） */
+.expr-tree-toolbar button {
+    background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(74, 158, 255, 0.3);
+}
+.expr-tree-toolbar button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(74, 158, 255, 0.4);
+}
+.expr-tree-toolbar button:active {
+    transform: translateY(0);
+}
+
 .btn-primary:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 16px rgba(74, 158, 255, 0.4);

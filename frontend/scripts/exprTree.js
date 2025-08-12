@@ -1508,9 +1508,11 @@
     // 在SVG下方渲染操作按钮条
     try {
       const toolbar = document.createElement('div');
+      toolbar.className = 'expr-tree-toolbar';
       toolbar.style.display = 'flex';
-      toolbar.style.gap = '10px';
-      toolbar.style.marginTop = '10px';
+      toolbar.style.gap = '12px';
+      toolbar.style.marginTop = '12px';
+      toolbar.style.justifyContent = 'flex-end';
 
       const btns = [
         { text: '删除节点/子树', color: '#ef4444', id: 'btn-delete' },
@@ -1518,30 +1520,59 @@
         { text: '优化', color: '#3b82f6', id: 'btn-optimize' },
         { text: '撤销', color: '#f59e0b', id: 'btn-undo' },
       ];
-      btns.forEach(b => {
+      // 操作计数器（右对齐同一行）
+      const counter = document.createElement('div');
+      counter.id = 'expr-op-counter';
+      counter.textContent = '操作次数：0';
+      counter.style.marginLeft = '16px';
+      counter.style.alignSelf = 'center';
+      counter.style.color = '#9ca3af';
+      counter.style.fontSize = '13px';
+      counter.style.minWidth = '110px';
+      counter.style.textAlign = 'right';
+
+      // 初始化全局计数
+      if (typeof window.__exprOpCount__ !== 'number') window.__exprOpCount__ = 0;
+
+      const buildButton = (b) => {
         const el = document.createElement('button');
         el.textContent = b.text;
-        el.style.background = b.color;
+        el.style.background = 'linear-gradient(135deg, rgba(74,158,255,1) 0%, rgba(107,182,255,1) 100%)';
         el.style.border = 'none';
         el.style.color = '#fff';
-        el.style.padding = '8px 14px';
-        el.style.borderRadius = '6px';
+        el.style.padding = '10px 18px';
+        el.style.borderRadius = '8px';
         el.style.cursor = 'pointer';
         el.style.fontWeight = '600';
+        el.style.fontSize = '14px';
+        el.style.boxShadow = '0 4px 12px rgba(74,158,255,0.3)';
+        el.style.transition = 'all 0.2s ease';
+        el.onmouseenter = () => { el.style.transform = 'translateY(-2px)'; el.style.boxShadow = '0 6px 16px rgba(74,158,255,0.4)'; };
+        el.onmouseleave = () => { el.style.transform = 'translateY(0)'; el.style.boxShadow = '0 4px 12px rgba(74,158,255,0.3)'; };
         el.id = b.id;
-        // 仅挂空实现，后续填充逻辑
-        el.addEventListener('click', () => {
-          console.log(`[ExprTree] 点击: ${b.text}, 当前选中:`, selectedNodeId);
-        });
         toolbar.appendChild(el);
-      });
+        return el;
+      };
+
+      const created = {};
+      btns.forEach(b => { created[b.id] = buildButton(b); });
+      toolbar.appendChild(counter);
       // 将按钮条插入到容器(非SVG)下方
       if (containerEl && containerEl.parentElement) {
         // 移除旧工具条避免重复
         const prev = containerEl.parentElement.querySelector('.expr-tree-toolbar');
         if (prev) prev.remove();
-        toolbar.className = 'expr-tree-toolbar';
-        containerEl.parentElement.appendChild(toolbar);
+      containerEl.parentElement.appendChild(toolbar);
+      // 提供一个更新计数器的辅助方法
+      window.__updateExprOpCounter__ = function(delta) {
+        try {
+          if (typeof delta === 'number') {
+            window.__exprOpCount__ = Math.max(0, (window.__exprOpCount__ || 0) + delta);
+          }
+          const label = containerEl.parentElement.querySelector('#expr-op-counter');
+          if (label) label.textContent = `操作次数：${window.__exprOpCount__}`;
+        } catch (_) {}
+      };
       }
     } catch (_) {}
 

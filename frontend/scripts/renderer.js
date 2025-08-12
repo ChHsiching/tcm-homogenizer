@@ -871,6 +871,7 @@ function wireToolbarActions(container, getSvg) {
         const next = ExprTree.deleteNodeById(window.currentExpressionAst, id);
         window.currentExpressionAst = ExprTree.simplifyAst(next);
         showNotification('正在删除节点/子树...', 'info');
+        if (typeof window.__updateExprOpCounter__ === 'function') window.__updateExprOpCounter__(+1);
         rerender(window.currentExpressionAst, 'delete');
     };
     if (btnUndo) btnUndo.onclick = () => {
@@ -878,18 +879,21 @@ function wireToolbarActions(container, getSvg) {
         const prev = window.__exprTreeUndo__.pop();
         window.currentExpressionAst = prev;
         showNotification('正在撤销操作...', 'info');
+        if (typeof window.__updateExprOpCounter__ === 'function') window.__updateExprOpCounter__(-1);
         rerender(window.currentExpressionAst, 'undo');
     };
     if (btnSimplify) btnSimplify.onclick = () => {
         window.__exprTreeUndo__.push(ExprTree.cloneAst(window.currentExpressionAst));
         window.currentExpressionAst = ExprTree.simplifyAst(window.currentExpressionAst);
         showNotification('正在简化表达式...', 'info');
+        if (typeof window.__updateExprOpCounter__ === 'function') window.__updateExprOpCounter__(+1);
         rerender(window.currentExpressionAst, 'simplify');
     };
     if (btnOptimize) btnOptimize.onclick = () => {
         window.__exprTreeUndo__.push(ExprTree.cloneAst(window.currentExpressionAst));
         window.currentExpressionAst = ExprTree.simplifyAst(window.currentExpressionAst);
         showNotification('正在优化表达式...', 'info');
+        if (typeof window.__updateExprOpCounter__ === 'function') window.__updateExprOpCounter__(+1);
         rerender(window.currentExpressionAst, 'optimize');
     };
 }
