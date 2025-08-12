@@ -141,8 +141,12 @@ class SymbolicRegression:
             y_pred = np.dot(X, coefficients) + intercept
             
             # 计算性能指标
-            mse = np.mean((y - y_pred) ** 2)
-            r2 = 1 - np.sum((y - y_pred) ** 2) / np.sum((y - np.mean(y)) ** 2)
+            # 计算皮尔逊相关系数
+            y_mean = np.mean(y)
+            y_pred_mean = np.mean(y_pred)
+            numerator = np.sum((y - y_mean) * (y_pred - y_pred_mean))
+            denominator = np.sqrt(np.sum((y - y_mean) ** 2) * np.sum((y_pred - y_pred_mean) ** 2))
+            pearson_r = numerator / denominator if denominator != 0 else 0
             
             # 特征重要性（基于系数绝对值）
             feature_importance = []
@@ -158,8 +162,7 @@ class SymbolicRegression:
             
             result = {
                 'expression': expression,
-                'r2': float(r2),
-                'mse': float(mse),
+                'pearson_r': float(pearson_r),
                 'feature_importance': feature_importance,
                 'predictions': {
                     'actual': y.tolist(),
@@ -174,7 +177,7 @@ class SymbolicRegression:
                 'timestamp': time.time()
             }
             
-            logger.info(f"符号回归完成，R² = {r2:.3f}, MSE = {mse:.3f}")
+            logger.info(f"符号回归完成，皮尔逊相关系数 = {pearson_r:.3f}")
             return result
             
         except Exception as e:
@@ -213,8 +216,7 @@ class SymbolicRegression:
             models.append({
                 'model_id': model_id,
                 'expression': model['expression'],
-                'r2': model['r2'],
-                'mse': model['mse'],
+                'pearson_r': model.get('pearson_r', 0),
                 'timestamp': model['timestamp']
             })
         return models
