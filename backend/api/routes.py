@@ -818,17 +818,15 @@ def update_data_model_file(model_id, file_type):
                     new_index = op_index
                     if action in ('delete', 'simplify', 'optimize'):
                         new_index = op_index + 1
-                        if new_index <= 15:
-                            seq_metrics = MOCK_INDICATORS_SEQUENCE[new_index]
+                        # 超过15次：指标固定为第15次的值，但索引持续增长，确保无限撤销回滚可用
+                        idx = new_index if new_index <= 15 else 15
+                        if idx > 0:
+                            seq_metrics = MOCK_INDICATORS_SEQUENCE[idx]
                             if isinstance(seq_metrics, dict):
                                 reg_content['detailed_metrics'] = seq_metrics
-                                # 同步写入模型元数据中的主要指标，供列表/摘要使用
                                 model.setdefault('metadata', {})['pearson_r_test'] = seq_metrics.get('pearson_r_test')
                                 model['metadata']['pearson_r_training'] = seq_metrics.get('pearson_r_training')
-                                model['metadata']['expr_tree_op_index'] = new_index
-                        else:
-                            # 超过15次，不再更新指标，但索引仍然增长以配合前端撤销栈记录
-                            model.setdefault('metadata', {})['expr_tree_op_index'] = new_index
+                        model.setdefault('metadata', {})['expr_tree_op_index'] = new_index
                     elif action == 'undo':
                         new_index = max(0, op_index - 1)
                         if new_index == 0:
@@ -838,7 +836,9 @@ def update_data_model_file(model_id, file_type):
                                 model.setdefault('metadata', {})['pearson_r_test'] = base.get('pearson_r_test')
                                 model['metadata']['pearson_r_training'] = base.get('pearson_r_training')
                         else:
-                            seq_metrics = MOCK_INDICATORS_SEQUENCE[new_index]
+                            # 对超过 15 的索引进行截断（>=15 视同第15次的指标），支持无限撤销
+                            idx = new_index if new_index <= 15 else 15
+                            seq_metrics = MOCK_INDICATORS_SEQUENCE[idx]
                             if isinstance(seq_metrics, dict):
                                 reg_content['detailed_metrics'] = seq_metrics
                                 model.setdefault('metadata', {})['pearson_r_test'] = seq_metrics.get('pearson_r_test')
