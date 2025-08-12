@@ -970,8 +970,16 @@ function displayExpressionTreeSummary(result) {
     // 左侧：性能
     perfContainer.innerHTML = `
         <div class="performance-metrics">
-            <div class="performance-metric"><div class="metric-label">皮尔逊相关系数</div><div class="metric-value">${(result.pearson_r_test ?? 0).toFixed(3)}</div><div class="metric-unit">(测试)</div></div>
-            <div class="performance-metric"><div class="metric-label">皮尔逊相关系数</div><div class="metric-value">${(result.pearson_r_training ?? 0).toFixed(3)}</div><div class="metric-unit">(训练)</div></div>
+            <div class="performance-metric">
+                <div class="metric-label">皮尔逊相关系数</div>
+                <div class="metric-value">${(result.pearson_r_test ?? 0).toFixed(3)}<span class="metric-raw">${typeof result.pearson_r_test === 'number' ? ` (${result.pearson_r_test})` : ''}</span></div>
+                <div class="metric-unit">(测试)</div>
+            </div>
+            <div class="performance-metric">
+                <div class="metric-label">皮尔逊相关系数</div>
+                <div class="metric-value">${(result.pearson_r_training ?? 0).toFixed(3)}<span class="metric-raw">${typeof result.pearson_r_training === 'number' ? ` (${result.pearson_r_training})` : ''}</span></div>
+                <div class="metric-unit">(训练)</div>
+            </div>
         </div>
     `;
 
