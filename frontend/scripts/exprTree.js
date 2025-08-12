@@ -975,6 +975,16 @@
       tooltipHost.appendChild(tooltipEl);
     }
 
+    // 右键菜单容器（统一复用）
+    let ctxMenu = tooltipHost.querySelector('.expr-context-menu');
+    if (!ctxMenu) {
+      ctxMenu = document.createElement('div');
+      ctxMenu.className = 'expr-context-menu';
+      ctxMenu.style.display = 'none';
+      ctxMenu.style.position = 'absolute';
+      tooltipHost.appendChild(ctxMenu);
+    }
+
     // 连线层
     const linksLayer = document.createElementNS(svgNS, 'g');
     linksLayer.setAttribute('fill', 'none');
@@ -1153,7 +1163,75 @@
       // 交互回调
       g.addEventListener('contextmenu', (ev) => {
         ev.preventDefault();
-        try { options.onContextMenu && options.onContextMenu(node, { x: ev.clientX, y: ev.clientY }); } catch (_) {}
+        // 隐藏悬浮窗
+        hideTooltip();
+        // 选中该节点
+        try {
+          const old = nodesLayer.querySelector('[data-selected="true"]');
+          if (old) {
+            old.removeAttribute('data-selected');
+            old.setAttribute('stroke', '#1f2937');
+            old.setAttribute('stroke-width', '2');
+            old.setAttribute('filter', '');
+          }
+          const shape = g.querySelector('rect');
+          if (shape) {
+            shape.setAttribute('data-selected', 'true');
+            shape.setAttribute('stroke', '#60a5fa');
+            shape.setAttribute('stroke-width', '3');
+            shape.setAttribute('filter', 'drop-shadow(0 0 6px rgba(96,165,250,0.65)) drop-shadow(0 0 14px rgba(96,165,250,0.35))');
+            selectedNodeId = node.id;
+          }
+        } catch (_) {}
+
+        // 渲染并显示右键菜单
+        try {
+          ctxMenu.innerHTML = '';
+          const item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'context-item danger';
+          item.textContent = '删除节点/子树';
+          item.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            ctxMenu.style.display = 'none';
+            // 触发底部红色“删除节点/子树”按钮（已由外层绑定真实逻辑）
+            const btn = tooltipHost.querySelector('#btn-delete');
+            if (btn && typeof btn.click === 'function') btn.click();
+          };
+          ctxMenu.appendChild(item);
+
+          const hostRect = tooltipHost.getBoundingClientRect();
+          const offset = 2;
+          let left = ev.clientX - hostRect.left + offset;
+          let top = ev.clientY - hostRect.top + offset;
+          ctxMenu.style.display = 'block';
+          // 边界纠正
+          const menuRect = ctxMenu.getBoundingClientRect();
+          const maxLeft = hostRect.width - menuRect.width - 8;
+          const maxTop = hostRect.height - menuRect.height - 8;
+          if (left > maxLeft) left = Math.max(8, maxLeft);
+          if (top > maxTop) top = Math.max(8, maxTop);
+          if (left < 8) left = 8;
+          if (top < 8) top = 8;
+          ctxMenu.style.left = `${left}px`;
+          ctxMenu.style.top = `${top}px`;
+
+          const dismiss = (e2) => {
+            // 点击在菜单外部则关闭
+            try {
+              if (!ctxMenu.contains(e2.target)) {
+                ctxMenu.style.display = 'none';
+                window.removeEventListener('click', dismiss, true);
+                window.removeEventListener('scroll', dismiss, true);
+                window.removeEventListener('resize', dismiss, true);
+              }
+            } catch (_) {}
+          };
+          window.addEventListener('click', dismiss, true);
+          window.addEventListener('scroll', dismiss, true);
+          window.addEventListener('resize', dismiss, true);
+        } catch (_) {}
       });
       g.addEventListener('click', (ev) => {
         // 选中高亮：先清除旧选中
