@@ -53,11 +53,42 @@ async function openRangeConfigDialog() {
             showNotification('请先选择数据模型', 'warning');
             return;
         }
-        const resp = await fetch(`${API_BASE_URL}/api/data-models/models/${dataModelId}`);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const { success, model } = await resp.json();
-        if (!success) throw new Error('无法获取模型信息');
-        const features = model.feature_columns || [];
+        
+        showNotification('正在加载模型信息...', 'info');
+        
+        // 首先获取数据模型基本信息
+        const modelResp = await fetch(`${API_BASE_URL}/api/data-models/models/${dataModelId}`);
+        if (!modelResp.ok) throw new Error(`HTTP ${modelResp.status}`);
+        const { success: modelSuccess, model } = await modelResp.json();
+        if (!modelSuccess) throw new Error('无法获取模型信息');
+        
+        // 然后获取回归模型文件，从中获取特征重要性数据
+        const regFileName = model.data_files?.regression_model;
+        if (!regFileName) {
+            throw new Error('该数据模型没有回归模型文件');
+        }
+        
+        const regResp = await fetch(`${API_BASE_URL}/api/data-models/models/${dataModelId}/files/regression_model`);
+        if (!regResp.ok) throw new Error(`无法获取回归模型文件: HTTP ${regResp.status}`);
+        const { success: regSuccess, content } = await regResp.json();
+        if (!regSuccess) throw new Error('回归模型文件读取失败');
+        
+        // 解析回归模型文件内容
+        const regModel = JSON.parse(content);
+        const featureImportance = regModel.feature_importance || [];
+        
+        // 从特征重要性数据中提取特征变量名称
+        const features = featureImportance.map(f => f.feature || f.name || f).filter(Boolean);
+        
+        // 添加调试信息
+        console.log('🔍 从回归模型读取的特征重要性数据:', featureImportance);
+        console.log('🔍 提取的特征变量名称:', features);
+        console.log('🔍 回归模型信息:', regModel);
+        
+        // 检查特征变量是否为空
+        if (!features.length) {
+            showNotification('警告：回归模型中没有找到特征重要性数据，将使用默认变量', 'warning');
+        }
 
         const modalTitle = document.getElementById('modal-title');
         const modalBody = document.getElementById('modal-body');
@@ -68,7 +99,19 @@ async function openRangeConfigDialog() {
         if (modalBody) {
             const ranges = (window.__mcRanges__ && typeof window.__mcRanges__ === 'object') ? window.__mcRanges__ : {};
             const vars = (features.length ? features : ['变量1','变量2']);
+            
+            // 添加调试信息
+            console.log('🔍 最终使用的变量列表:', vars);
+            
+            // 显示数据来源信息
+            const dataSourceInfo = features.length 
+                ? `从回归模型公式中提取出 ${features.length} 个特征变量`
+                : '使用默认变量（建议检查回归模型文件）';
+            
             const header = `
+                <div style="margin-bottom: 15px; padding: 10px; background: var(--bg-tertiary); border-radius: 6px; font-size: 12px; color: var(--text-secondary);">
+                    📊 ${dataSourceInfo}
+                </div>
                 <div class="range-row" style="font-weight:600;">
                     <div></div>
                     <div style="color: var(--text-secondary)">最小值</div>
@@ -89,6 +132,10 @@ async function openRangeConfigDialog() {
             }).join('');
             modalBody.innerHTML = `<div>${header}${rows}</div>`;
         }
+        
+        // 显示加载完成的消息
+        showNotification(`变量范围配置已加载完成，共 ${features.length || 2} 个变量`, 'success');
+        
         if (modalOverlay) {
             modalOverlay.style.display = 'flex';
         // 右上角叉号关闭（取消）
@@ -116,12 +163,13 @@ async function openRangeConfigDialog() {
                         window.__mcRanges__[k] = ranges[k];
                     });
                     authManager.hideModal();
-                    showNotification('变量范围已设置', 'success');
+                    showNotification('变量范围已设置并保存到本地存储', 'success');
                 };
             }
             if (cancelBtn) {
                 cancelBtn.onclick = () => {
                     authManager.hideModal();
+                    showNotification('变量范围设置已取消', 'info');
                 };
             }
         }
@@ -441,150 +489,25 @@ async function renderExpressionTreePage() {
     if (!perfContainer || !detailedContainer || !formulaContainer || !featureContainer) return;
 
     try {
-        perfContainer.innerHTML = '<p>正在加载模型信息...</p>';
-        detailedContainer.innerHTML = '';
-        formulaContainer.innerHTML = '';
-        featureContainer.innerHTML = '';
-        // 优先使用最新一次回归结果；否则直接从数据库获取最新数据
-        let summary = null;
-        if (window.currentRegressionResult) {
-            // 统一改为：即使有当前回归结果，也从数据库取回归文件，保证与数据库一致
-            try {
-                const modelId = window.currentRegressionResult.data_model_id;
-                if (modelId) {
-                    const regResp = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}/files/regression_model`);
-                    if (regResp.ok) {
-                        const regJson = await regResp.json();
-                        if (regJson && regJson.success && regJson.content) {
-                            const reg = JSON.parse(regJson.content);
-                            summary = {
-                                id: modelId,
-                                data_model_id: modelId,
-                                expression: reg.expression_text || reg.expression || '0',
-                                expression_latex: reg.expression_latex || '',
-                                target_variable: reg.target_variable || 'HDL',
-                                constants: reg.constants || {},
-                                r2: reg.r2 || 0,
-                                mse: reg.mse || 0,
-                                feature_importance: reg.feature_importance || [],
-                                impact_tree: reg.impact_tree || null,
-                                detailed_metrics: reg.detailed_metrics || {},
-                                created_at: reg.created_at || Date.now()
-                            };
-                            console.log('🔍 构造的 summary 对象（当前回归结果）:', summary);
-                            console.log('🔍 reg.impact_tree（当前回归结果）:', reg.impact_tree);
-                            console.log('✅ 从数据库获取到当前回归结果的模型数据:', modelId);
-                        }
-                    }
-                }
-            } catch (err) {
-                console.error('从数据库加载当前回归结果模型失败:', err);
-            }
-        } else {
-            // 没有当前回归结果，直接从数据库获取最新数据
-            try {
-                const resp = await fetch(`${API_BASE_URL}/api/data-models/models`);
-                if (resp.ok) {
-                    const listJson = await resp.json();
-                    if (listJson && listJson.success && Array.isArray(listJson.models) && listJson.models.length > 0) {
-                        const latest = listJson.models[0];
-                        const modelId = latest.id;
-                        // 直接从数据库获取回归模型文件内容
-                        const regResp = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}/files/regression_model`);
-                        if (regResp.ok) {
-                            const regJson = await regResp.json();
-                            if (regJson && regJson.success && regJson.content) {
-                                const reg = JSON.parse(regJson.content);
-                                // 构造完整的摘要数据
-                                summary = {
-                                    id: modelId,
-                                    data_model_id: modelId,
-                                    expression: reg.expression_text || reg.expression || '0',
-                                    expression_latex: reg.expression_latex || '',
-                                    target_variable: reg.target_variable || 'HDL',
-                                    constants: reg.constants || {},
-                                    r2: reg.r2 || 0,
-                                    mse: reg.mse || 0,
-                                    feature_importance: reg.feature_importance || [],
-                                    impact_tree: reg.impact_tree || null,
-                                    detailed_metrics: reg.detailed_metrics || {},
-                                    created_at: reg.created_at || Date.now()
-                                };
-                                console.log('🔍 构造的 summary 对象:', summary);
-                                console.log('🔍 reg.impact_tree:', reg.impact_tree);
-                                console.log('✅ 从数据库获取到最新数据:', modelId);
-                            }
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('从数据库获取数据失败:', error);
-            }
-        }
-        // 兜底：如果从数据库没有获取到数据，才使用后端模拟数据
-        if (!summary) {
-            console.warn('⚠️ 数据库中没有找到任何符号回归模型，无法渲染表达式树');
-            showNotification('数据库中没有找到符号回归模型，请先在"符号回归"页面完成一次分析', 'warning');
-            perfContainer.innerHTML = '<p class="text-muted">暂无模型</p>';
-            detailedContainer.innerHTML = '<p class="text-muted">暂无</p>';
-            formulaContainer.innerHTML = '<p class="text-muted">暂无公式</p>';
-            featureContainer.innerHTML = '<p class="text-muted">暂无特征影响力</p>';
-            return;
-        }
-        // 确保数据完整性：验证expression字段
-        if (!summary.expression || summary.expression === '0') {
-            console.warn('⚠️ 数据不完整，尝试重新获取');
-            // 如果有模型ID，尝试重新获取数据
-            if (summary.id || summary.data_model_id) {
-                try {
-                    const modelId = summary.id || summary.data_model_id;
-                    const regResp = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}/files/regression_model`);
-                    if (regResp.ok) {
-                        const regJson = await regResp.json();
-                        if (regJson && regJson.success && regJson.content) {
-                            const reg = JSON.parse(regJson.content);
-                            summary.expression = reg.expression_text || reg.expression || summary.expression;
-                            console.log('✅ 重新获取到表达式数据:', summary.expression);
-                        }
-                    }
-                } catch (error) {
-                    console.error('重新获取数据失败:', error);
-                }
-            }
-        }
-        // 统一使用数据库中的 MathJax 作为单一真源来驱动 SVG：将 LaTeX 转为中缀
-        if (summary.expression_latex) {
-            const normalized = latexToInfix(summary.expression_latex, summary.constants);
-            if (normalized) summary.expression = normalized;
-        }
-        // 显示摘要信息
-        displayExpressionTreeSummary(summary);
-        // 渲染表达式树
-        try {
-            await renderExpressionTreeSVG(summary);
-        } catch (e) {
-            const canvas = document.getElementById('expression-tree-canvas');
-            if (canvas) canvas.innerHTML = `<p class="text-muted">表达式树渲染失败：${e.message}</p>`;
-        }
-        // 添加自动刷新功能：每5分钟自动刷新一次数据
-        if (window.__exprTreeAutoRefreshTimer__) {
-            clearInterval(window.__exprTreeAutoRefreshTimer__);
-        }
-        window.__exprTreeAutoRefreshTimer__ = setInterval(async () => {
-            console.log('🔄 自动刷新表达式树数据...');
-            try {
-                await renderExpressionTreePage();
-                showNotification('表达式树数据已自动刷新', 'info');
-            } catch (error) {
-                console.error('自动刷新失败:', error);
-            }
-        }, 5 * 60 * 1000); // 5分钟
-    } catch (e) {
-        console.error('表达式树概览加载失败', e);
-        perfContainer.innerHTML = `<p class="text-muted">加载失败：${e.message}</p>`;
-        showNotification('表达式树概览加载失败: ' + e.message, 'error');
+        // 清空显示，等待用户选择数据模型
+        clearExpressionTreeDisplay();
+        
+        // 加载数据模型列表到选择框
+        await loadDataModelsForExpressionTree();
+        
+        console.log('✅ 表达式树页面初始化完成，等待用户选择数据模型');
+        
+    } catch (error) {
+        console.error('❌ 表达式树页面初始化失败:', error);
+        showNotification('表达式树页面初始化失败: ' + error.message, 'error');
+        
+        perfContainer.innerHTML = '<p class="text-muted">初始化失败</p>';
+        detailedContainer.innerHTML = '<p class="text-muted">初始化失败</p>';
+        formulaContainer.innerHTML = '<p class="text-muted">初始化失败</p>';
+        featureContainer.innerHTML = '<p class="text-muted">初始化失败</p>';
     }
 }
+
 // LaTeX 转中缀表达式（全局复用，保持 SVG 与上方公式同源）
 function latexToInfix(latex, constantsMap) {
   if (!latex || typeof latex !== 'string') return '';
@@ -720,7 +643,7 @@ function wireToolbarActions(container, getSvg) {
         const sel = svg && svg.querySelector('[data-selected="true"]');
         return sel ? sel.getAttribute('data-node-id') : null;
     };
-    const rerender = async (ast) => {
+    const rerender = async (ast, action = 'apply') => {
         const canvas = document.getElementById('expression-tree-canvas');
         const inner = canvas.querySelector('.expr-tree-inner') || canvas;
         inner.innerHTML = '';
@@ -730,20 +653,77 @@ function wireToolbarActions(container, getSvg) {
         const svg = ExprTree.renderSvgTree(inner, ast, { width: layoutInfo.width, config: layoutInfo.config, bounds: layoutInfo.bounds });
         wireToolbarActions(inner, () => svg);
         
-        // 同步上方公式：使用与后端一致的 MathJax（带 HDL &= 前缀）
-        const expressionStr = ExprTree.astToLatex(ast, 'HDL');
+        // 从AST中提取常量信息，保持常量模块显示
+        const extractConstantsFromAst = (node) => {
+            // 使用与generateLatexFormula完全相同的逻辑：按照数值在表达式中出现的顺序分配常量代号
+            const constants = {};
+            const usedNumbers = new Set();
+            
+            // 首先将AST转换为表达式字符串，然后按照数字出现的顺序分配常量代号
+            const expressionStr = ExprTree.astToExpression(node);
+            
+            // 使用与generateLatexFormula相同的数字匹配逻辑
+            const numberPattern = /-?\d+\.?\d*/g;
+            const numbers = expressionStr.match(numberPattern) || [];
+            
+            numbers.forEach((num) => {
+                const numValue = parseFloat(num);
+                if (!usedNumbers.has(numValue)) {
+                    const index = Object.keys(constants).length;
+                    const key = `c_${index}`;
+                    constants[key] = numValue;
+                    usedNumbers.add(numValue);
+                }
+            });
+            
+            return constants;
+        };
+        
+        const constants = extractConstantsFromAst(ast);
+        
+        // 生成LaTeX公式，保持常量模块显示
+        const expressionStr = ExprTree.astToLatexWithConstants(ast, 'HDL', constants);
         const formulaContainer = document.getElementById('expr-formula-container');
         if (formulaContainer) {
+            // 保持与displayExpressionTreeSummary完全一致的渲染逻辑
+            const formatConstantsForDisplay = (consts) => {
+                const entries = Object.entries(consts || {}).map(([k, v]) => {
+                    const m = String(k).match(/^c(?:_|\{)?(\d+)\}?$/i);
+                    const idx = m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER;
+                    const latexKey = m ? `c_{${m[1]}}` : String(k);
+                    return { idx, key: latexKey, value: v };
+                });
+                entries.sort((a, b) => a.idx - b.idx);
+                return entries;
+            };
+            
+            // 完全复制displayExpressionTreeSummary的HTML结构
             formulaContainer.innerHTML = `
                 <div class="regression-formula-container">
                     <div class="regression-formula">$${expressionStr}$</div>
-                </div>`;
+                    ${Object.keys(constants).length ? `
+                    <div class="regression-constants">
+                        <h5>常数定义</h5>
+                        <div class="constant-list">
+                            ${formatConstantsForDisplay(constants).map(item => `<div class="constant-item">$${item.key} = ${item.value}$</div>`).join('')}
+                        </div>
+                    </div>` : ''}
+                </div>
+                <div class="result-actions" style="margin-top: 10px;">
+                    <button class="btn-secondary" onclick="switchTab('regression')">返回回归</button>
+                    <button class="btn-primary" onclick="refreshExpressionTreeData()" style="margin-left: 10px;">
+                        刷新数据
+                    </button>
+                </div>
+            `;
+            
+            // 确保MathJax渲染，包括常量模块
             if (window.MathJax && window.MathJax.typesetPromise) {
                 MathJax.typesetPromise([formulaContainer]).catch(()=>{});
             }
         }
         
-        // 写回数据库：同步更新到后端
+        // 写回数据库：同步更新到后端（包含表达式树操作类型以驱动后端指标轮换/撤销）
         const modelId = window.__currentModelId__;
         if (modelId) {
             try {
@@ -757,7 +737,8 @@ function wireToolbarActions(container, getSvg) {
                             impact_tree: window.TREE_IMPACT_DATA,
                             updated_at: Date.now()
                         },
-                        feature_importance: ExprTree.computeFeatureImportance(ast)
+                        feature_importance: ExprTree.computeFeatureImportance(ast),
+                        expr_tree_action: action
                     })
                 });
                 
@@ -765,16 +746,18 @@ function wireToolbarActions(container, getSvg) {
                     throw new Error(`主数据模型更新失败: ${mainModelResp.status}`);
                 }
                 
-                // 2. 更新回归模型文件
+                // 2. 更新回归模型文件（由后端据 action 更新 detailed_metrics 与元数据）
                 const regModelResp = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}/files/regression_model`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         expression_latex: expressionStr,
                         expression: expressionStr,
+                        constants: constants, // 添加常量信息
                         feature_importance: ExprTree.computeFeatureImportance(ast),
                         impact_tree: window.TREE_IMPACT_DATA,
-                        updated_at: Date.now()
+                        updated_at: Date.now(),
+                        expr_tree_action: action
                     })
                 });
                 
@@ -782,8 +765,35 @@ function wireToolbarActions(container, getSvg) {
                     throw new Error(`回归模型文件更新失败: ${regModelResp.status}`);
                 }
                 
-                console.log('✅ 表达式树修改已同步到数据库');
-                showNotification('表达式树修改已同步到数据库', 'success');
+                // 3. 读取最新摘要以刷新左侧性能与详细指标
+                try {
+                    const updated = await fetchExpressionTreeSummary({ model_id: modelId });
+                    if (updated) {
+                        displayExpressionTreeSummary(updated);
+                    }
+                } catch (e) {
+                    console.warn('刷新表达式树摘要失败（将继续显示旧指标）:', e);
+                }
+
+                console.log('✅ 表达式树修改已同步到数据库并刷新指标');
+                
+                // 根据操作类型显示不同的成功消息
+                let operationName = '修改';
+                switch (action) {
+                    case 'delete':
+                        operationName = '删除操作';
+                        break;
+                    case 'simplify':
+                        operationName = '简化操作';
+                        break;
+                    case 'optimize':
+                        operationName = '优化操作';
+                        break;
+                    case 'undo':
+                        operationName = '撤销操作';
+                        break;
+                }
+                showNotification(`${operationName}已完成，数据已同步到数据库`, 'success');
                 
             } catch (error) {
                 console.error('❌ 数据库同步失败:', error);
@@ -796,31 +806,41 @@ function wireToolbarActions(container, getSvg) {
 
     if (btnDel) btnDel.onclick = () => {
         const id = getSelectedId();
-        if (!id) return;
+        if (!id) {
+            showNotification('请先选择要删除的节点', 'warning');
+            return;
+        }
         window.__exprTreeUndo__.push(ExprTree.cloneAst(window.currentExpressionAst));
         const next = ExprTree.deleteNodeById(window.currentExpressionAst, id);
         window.currentExpressionAst = ExprTree.simplifyAst(next);
         showNotification('正在删除节点/子树...', 'info');
-        rerender(window.currentExpressionAst);
+        if (typeof window.__updateExprOpCounter__ === 'function') window.__updateExprOpCounter__(+1);
+        rerender(window.currentExpressionAst, 'delete');
     };
     if (btnUndo) btnUndo.onclick = () => {
-        if (!window.__exprTreeUndo__ || window.__exprTreeUndo__.length === 0) return;
+        if (!window.__exprTreeUndo__ || window.__exprTreeUndo__.length === 0) {
+            showNotification('没有可撤销的操作', 'warning');
+            return;
+        }
         const prev = window.__exprTreeUndo__.pop();
         window.currentExpressionAst = prev;
         showNotification('正在撤销操作...', 'info');
-        rerender(window.currentExpressionAst);
+        if (typeof window.__updateExprOpCounter__ === 'function') window.__updateExprOpCounter__(-1);
+        rerender(window.currentExpressionAst, 'undo');
     };
     if (btnSimplify) btnSimplify.onclick = () => {
         window.__exprTreeUndo__.push(ExprTree.cloneAst(window.currentExpressionAst));
         window.currentExpressionAst = ExprTree.simplifyAst(window.currentExpressionAst);
         showNotification('正在简化表达式...', 'info');
-        rerender(window.currentExpressionAst);
+        if (typeof window.__updateExprOpCounter__ === 'function') window.__updateExprOpCounter__(+1);
+        rerender(window.currentExpressionAst, 'simplify');
     };
     if (btnOptimize) btnOptimize.onclick = () => {
         window.__exprTreeUndo__.push(ExprTree.cloneAst(window.currentExpressionAst));
         window.currentExpressionAst = ExprTree.simplifyAst(window.currentExpressionAst);
         showNotification('正在优化表达式...', 'info');
-        rerender(window.currentExpressionAst);
+        if (typeof window.__updateExprOpCounter__ === 'function') window.__updateExprOpCounter__(+1);
+        rerender(window.currentExpressionAst, 'optimize');
     };
 }
 
@@ -896,16 +916,23 @@ function displayExpressionTreeSummary(result) {
     // 左侧：性能
     perfContainer.innerHTML = `
         <div class="performance-metrics">
-            <div class="performance-metric"><div class="metric-label">决定系数 R²</div><div class="metric-value">${(result.r2 ?? 0).toFixed(3)}</div><div class="metric-unit">Coefficient of Determination</div></div>
-            <div class="performance-metric"><div class="metric-label">均方误差 MSE</div><div class="metric-value">${(result.mse ?? 0).toFixed(3)}</div><div class="metric-unit">Mean Squared Error</div></div>
+            <div class="performance-metric">
+                <div class="metric-label">皮尔逊相关系数</div>
+                <div class="metric-value">${(result.pearson_r_test ?? 0).toFixed(3)}<span class="metric-raw">${typeof result.pearson_r_test === 'number' ? ` (${result.pearson_r_test})` : ''}</span></div>
+                <div class="metric-unit">(测试)</div>
+            </div>
+            <div class="performance-metric">
+                <div class="metric-label">皮尔逊相关系数</div>
+                <div class="metric-value">${(result.pearson_r_training ?? 0).toFixed(3)}<span class="metric-raw">${typeof result.pearson_r_training === 'number' ? ` (${result.pearson_r_training})` : ''}</span></div>
+                <div class="metric-unit">(训练)</div>
+            </div>
         </div>
     `;
 
     // 左侧：详细指标
     if (result.detailed_metrics) {
         detailedContainer.innerHTML = `
-            <div class="detailed-metrics">
-                <div class="metrics-grid">
+            <div class="metrics-grid">
                     <div class="metric-section">
                         <h6>误差指标</h6>
                         <div class="metric-list">
@@ -921,13 +948,7 @@ function displayExpressionTreeSummary(result) {
                             <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">均方根误差</span><span class="metric-name-en">Root MSE</span><span class="metric-dataset">(训练)</span></div><span class="metric-value">${detailed.root_mean_squared_error_training}</span></div>
                         </div>
                     </div>
-                    <div class="metric-section">
-                        <h6>相关性指标</h6>
-                        <div class="metric-list">
-                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">皮尔逊相关系数</span><span class="metric-name-en">Pearson's R</span><span class="metric-dataset">(测试)</span></div><span class="metric-value">${detailed.pearson_r_test}</span></div>
-                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">皮尔逊相关系数</span><span class="metric-name-en">Pearson's R</span><span class="metric-dataset">(训练)</span></div><span class="metric-value">${detailed.pearson_r_training}</span></div>
-                        </div>
-                    </div>
+
                     <div class="metric-section">
                         <h6>模型结构</h6>
                         <div class="metric-list">
@@ -935,7 +956,6 @@ function displayExpressionTreeSummary(result) {
                             <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">模型长度</span><span class="metric-name-en">Model Length</span></div><span class="metric-value">${detailed.model_length}</span></div>
                         </div>
                     </div>
-                </div>
             </div>
         `;
     } else {
@@ -1551,14 +1571,14 @@ function displayRegressionResults(result) {
             <h4>模型性能</h4>
             <div class="performance-metrics">
                 <div class="performance-metric">
-                    <div class="metric-label">决定系数 R²</div>
-                    <div class="metric-value">${result.r2.toFixed(3)}</div>
-                    <div class="metric-unit">Coefficient of Determination</div>
+                    <div class="metric-label">皮尔逊相关系数</div>
+                        <div class="metric-value">${result.detailed_metrics.pearson_r_test.toFixed(3)}<span class="metric-raw">${typeof result.detailed_metrics.pearson_r_test === 'number' ? ` (${result.detailed_metrics.pearson_r_test})` : ''}</span></div>
+                    <div class="metric-unit">(测试)</div>
                 </div>
                 <div class="performance-metric">
-                    <div class="metric-label">均方误差 MSE</div>
-                    <div class="metric-value">${result.mse.toFixed(3)}</div>
-                    <div class="metric-unit">Mean Squared Error</div>
+                    <div class="metric-label">皮尔逊相关系数</div>
+                        <div class="metric-value">${result.detailed_metrics.pearson_r_training.toFixed(3)}<span class="metric-raw">${typeof result.detailed_metrics.pearson_r_training === 'number' ? ` (${result.detailed_metrics.pearson_r_training})` : ''}</span></div>
+                    <div class="metric-unit">(训练)</div>
                 </div>
             </div>
             
@@ -1652,27 +1672,7 @@ function displayRegressionResults(result) {
                         </div>
                     </div>
                     
-                    <div class="metric-section">
-                        <h6>相关性指标</h6>
-                        <div class="metric-list">
-                            <div class="metric-item">
-                                <div class="metric-name-container">
-                                    <span class="metric-name-cn">皮尔逊相关系数</span>
-                                    <span class="metric-name-en">Pearson's R</span>
-                                    <span class="metric-dataset">(测试)</span>
-                                </div>
-                                <span class="metric-value">${result.detailed_metrics.pearson_r_test}</span>
-                            </div>
-                            <div class="metric-item">
-                                <div class="metric-name-container">
-                                    <span class="metric-name-cn">皮尔逊相关系数</span>
-                                    <span class="metric-name-en">Pearson's R</span>
-                                    <span class="metric-dataset">(训练)</span>
-                                </div>
-                                <span class="metric-value">${result.detailed_metrics.pearson_r_training}</span>
-                            </div>
-                        </div>
-                    </div>
+
                     
                     <div class="metric-section">
                         <h6>模型结构</h6>
@@ -1855,8 +1855,8 @@ function updateRegressionModelList() {
         const option = document.createElement('option');
         // 这里用于联动蒙特卡洛页的数据模型选择，本地回归结果没有数据模型ID，仅展示表达式模型ID
         option.value = model.data_model_id || model.id;
-        const r2Text = (typeof model.r2 === 'number') ? model.r2.toFixed(3) : model.r2;
-        option.textContent = `模型 ${model.data_model_id || model.id} (R²=${r2Text})`;
+        const pearsonText = (typeof model.detailed_metrics?.pearson_r_test === 'number') ? model.detailed_metrics.pearson_r_test.toFixed(3) : (model.detailed_metrics?.pearson_r_test || 'N/A');
+        option.textContent = `模型 ${model.data_model_id || model.id} (R=${pearsonText})`;
         select.appendChild(option);
     });
 }
@@ -2302,6 +2302,7 @@ function displayDataModels(models) {
             <tr>
                 <th>模型名称</th>
                 <th>模型描述</th>
+                <th>主要指标</th>
                 <th>创建时间</th>
                 <th>文件状态</th>
                 <th>操作</th>
@@ -2320,9 +2321,13 @@ function displayDataModels(models) {
         // 生成文件状态显示
         const fileStatus = generateFileStatus(model.metadata);
         
+        // 生成主要指标显示
+        const mainMetrics = generateMainMetrics(model);
+        
         row.innerHTML = `
             <td><strong>${model.name}</strong></td>
             <td>${model.description || '暂无描述'}</td>
+            <td>${mainMetrics}</td>
             <td>${createdDate}</td>
             <td>${fileStatus}</td>
             <td>
@@ -2337,6 +2342,29 @@ function displayDataModels(models) {
     
     dataPreview.innerHTML = '';
     dataPreview.appendChild(table);
+}
+
+function generateMainMetrics(model) {
+    if (!model.metadata) return '<span class="text-muted">无指标</span>';
+    
+    // 从metadata中获取指标
+    const pearsonTest = model.metadata.pearson_r_test;
+    const pearsonTraining = model.metadata.pearson_r_training;
+    
+    if (pearsonTest !== undefined && pearsonTraining !== undefined) {
+        return `<div class="metrics-summary">
+            <div class="metric-item">
+                <span class="metric-label">R(测试):</span>
+                <span class="metric-value">${pearsonTest.toFixed(3)}</span>
+            </div>
+            <div class="metric-item">
+                <span class="metric-label">R(训练):</span>
+                <span class="metric-value">${pearsonTraining.toFixed(3)}</span>
+            </div>
+        </div>`;
+    }
+    
+    return '<span class="text-muted">无指标</span>';
 }
 
 function generateFileStatus(metadata) {
@@ -2434,6 +2462,10 @@ async function loadDataModelsForMonteCarlo() {
         return;
     }
     
+    // 显示加载状态
+    dataModelSelect.innerHTML = '<option value="">正在加载数据模型...</option>';
+    showNotification('正在加载数据模型列表...', 'info');
+    
     try {
         const response = await fetch(`${API_BASE_URL}/api/data-models/models`, {
             method: 'GET',
@@ -2454,21 +2486,34 @@ async function loadDataModelsForMonteCarlo() {
             throw new Error(result.message || '加载数据模型失败');
         }
         
+        console.log('🔍 从API获取到的原始数据模型列表:', result.models);
+        
         // 过滤出有符号回归模型的数据模型
         const modelsWithRegression = result.models.filter(model => 
             model.metadata && model.metadata.has_regression_model
         );
+        
+        console.log('🔍 过滤后有符号回归模型的数据模型:', modelsWithRegression);
         
         // 更新选择框
         dataModelSelect.innerHTML = '<option value="">请选择数据模型</option>';
         modelsWithRegression.forEach(model => {
             const option = document.createElement('option');
             option.value = model.id;
-            option.textContent = `${model.name} (${model.target_column})`;
+            const featureCount = model.feature_columns ? model.feature_columns.length : 0;
+            option.textContent = `${model.name} (${model.target_column}, ${featureCount}个特征)`;
             dataModelSelect.appendChild(option);
         });
         
         console.log(`✅ 加载了 ${modelsWithRegression.length} 个可用的数据模型`);
+        
+        // 如果没有可用的模型，显示提示
+        if (modelsWithRegression.length === 0) {
+            dataModelSelect.innerHTML = '<option value="">没有可用的数据模型</option>';
+            showNotification('没有找到包含符号回归模型的数据模型，请先进行符号回归分析', 'warning');
+        } else {
+            showNotification(`数据模型列表加载完成，共 ${modelsWithRegression.length} 个可用模型`, 'success');
+        }
         
     } catch (error) {
         console.error('❌ 加载数据模型失败:', error);
@@ -2858,17 +2903,49 @@ function renderBeautifiedFileContent(container, content, filename, fileType) {
 
     if (fileType === 'regression_model') {
         const json = JSON.parse(content || '{}');
+        const dm = json.detailed_metrics || {};
         const featureImportance = Array.isArray(json.feature_importance) ? json.feature_importance.slice() : [];
         featureImportance.sort((a, b) => (b.importance || 0) - (a.importance || 0));
+
+        const fmt = (v) => (v === 0 || typeof v === 'number') ? (Math.abs(v) < 1e-4 ? v.toExponential(2) : Number(v).toFixed(3)) : (v ?? '-');
+
         const html = `
             <div class="beautified-json">
                 <div class="metric-cards">
                     <div class="metric-card"><div class="metric-label">目标变量</div><div class="metric-value">${json.target_column || '-'}</div></div>
-                    <div class="metric-card"><div class="metric-label">R²</div><div class="metric-value">${json.r2 ?? '-'}</div></div>
-                    <div class="metric-card"><div class="metric-label">MSE</div><div class="metric-value">${json.mse ?? '-'}</div></div>
+                    <div class="metric-card"><div class="metric-label">皮尔逊相关系数(测试)</div><div class="metric-value">${dm.pearson_r_test ?? '-'}</div></div>
+                    <div class="metric-card"><div class="metric-label">皮尔逊相关系数(训练)</div><div class="metric-value">${dm.pearson_r_training ?? '-'}</div></div>
                     <div class="metric-card"><div class="metric-label">复杂度</div><div class="metric-value">${json.model_complexity ?? '-'}</div></div>
                 </div>
                 ${json.expression_latex ? `<div class="expression-box"><div class="expression-label">模型表达式（MathJax）</div><div class="expression-value">$${json.expression_latex}$</div></div>` : (json.expression ? `<div class="expression-box"><div class="expression-label">模型表达式（MathJax）</div><div class="expression-value">$${json.expression}$</div></div>` : (json.expression_text ? `<div class="expression-box"><div class="expression-label">模型表达式（文本）</div><div class="expression-value">${json.expression_text}</div></div>` : ''))}
+
+                <div class="section-subtitle">详细指标</div>
+                <div class="metrics-grid">
+                    <div class="metric-section">
+                        <h6>误差指标</h6>
+                        <div class="metric-list">
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">平均相对误差</span><span class="metric-name-en">Average relative error</span><span class="metric-dataset">(测试)</span></div><span class="metric-value">${dm.average_relative_error_test != null ? dm.average_relative_error_test + '%' : '-'}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">平均相对误差</span><span class="metric-name-en">Average relative error</span><span class="metric-dataset">(训练)</span></div><span class="metric-value">${dm.average_relative_error_training != null ? dm.average_relative_error_training + '%' : '-'}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">平均绝对误差</span><span class="metric-name-en">Mean absolute error</span><span class="metric-dataset">(测试)</span></div><span class="metric-value">${fmt(dm.mean_absolute_error_test)}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">平均绝对误差</span><span class="metric-name-en">Mean absolute error</span><span class="metric-dataset">(训练)</span></div><span class="metric-value">${fmt(dm.mean_absolute_error_training)}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">均方误差</span><span class="metric-name-en">Mean squared error</span><span class="metric-dataset">(测试)</span></div><span class="metric-value">${fmt(dm.mean_squared_error_test)}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">均方误差</span><span class="metric-name-en">Mean squared error</span><span class="metric-dataset">(训练)</span></div><span class="metric-value">${fmt(dm.mean_squared_error_training)}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">归一化均方误差</span><span class="metric-name-en">Normalized MSE</span><span class="metric-dataset">(测试)</span></div><span class="metric-value">${fmt(dm.normalized_mean_squared_error_test)}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">归一化均方误差</span><span class="metric-name-en">Normalized MSE</span><span class="metric-dataset">(训练)</span></div><span class="metric-value">${fmt(dm.normalized_mean_squared_error_training)}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">均方根误差</span><span class="metric-name-en">Root MSE</span><span class="metric-dataset">(测试)</span></div><span class="metric-value">${fmt(dm.root_mean_squared_error_test)}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">均方根误差</span><span class="metric-name-en">Root MSE</span><span class="metric-dataset">(训练)</span></div><span class="metric-value">${fmt(dm.root_mean_squared_error_training)}</span></div>
+                        </div>
+                    </div>
+
+                    <div class="metric-section">
+                        <h6>模型结构</h6>
+                        <div class="metric-list">
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">模型深度</span><span class="metric-name-en">Model Depth</span></div><span class="metric-value">${dm.model_depth ?? '-'}</span></div>
+                            <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">模型长度</span><span class="metric-name-en">Model Length</span></div><span class="metric-value">${dm.model_length ?? '-'}</span></div>
+                        </div>
+                    </div>
+                </div>
+
                 ${featureImportance.length ? `
                 <div class="section-subtitle">特征重要性</div>
                 <div class="importance-table">
@@ -3213,3 +3290,197 @@ window.refreshExpressionTreeData = async function() {
         showNotification('刷新数据失败: ' + error.message, 'error');
     }
 };
+
+// 为表达式树页面加载数据模型列表
+async function loadDataModelsForExpressionTree() {
+    console.log('📊 为表达式树页面加载数据模型列表...');
+    const dataModelSelect = document.getElementById('expr-data-model');
+    
+    if (!dataModelSelect) {
+        console.error('找不到表达式树数据模型选择框');
+        return;
+    }
+    
+    // 显示加载状态
+    dataModelSelect.innerHTML = '<option value="">正在加载数据模型...</option>';
+    showNotification('正在加载数据模型列表...', 'info');
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/data-models/models`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Username': authManager.currentUser.username
+            }
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || '加载数据模型失败');
+        }
+        
+        console.log('🔍 从API获取到的原始数据模型列表:', result.models);
+        
+        // 过滤出有符号回归模型的数据模型
+        const modelsWithRegression = result.models.filter(model => 
+            model.metadata && model.metadata.has_regression_model
+        );
+        
+        console.log('🔍 过滤后有符号回归模型的数据模型:', modelsWithRegression);
+        
+        // 更新选择框
+        dataModelSelect.innerHTML = '<option value="">请选择数据模型</option>';
+        modelsWithRegression.forEach(model => {
+            const option = document.createElement('option');
+            option.value = model.id;
+            const featureCount = model.feature_columns ? model.feature_columns.length : 0;
+            option.textContent = `${model.name} (${model.target_column}, ${featureCount}个特征)`;
+            dataModelSelect.appendChild(option);
+        });
+        
+        console.log(`✅ 加载了 ${modelsWithRegression.length} 个可用的数据模型`);
+        
+        // 如果没有可用的模型，显示提示
+        if (modelsWithRegression.length === 0) {
+            dataModelSelect.innerHTML = '<option value="">没有可用的数据模型</option>';
+            showNotification('没有找到包含符号回归模型的数据模型，请先进行符号回归分析', 'warning');
+        } else {
+            showNotification(`数据模型列表加载完成，共 ${modelsWithRegression.length} 个可用模型`, 'success');
+        }
+        
+        // 添加选择事件监听器
+        dataModelSelect.addEventListener('change', async (e) => {
+            const selectedModelId = e.target.value;
+            if (selectedModelId) {
+                await loadExpressionTreeData(selectedModelId);
+            } else {
+                // 清空显示
+                clearExpressionTreeDisplay();
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ 加载数据模型失败:', error);
+        showNotification('加载数据模型失败: ' + error.message, 'error');
+        dataModelSelect.innerHTML = '<option value="">加载失败</option>';
+    }
+}
+
+// 清空表达式树显示
+function clearExpressionTreeDisplay() {
+    const perfContainer = document.getElementById('expr-performance-container');
+    const detailedContainer = document.getElementById('expr-detailed-container');
+    const formulaContainer = document.getElementById('expr-formula-container');
+    const featureContainer = document.getElementById('expr-feature-container');
+    
+    if (perfContainer) perfContainer.innerHTML = '<p>请先选择数据模型</p>';
+    if (detailedContainer) detailedContainer.innerHTML = '<p>请先选择数据模型</p>';
+    if (formulaContainer) formulaContainer.innerHTML = '<p>请先选择数据模型</p>';
+    if (featureContainer) featureContainer.innerHTML = '<p>请先选择数据模型</p>';
+}
+
+// 加载指定数据模型的表达式树数据
+async function loadExpressionTreeData(modelId) {
+    console.log(`📊 加载表达式树数据，模型ID: ${modelId}`);
+    
+    const perfContainer = document.getElementById('expr-performance-container');
+    const detailedContainer = document.getElementById('expr-detailed-container');
+    const formulaContainer = document.getElementById('expr-formula-container');
+    const featureContainer = document.getElementById('expr-feature-container');
+    
+    if (!perfContainer || !detailedContainer || !formulaContainer || !featureContainer) return;
+
+    try {
+        perfContainer.innerHTML = '<p>正在加载模型信息...</p>';
+        detailedContainer.innerHTML = '<p>正在加载详细指标...</p>';
+        formulaContainer.innerHTML = '<p>正在加载回归表达式...</p>';
+        featureContainer.innerHTML = '<p>正在加载特征影响力...</p>';
+        
+        // 从数据库获取指定模型的数据
+        const regResp = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}/files/regression_model`);
+        if (!regResp.ok) {
+            throw new Error(`无法获取回归模型文件: HTTP ${regResp.status}`);
+        }
+        
+        const regJson = await regResp.json();
+        if (!regJson || !regJson.success || !regJson.content) {
+            throw new Error('回归模型文件读取失败');
+        }
+        
+        const reg = JSON.parse(regJson.content);
+        
+        // 构造完整的摘要数据
+        const summary = {
+            id: modelId,
+            data_model_id: modelId,
+            expression: reg.expression_text || reg.expression || '0',
+            expression_latex: reg.expression_latex || '',
+            target_variable: reg.target_variable || 'HDL',
+            constants: reg.constants || {},
+            pearson_r_test: reg.detailed_metrics?.pearson_r_test || 0,
+            pearson_r_training: reg.detailed_metrics?.pearson_r_training || 0,
+            feature_importance: reg.feature_importance || [],
+            impact_tree: reg.impact_tree || null,
+            detailed_metrics: reg.detailed_metrics || {},
+            created_at: reg.created_at || Date.now()
+        };
+        
+        console.log('🔍 构造的 summary 对象:', summary);
+        console.log('🔍 reg.impact_tree:', reg.impact_tree);
+        console.log('✅ 从数据库获取到指定模型数据:', modelId);
+        
+        // 设置全局模型ID，供表达式树操作使用
+        window.__currentModelId__ = modelId;
+        
+        // 显示数据
+        displayExpressionTreeSummary(summary);
+        
+        // 渲染表达式树
+        await renderExpressionTree(summary);
+        
+        showNotification(`数据模型 "${summary.id}" 加载完成`, 'success');
+        
+    } catch (error) {
+        console.error('❌ 加载表达式树数据失败:', error);
+        showNotification('加载表达式树数据失败: ' + error.message, 'error');
+        
+        perfContainer.innerHTML = '<p class="text-muted">加载失败</p>';
+        detailedContainer.innerHTML = '<p class="text-muted">加载失败</p>';
+        formulaContainer.innerHTML = '<p class="text-muted">加载失败</p>';
+        featureContainer.innerHTML = '<p class="text-muted">加载失败</p>';
+    }
+}
+
+// 渲染表达式树
+async function renderExpressionTree(summary) {
+    try {
+        // 统一使用数据库中的 MathJax 作为单一真源来驱动 SVG：将 LaTeX 转为中缀
+        if (summary.expression_latex) {
+            const normalized = latexToInfix(summary.expression_latex, summary.constants);
+            if (normalized) summary.expression = normalized;
+        }
+        
+        // 显示摘要信息
+        displayExpressionTreeSummary(summary);
+        
+        // 渲染表达式树
+        try {
+            await renderExpressionTreeSVG(summary);
+        } catch (e) {
+            const canvas = document.getElementById('expression-tree-canvas');
+            if (canvas) canvas.innerHTML = `<p class="text-muted">表达式树渲染失败：${e.message}</p>`;
+        }
+        
+        console.log('✅ 表达式树渲染完成');
+        
+    } catch (error) {
+        console.error('❌ 表达式树渲染失败:', error);
+        showNotification('表达式树渲染失败: ' + error.message, 'error');
+    }
+}

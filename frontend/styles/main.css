@@ -952,7 +952,8 @@ input.readonly-not-allowed {
 }
 
 #expr-performance-container .performance-metrics {
-    grid-template-columns: repeat(2, minmax(120px, 1fr));
+    /* 改为上下排布两张卡片 */
+    grid-template-columns: 1fr;
 }
 
 #expr-detailed-container .metrics-grid {
@@ -1579,6 +1580,13 @@ input[type="checkbox"]:focus {
     font-weight: bold;
     color: var(--accent-primary);
 }
+.performance-metric .metric-value .metric-raw {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
 
 .performance-metric .metric-unit {
     font-size: var(--font-size-xs);
@@ -1593,6 +1601,18 @@ input[type="checkbox"]:focus {
     background: var(--bg-secondary);
     border-radius: 8px;
     border: 1px solid var(--border-color);
+}
+
+/* 表达式树左侧-详细指标：直接让栅格容器居中且更宽 */
+#expr-detailed-container {
+    padding: 0 !important; /* 去掉周围多余 padding */
+}
+
+#expr-detailed-container .metrics-grid {
+    width: 96%;
+    max-width: 980px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .detailed-metrics h5 {
@@ -1679,6 +1699,32 @@ input[type="checkbox"]:focus {
     font-family: 'Courier New', monospace;
     min-width: 60px;
     text-align: right;
+}
+
+/* 符号表达式树左侧“详细指标”模块的定制排版与悬停动效 */
+#expr-detailed-container .metric-list { gap: 10px; }
+#expr-detailed-container .metric-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    border-bottom: none; /* 覆盖通用的下边框分隔 */
+    transition: background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+#expr-detailed-container .metric-item:hover {
+    background: rgba(74, 158, 255, 0.08);
+    border-color: var(--accent-primary);
+    box-shadow: 0 2px 8px rgba(74, 158, 255, 0.15);
+}
+#expr-detailed-container .metric-item .metric-value {
+    min-width: 0;
+    width: 100%;
+    text-align: left; /* 数值放在名字下面并左对齐 */
+    font-size: 15px;
 }
 
 /* 特征重要性美化 */
@@ -1990,6 +2036,27 @@ input[type="checkbox"]:focus {
     overflow: hidden;
 }
 
+/* 表达式树工具条按钮（统一发光效果尺寸） */
+.expr-tree-toolbar button {
+    background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(74, 158, 255, 0.3);
+}
+.expr-tree-toolbar button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(74, 158, 255, 0.4);
+}
+.expr-tree-toolbar button:active {
+    transform: translateY(0);
+}
+
 .btn-primary:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 16px rgba(74, 158, 255, 0.4);
@@ -2201,8 +2268,9 @@ input[type="checkbox"]:focus {
 }
 
 .modal-content.modal-large {
-    max-width: 800px;
-    max-height: 90vh;
+    max-width: 1100px;
+    width: 92vw;
+    max-height: 92vh;
 }
 
 .modal-header {
@@ -4652,4 +4720,50 @@ input[type="checkbox"]:focus {
 .data-table td:nth-child(5) {
     max-width: 150px;
     text-align: center;
+}
+
+/* 指标摘要显示样式 */
+.metrics-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+}
+
+.metrics-summary .metric-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    background: rgba(74, 158, 255, 0.1);
+    border: 1px solid rgba(74, 158, 255, 0.2);
+}
+
+.metrics-summary .metric-label {
+    color: var(--text-secondary);
+    font-weight: 500;
+    min-width: 60px;
+}
+
+.metrics-summary .metric-value {
+    color: var(--accent-primary);
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+}
+
+/* 数据模型表格中的指标列样式 */
+#data-preview table td:nth-child(3) {
+    max-width: 150px;
+    vertical-align: middle;
+}
+
+#data-preview table td:nth-child(3) .metrics-summary {
+    font-size: 11px;
+}
+
+#data-preview table td:nth-child(3) .metrics-summary .metric-item {
+    padding: 1px 3px;
+    gap: 4px;
 }

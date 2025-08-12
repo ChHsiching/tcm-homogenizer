@@ -503,7 +503,7 @@
     return '0';
   }
 
-  // 在减法中用于格式化右侧被减数，移除其“自身携带的负号”，保留减法运算符的负号语义
+  // 在减法中用于格式化右侧被减数，移除其"自身携带的负号"，保留减法运算符的负号语义
   function expressionForSubRight(n) {
     if (!n) return '0';
     // 常数：输出绝对值
@@ -581,6 +581,63 @@
     return `\\begin{align*} \\nonumber ${target} &= ${body} \\end{align*}`;
   }
   ExprTree.astToLatex = astToLatex;
+
+  // 生成 LaTeX（使用常量代号替换数字）
+  function astToLatexWithConstants(ast, target = 'Y', constants = {}) {
+    // 归一化数值为稳定字符串键，避免浮点误差
+    const normKey = (num) => {
+      const n = Number(num);
+      if (!isFinite(n)) return String(num);
+      // 统一到 6 位小数并去除结尾多余的 0
+      const s = n.toFixed(6);
+      return s.replace(/\.0+$/, '').replace(/(\.[0-9]*?)0+$/, '$1');
+    };
+
+    // 创建常量映射：规范化数值键 -> 常量代号
+    const valueToConstant = {};
+    Object.entries(constants || {}).forEach(([key, value]) => {
+      valueToConstant[normKey(value)] = key;
+    });
+
+    function core(n, parentOp) {
+      if (!n) return '0';
+      if (n.kind === 'constant') {
+        const k = normKey(n.value);
+        const constantKey = valueToConstant[k];
+        if (constantKey) {
+          const match = constantKey.match(/^c(?:_|\{)?(\d+)\}?$/i);
+          return match ? `c_{${match[1]}}` : constantKey;
+        }
+        return String(n.value);
+      }
+      if (n.kind === 'variable') {
+        const coef = (typeof n.coefficient === 'number') ? n.coefficient : 1;
+        if (coef === 1) return String(n.value);
+        if (coef === -1) return `-1 \\cdot ${n.value}`;
+        const k = normKey(coef);
+        const constantKey = valueToConstant[k];
+        if (constantKey) {
+          const match = constantKey.match(/^c(?:_|\{)?(\d+)\}?$/i);
+          return match ? `c_{${match[1]}} \\cdot ${n.value}` : `${constantKey} \\cdot ${n.value}`;
+        }
+        return `${formatNumberSci(coef, 6)} \\cdot ${n.value}`;
+      }
+      const a = core(n.children[0], n.op);
+      const b = core(n.children[1], n.op);
+      if (n.op === 'add') return `${a} + ${b}`;
+      if (n.op === 'sub') return `${a} - ${b}`;
+      if (n.op === 'mul') {
+        const la = (n.children[0].kind === 'operator' && (n.children[0].op === 'add' || n.children[0].op === 'sub')) ? `\\left(${a}\\right)` : a;
+        const rb = (n.children[1].kind === 'operator' && (n.children[1].op === 'add' || n.children[1].op === 'sub')) ? `\\left(${b}\\right)` : b;
+        return `${la} \\cdot ${rb}`;
+      }
+      if (n.op === 'div') return `\\cfrac{${a}}{${b}}`;
+      return `${a} ${n.op} ${b}`;
+    }
+    const body = core(ast, null);
+    return `\\begin{align*} \\nonumber ${target} &= ${body} \\end{align*}`;
+  }
+  ExprTree.astToLatexWithConstants = astToLatexWithConstants;
 
   // =============================
   // 公开 API
@@ -751,7 +808,7 @@
             if (nextImpactPath && typeof nextImpactPath === 'object' && want && hasOwn(nextImpactPath, want)) {
               nextImpactPath = nextImpactPath[want];
             } else {
-              // 兼容“本层先进入某个运算符分支，再在该分支内才出现子节点的运算符键”的结构
+              // 兼容"本层先进入某个运算符分支，再在该分支内才出现子节点的运算符键"的结构
               const bridged = findUniqueOpChildForOp(nextImpactPath, want);
               if (bridged) nextImpactPath = bridged;
               else if (availableOpKeys.length === 1) nextImpactPath = nextImpactPath[availableOpKeys[0]];
@@ -909,7 +966,7 @@
       : String(op || '?');
   }
 
-  // 将整棵树聚合为“特征影响力”列表（V2：使用真实影响力数据）
+  // 将整棵树聚合为"特征影响力"列表（V2：使用真实影响力数据）
   function computeFeatureImportance(root) {
     const totals = new Map();
     (function walk(n) {
@@ -981,7 +1038,7 @@
       });
       if (!node.children || node.children.length === 0) return left + lw;
 
-      // 将同级子树按“子树块宽 + siblingGap”对称排列，父节点位于子块中心，保证不交叉
+      // 将同级子树按"子树块宽 + siblingGap"对称排列，父节点位于子块中心，保证不交叉
       const childrenSumW = node.children.reduce((s, ch) => s + (ch.layout?.w || ch.layout?.wSelf || selfW), 0);
       const block = childrenSumW + cfg.siblingGap * (node.children.length - 1);
       let cursor = centerX - block / 2; // 子块的最左
@@ -1013,9 +1070,9 @@
 
     function operatorHalfWidthEstimate(op) {
       // 动态估计胶囊宽度的一半（考虑文本长度与放大倍率），单位：布局坐标
-      const fontSize = 12 * (cfg.textScale || 1);
+      const fontSize = 12 * (cfg.textScale || 1.15); // 默认文字整体放大约15%
       const text = operatorLabel(op);
-      const pad = 12 * (cfg.textScale || 1);
+      const pad = 12 * (cfg.textScale || 1.15);
       const estWidth = text.length * fontSize * 0.6 + 2 * pad; // 经验系数 0.6
       const minWidth = cfg.nodeRadius * 2 * (cfg.drawScale || 1);
       return Math.max(minWidth / 2, estWidth / 2);
@@ -1130,9 +1187,9 @@
     const baseH2 = Math.max(cfg.nodeRadius * 2, cfg.leafH);
     if (!cfg.vGap || cfg.vGap < baseH2 * 2) cfg.vGap = baseH2 * 2;
 
-    // 显示放大倍率：节点尺寸 1.5x，字体 2x
+    // 显示放大倍率：节点尺寸 1.5x，字体 2.15x（略增）
     const NODE_SCALE = 1.5;
-    const TEXT_SCALE = 2.0;
+    const TEXT_SCALE = 2.15;
     const rDraw = cfg.nodeRadius * NODE_SCALE;
     const leafWDraw = cfg.leafW * NODE_SCALE;
     const leafHDraw = cfg.leafH * NODE_SCALE;
@@ -1388,7 +1445,7 @@
             e.preventDefault();
             e.stopPropagation();
             ctxMenu.style.display = 'none';
-            // 触发底部红色“删除节点/子树”按钮（已由外层绑定真实逻辑）
+            // 触发底部红色"删除节点/子树"按钮（已由外层绑定真实逻辑）
             const btn = tooltipHost.querySelector('#btn-delete');
             if (btn && typeof btn.click === 'function') btn.click();
           };
@@ -1451,9 +1508,12 @@
     // 在SVG下方渲染操作按钮条
     try {
       const toolbar = document.createElement('div');
+      toolbar.className = 'expr-tree-toolbar';
       toolbar.style.display = 'flex';
-      toolbar.style.gap = '10px';
-      toolbar.style.marginTop = '10px';
+      toolbar.style.gap = '12px';
+      toolbar.style.marginTop = '12px';
+      toolbar.style.justifyContent = 'space-between';
+      toolbar.style.alignItems = 'center';
 
       const btns = [
         { text: '删除节点/子树', color: '#ef4444', id: 'btn-delete' },
@@ -1461,30 +1521,98 @@
         { text: '优化', color: '#3b82f6', id: 'btn-optimize' },
         { text: '撤销', color: '#f59e0b', id: 'btn-undo' },
       ];
-      btns.forEach(b => {
+      // 左侧按钮分组（左对齐）
+      const btnGroup = document.createElement('div');
+      btnGroup.className = 'expr-tree-btns';
+      btnGroup.style.display = 'flex';
+      btnGroup.style.gap = '12px';
+
+      // 操作计数器（同一行右对齐）
+      const counter = document.createElement('div');
+      counter.id = 'expr-op-counter';
+      counter.textContent = '操作次数：0';
+      counter.style.marginLeft = '16px';
+      counter.style.alignSelf = 'center';
+      counter.style.color = '#9ca3af';
+      counter.style.fontSize = '13px';
+      counter.style.minWidth = '110px';
+      counter.style.textAlign = 'right';
+
+      // 初始化全局计数
+      if (typeof window.__exprOpCount__ !== 'number') window.__exprOpCount__ = 0;
+
+      // 统一按钮主题：根据按钮ID设定颜色（红/蓝/绿/黄），保持项目主题风格
+      function getButtonTheme(id) {
+        switch (id) {
+          case 'btn-delete': // 红色
+            return {
+              start: '#ef4444', end: '#f87171',
+              shadow: 'rgba(239,68,68,0.30)', hoverShadow: 'rgba(239,68,68,0.40)'
+            };
+          case 'btn-simplify': // 绿色
+            return {
+              start: '#10b981', end: '#34d399',
+              shadow: 'rgba(16,185,129,0.30)', hoverShadow: 'rgba(16,185,129,0.40)'
+            };
+          case 'btn-optimize': // 蓝色（采用全局主题色）
+            return {
+              start: 'var(--accent-primary)', end: 'var(--accent-secondary)',
+              shadow: 'rgba(74,158,255,0.30)', hoverShadow: 'rgba(74,158,255,0.40)'
+            };
+          case 'btn-undo': // 黄色
+            return {
+              start: '#f59e0b', end: '#fbbf24',
+              shadow: 'rgba(245,158,11,0.30)', hoverShadow: 'rgba(245,158,11,0.40)'
+            };
+          default:
+            return {
+              start: 'var(--accent-primary)', end: 'var(--accent-secondary)',
+              shadow: 'rgba(74,158,255,0.30)', hoverShadow: 'rgba(74,158,255,0.40)'
+            };
+        }
+      }
+
+      const buildButton = (b) => {
         const el = document.createElement('button');
         el.textContent = b.text;
-        el.style.background = b.color;
+        const theme = getButtonTheme(b.id);
+        el.style.background = `linear-gradient(135deg, ${theme.start} 0%, ${theme.end} 100%)`;
         el.style.border = 'none';
         el.style.color = '#fff';
-        el.style.padding = '8px 14px';
-        el.style.borderRadius = '6px';
+        el.style.padding = '10px 18px';
+        el.style.borderRadius = '8px';
         el.style.cursor = 'pointer';
         el.style.fontWeight = '600';
+        el.style.fontSize = '14px';
+        el.style.boxShadow = `0 4px 12px ${theme.shadow}`;
+        el.style.transition = 'all 0.2s ease';
+        el.onmouseenter = () => { el.style.transform = 'translateY(-2px)'; el.style.boxShadow = `0 6px 16px ${theme.hoverShadow}`; };
+        el.onmouseleave = () => { el.style.transform = 'translateY(0)'; el.style.boxShadow = `0 4px 12px ${theme.shadow}`; };
         el.id = b.id;
-        // 仅挂空实现，后续填充逻辑
-        el.addEventListener('click', () => {
-          console.log(`[ExprTree] 点击: ${b.text}, 当前选中:`, selectedNodeId);
-        });
-        toolbar.appendChild(el);
-      });
+        btnGroup.appendChild(el);
+        return el;
+      };
+
+      const created = {};
+      btns.forEach(b => { created[b.id] = buildButton(b); });
+      toolbar.appendChild(btnGroup);
+      toolbar.appendChild(counter);
       // 将按钮条插入到容器(非SVG)下方
       if (containerEl && containerEl.parentElement) {
         // 移除旧工具条避免重复
         const prev = containerEl.parentElement.querySelector('.expr-tree-toolbar');
         if (prev) prev.remove();
-        toolbar.className = 'expr-tree-toolbar';
-        containerEl.parentElement.appendChild(toolbar);
+      containerEl.parentElement.appendChild(toolbar);
+      // 提供一个更新计数器的辅助方法
+      window.__updateExprOpCounter__ = function(delta) {
+        try {
+          if (typeof delta === 'number') {
+            window.__exprOpCount__ = Math.max(0, (window.__exprOpCount__ || 0) + delta);
+          }
+          const label = containerEl.parentElement.querySelector('#expr-op-counter');
+          if (label) label.textContent = `操作次数：${window.__exprOpCount__}`;
+        } catch (_) {}
+      };
       }
     } catch (_) {}
 

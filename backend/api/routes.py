@@ -37,6 +37,251 @@ os.makedirs(CSV_DATA_DIR, exist_ok=True)
 os.makedirs(MODELS_DIR, exist_ok=True)
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
+# 符号表达式树操作的模拟指标序列（不要从文件读取，直接内嵌）
+# 下标1..15分别对应第1~15次树结构变更后的指标；下标0表示基线，不覆盖。
+MOCK_INDICATORS_SEQUENCE = [None] + [
+    {
+        "average_relative_error_test": 2.74596305113801,
+        "average_relative_error_training": 2.3574806852981,
+        "mean_absolute_error_test": 0.020585454497077455,
+        "mean_absolute_error_training": 0.018182586660249123,
+        "mean_squared_error_test": 0.00073464638025446673,
+        "mean_squared_error_training": 0.00053687909383770235,
+        "normalized_mean_squared_error_test": 0.14358163045309327,
+        "normalized_mean_squared_error_training": 0.12666355569075083,
+        "pearson_r_test": 0.86776941659869888,
+        "pearson_r_training": 0.87333644430924906,
+        "root_mean_squared_error_test": 0.02710436090843071,
+        "root_mean_squared_error_training": 0.0231706515626493,
+        "model_depth": 9,
+        "model_length": 30
+    },
+    {
+        "average_relative_error_test": 2.74596305113801,
+        "average_relative_error_training": 2.3574806852981,
+        "mean_absolute_error_test": 0.020585454497077448,
+        "mean_absolute_error_training": 0.018182586660249123,
+        "mean_squared_error_test": 0.00073464638025446673,
+        "mean_squared_error_training": 0.00053687909383770235,
+        "normalized_mean_squared_error_test": 0.14358163045309327,
+        "normalized_mean_squared_error_training": 0.12666355569075086,
+        "pearson_r_test": 0.86776941659869888,
+        "pearson_r_training": 0.87333644430924928,
+        "root_mean_squared_error_test": 0.02710436090843071,
+        "root_mean_squared_error_training": 0.0231706515626493,
+        "model_depth": 9,
+        "model_length": 30
+    },
+    {
+        "average_relative_error_test": 2.74596305113801,
+        "average_relative_error_training": 2.3574806852981,
+        "mean_absolute_error_test": 0.020585454497077455,
+        "mean_absolute_error_training": 0.018182586660249123,
+        "mean_squared_error_test": 0.0007346463802544676,
+        "mean_squared_error_training": 0.00053687909383770245,
+        "normalized_mean_squared_error_test": 0.14358163045309344,
+        "normalized_mean_squared_error_training": 0.12666355569075086,
+        "pearson_r_test": 0.86776941659869844,
+        "pearson_r_training": 0.87333644430924906,
+        "root_mean_squared_error_test": 0.027104360908430724,
+        "root_mean_squared_error_training": 0.0231706515626493,
+        "model_depth": 9,
+        "model_length": 30
+    },
+    {
+        "average_relative_error_test": 2.74596305113801,
+        "average_relative_error_training": 2.3574806852981,
+        "mean_absolute_error_test": 0.020585454497077455,
+        "mean_absolute_error_training": 0.018182586660249123,
+        "mean_squared_error_test": 0.00073464638025446673,
+        "mean_squared_error_training": 0.00053687909383770235,
+        "normalized_mean_squared_error_test": 0.14358163045309327,
+        "normalized_mean_squared_error_training": 0.12666355569075083,
+        "pearson_r_test": 0.86776941659869888,
+        "pearson_r_training": 0.87333644430924906,
+        "root_mean_squared_error_test": 0.02710436090843071,
+        "root_mean_squared_error_training": 0.0231706515626493,
+        "model_depth": 9,
+        "model_length": 30
+    },
+    {
+        "average_relative_error_test": 2.84597275187996,
+        "average_relative_error_training": 2.48696808718705,
+        "mean_absolute_error_test": 0.021330165641595289,
+        "mean_absolute_error_training": 0.019181112565881491,
+        "mean_squared_error_test": 0.00078426119873988346,
+        "mean_squared_error_training": 0.00058318510503991,
+        "normalized_mean_squared_error_test": 0.15327850873935517,
+        "normalized_mean_squared_error_training": 0.13758833204365606,
+        "pearson_r_test": 0.8668991495312971,
+        "pearson_r_training": 0.86241166795634416,
+        "root_mean_squared_error_test": 0.028004663874788491,
+        "root_mean_squared_error_training": 0.024149225764813039,
+        "model_depth": 11,
+        "model_length": 33
+    },
+    {
+        "average_relative_error_test": 2.84597275187996,
+        "average_relative_error_training": 2.48696808718705,
+        "mean_absolute_error_test": 0.0213301656415953,
+        "mean_absolute_error_training": 0.019181112565881477,
+        "mean_squared_error_test": 0.00078426119873988389,
+        "mean_squared_error_training": 0.00058318510503990956,
+        "normalized_mean_squared_error_test": 0.15327850873935531,
+        "normalized_mean_squared_error_training": 0.13758833204365603,
+        "pearson_r_test": 0.86689914953129676,
+        "pearson_r_training": 0.86241166795634516,
+        "root_mean_squared_error_test": 0.028004663874788498,
+        "root_mean_squared_error_training": 0.024149225764813032,
+        "model_depth": 9,
+        "model_length": 29
+    },
+    {
+        "average_relative_error_test": 2.82362275136901,
+        "average_relative_error_training": 2.48051448622132,
+        "mean_absolute_error_test": 0.021248478681024353,
+        "mean_absolute_error_training": 0.019199989104899291,
+        "mean_squared_error_test": 0.000756269177768846,
+        "mean_squared_error_training": 0.00059333589584469092,
+        "normalized_mean_squared_error_test": 0.14780765892817582,
+        "normalized_mean_squared_error_training": 0.1399831640852911,
+        "pearson_r_test": 0.87072209571472137,
+        "pearson_r_training": 0.86001683591470957,
+        "root_mean_squared_error_test": 0.027500348684495732,
+        "root_mean_squared_error_training": 0.024358487141953027,
+        "model_depth": 11,
+        "model_length": 32
+    },
+    {
+        "average_relative_error_test": 2.82362275136901,
+        "average_relative_error_training": 2.48051448622132,
+        "mean_absolute_error_test": 0.021248478681024374,
+        "mean_absolute_error_training": 0.019199989104899284,
+        "mean_squared_error_test": 0.00075626917776884647,
+        "mean_squared_error_training": 0.00059333589584469081,
+        "normalized_mean_squared_error_test": 0.14780765892817591,
+        "normalized_mean_squared_error_training": 0.13998316408529107,
+        "pearson_r_test": 0.87072209571472114,
+        "pearson_r_training": 0.86001683591470945,
+        "root_mean_squared_error_test": 0.027500348684495739,
+        "root_mean_squared_error_training": 0.024358487141953024,
+        "model_depth": 9,
+        "model_length": 28
+    },
+    {
+        "average_relative_error_test": 2.82362275136901,
+        "average_relative_error_training": 2.48051448622132,
+        "mean_absolute_error_test": 0.021248478681024374,
+        "mean_absolute_error_training": 0.019199989104899281,
+        "mean_squared_error_test": 0.00075626917776884647,
+        "mean_squared_error_training": 0.00059333589584469059,
+        "normalized_mean_squared_error_test": 0.14780765892817591,
+        "normalized_mean_squared_error_training": 0.13998316408529105,
+        "pearson_r_test": 0.87072209571472114,
+        "pearson_r_training": 0.86001683591470979,
+        "root_mean_squared_error_test": 0.027500348684495739,
+        "root_mean_squared_error_training": 0.02435848714195302,
+        "model_depth": 9,
+        "model_length": 28
+    },
+    {
+        "average_relative_error_test": 2.82362275136901,
+        "average_relative_error_training": 2.48051448622132,
+        "mean_absolute_error_test": 0.021248478681024374,
+        "mean_absolute_error_training": 0.019199989104899281,
+        "mean_squared_error_test": 0.00075626917776884647,
+        "mean_squared_error_training": 0.00059333589584469059,
+        "normalized_mean_squared_error_test": 0.14780765892817591,
+        "normalized_mean_squared_error_training": 0.13998316408529107,
+        "pearson_r_test": 0.87072209571472114,
+        "pearson_r_training": 0.86001683591470945,
+        "root_mean_squared_error_test": 0.027500348684495739,
+        "root_mean_squared_error_training": 0.02435848714195302,
+        "model_depth": 9,
+        "model_length": 28
+    },
+    {
+        "average_relative_error_test": 2.82362275136901,
+        "average_relative_error_training": 2.48051448622132,
+        "mean_absolute_error_test": 0.021248478681024374,
+        "mean_absolute_error_training": 0.019199989104899284,
+        "mean_squared_error_test": 0.00075626917776884647,
+        "mean_squared_error_training": 0.00059333589584469081,
+        "normalized_mean_squared_error_test": 0.14780765892817591,
+        "normalized_mean_squared_error_training": 0.13998316408529107,
+        "pearson_r_test": 0.87072209571472114,
+        "pearson_r_training": 0.86001683591470945,
+        "root_mean_squared_error_test": 0.027500348684495739,
+        "root_mean_squared_error_training": 0.024358487141953024,
+        "model_depth": 9,
+        "model_length": 28
+    },
+    {
+        "average_relative_error_test": 2.82362275136901,
+        "average_relative_error_training": 2.48051448622132,
+        "mean_absolute_error_test": 0.021248478681024374,
+        "mean_absolute_error_training": 0.019199989104899281,
+        "mean_squared_error_test": 0.00075626917776884647,
+        "mean_squared_error_training": 0.00059333589584469059,
+        "normalized_mean_squared_error_test": 0.14780765892817591,
+        "normalized_mean_squared_error_training": 0.13998316408529105,
+        "pearson_r_test": 0.87072209571472114,
+        "pearson_r_training": 0.86001683591470979,
+        "root_mean_squared_error_test": 0.027500348684495739,
+        "root_mean_squared_error_training": 0.02435848714195302,
+        "model_depth": 9,
+        "model_length": 28
+    },
+    {
+        "average_relative_error_test": 2.82362275136901,
+        "average_relative_error_training": 2.48051448622132,
+        "mean_absolute_error_test": 0.021248478681024374,
+        "mean_absolute_error_training": 0.019199989104899281,
+        "mean_squared_error_test": 0.00075626917776884647,
+        "mean_squared_error_training": 0.00059333589584469059,
+        "normalized_mean_squared_error_test": 0.14780765892817591,
+        "normalized_mean_squared_error_training": 0.13998316408529107,
+        "pearson_r_test": 0.87072209571472114,
+        "pearson_r_training": 0.86001683591470945,
+        "root_mean_squared_error_test": 0.027500348684495739,
+        "root_mean_squared_error_training": 0.02435848714195302,
+        "model_depth": 9,
+        "model_length": 28
+    },
+    {
+        "average_relative_error_test": 2.82362275136901,
+        "average_relative_error_training": 2.48051448622132,
+        "mean_absolute_error_test": 0.021248478681024374,
+        "mean_absolute_error_training": 0.019199989104899284,
+        "mean_squared_error_test": 0.00075626917776884647,
+        "mean_squared_error_training": 0.00059333589584469081,
+        "normalized_mean_squared_error_test": 0.14780765892817591,
+        "normalized_mean_squared_error_training": 0.13998316408529107,
+        "pearson_r_test": 0.87072209571472114,
+        "pearson_r_training": 0.86001683591470945,
+        "root_mean_squared_error_test": 0.027500348684495739,
+        "root_mean_squared_error_training": 0.024358487141953024,
+        "model_depth": 9,
+        "model_length": 28
+    },
+    {
+        "average_relative_error_test": 2.82362275136901,
+        "average_relative_error_training": 2.48051448622132,
+        "mean_absolute_error_test": 0.021248478681024374,
+        "mean_absolute_error_training": 0.019199989104899284,
+        "mean_squared_error_test": 0.00075626917776884647,
+        "mean_squared_error_training": 0.00059333589584469081,
+        "normalized_mean_squared_error_test": 0.14780765892817591,
+        "normalized_mean_squared_error_training": 0.13998316408529107,
+        "pearson_r_test": 0.87072209571472114,
+        "pearson_r_training": 0.86001683591470945,
+        "root_mean_squared_error_test": 0.027500348684495739,
+        "root_mean_squared_error_training": 0.024358487141953024,
+        "model_depth": 9,
+        "model_length": 28
+    }
+]
+
 def load_data_models():
     """加载所有数据模型"""
     models = []
@@ -127,7 +372,8 @@ def expression_tree_summary():
                         'expression_latex': (reg_json or {}).get('expression_latex') or (
                             r"HDL =  \left(  \left(  \left(  \cfrac{  \left( c_{0}  \cdot\text{HYP} +  \left(  \left(  \left( c_{1}  \cdot\text{QA} + c_{2}  \cdot\text{HYP} \right)  + c_{3}  \cdot\text{CA} \right)  - c_{4} \right)  \right)  \cdot  \left( c_{5} + c_{6}  \cdot\text{MA}  \cdot  \left(  \left(  \left( c_{7} + c_{8}  \cdot\text{OA} \right)  + c_{9}  \cdot\text{UA} \right)  + c_{10}  \cdot\text{UA} \right)  \right) }{c_{11}  \cdot\text{VR} }  -  \cfrac{ c_{12}}{c_{13}  \cdot\text{HYP} }  \right)  +  \cfrac{ c_{14}  \cdot\text{VR}}{ \left( c_{15} - c_{16}  \cdot\text{HYP} \right)  }  \right)  \cdot c_{17} + c_{18} \right)"
                         ),
-                        'r2': (reg_json or {}).get('r2') or model.get('metadata', {}).get('r2_score', 0.85),
+                        'pearson_r_test': (reg_json or {}).get('detailed_metrics', {}).get('pearson_r_test') or model.get('metadata', {}).get('pearson_r_test'),
+                        'pearson_r_training': (reg_json or {}).get('detailed_metrics', {}).get('pearson_r_training') or model.get('metadata', {}).get('pearson_r_training'),
                         'mse': (reg_json or {}).get('mse') or model.get('metadata', {}).get('mse_score', 0.12),
                         'feature_importance': (reg_json or {}).get('feature_importance') or model.get('feature_importance') or [],
                         'impact_tree': (reg_json or {}).get('impact_tree') or model.get('symbolic_regression', {}).get('impact_tree') or None,
@@ -142,8 +388,6 @@ def expression_tree_summary():
                             "model_length": 22,
                             "normalized_mean_squared_error_test": 0.088,
                             "normalized_mean_squared_error_training": 0.079,
-                            "pearson_r_test": 0.921,
-                            "pearson_r_training": 0.935,
                             "root_mean_squared_error_test": 0.348,
                             "root_mean_squared_error_training": 0.321
                         },
@@ -185,8 +429,7 @@ def expression_tree_summary():
                     'c{17}': 0.0053559,
                     'c{18}': 0.93054,
                 },
-                'r2': 0.86,
-                'mse': 0.118,
+
                 'feature_importance': [
                     {'feature': 'HYP', 'importance': 0.85},
                     {'feature': 'QA', 'importance': 0.7},
@@ -254,20 +497,20 @@ def expression_tree_summary():
                     }
                 },
                 'detailed_metrics': {
-                    "average_relative_error_test": 12.3,
-                    "average_relative_error_training": 10.8,
-                    "mean_absolute_error_test": 0.233,
-                    "mean_absolute_error_training": 0.201,
-                    "mean_squared_error_test": 0.121,
-                    "mean_squared_error_training": 0.103,
-                    "model_depth": 11,
-                    "model_length": 48,
-                    "normalized_mean_squared_error_test": 0.088,
-                    "normalized_mean_squared_error_training": 0.079,
-                    "pearson_r_test": 0.921,
-                    "pearson_r_training": 0.935,
-                    "root_mean_squared_error_test": 0.348,
-                    "root_mean_squared_error_training": 0.321
+                    "average_relative_error_test": 2.75,
+                    "average_relative_error_training": 2.36,
+                    "mean_absolute_error_test": 0.0206,
+                    "mean_absolute_error_training": 0.0182,
+                    "mean_squared_error_test": 0.000735,
+                    "mean_squared_error_training": 0.000537,
+                    "model_depth": 14,
+                    "model_length": 39,
+                    "normalized_mean_squared_error_test": 0.1436,
+                    "normalized_mean_squared_error_training": 0.1267,
+                    "pearson_r_test": 0.8678,
+                    "pearson_r_training": 0.8733,
+                    "root_mean_squared_error_test": 0.0271,
+                    "root_mean_squared_error_training": 0.0232
                 },
                 'data_model_id': None
             }
@@ -560,20 +803,62 @@ def update_data_model_file(model_id, file_type):
                         reg_content['expression_latex'] = data['expression_latex']
                     if 'expression' in data:
                         reg_content['expression'] = data['expression']
+                    if 'constants' in data and isinstance(data['constants'], dict):
+                        reg_content['constants'] = data['constants']
                     if 'feature_importance' in data and isinstance(data['feature_importance'], list):
                         reg_content['feature_importance'] = data['feature_importance']
+                    if 'impact_tree' in data:
+                        reg_content['impact_tree'] = data['impact_tree']
+                    # 表达式树操作驱动的指标轮换/撤销
+                    action = (data or {}).get('expr_tree_action')
+                    # 初始化基线指标
+                    if 'baseline_detailed_metrics' not in reg_content:
+                        reg_content['baseline_detailed_metrics'] = reg_content.get('detailed_metrics') or {}
+                    op_index = int(model.get('metadata', {}).get('expr_tree_op_index', 0) or 0)
+                    new_index = op_index
+                    if action in ('delete', 'simplify', 'optimize'):
+                        new_index = op_index + 1
+                        # 超过15次：指标固定为第15次的值，但索引持续增长，确保无限撤销回滚可用
+                        idx = new_index if new_index <= 15 else 15
+                        if idx > 0:
+                            seq_metrics = MOCK_INDICATORS_SEQUENCE[idx]
+                            if isinstance(seq_metrics, dict):
+                                reg_content['detailed_metrics'] = seq_metrics
+                                model.setdefault('metadata', {})['pearson_r_test'] = seq_metrics.get('pearson_r_test')
+                                model['metadata']['pearson_r_training'] = seq_metrics.get('pearson_r_training')
+                        model.setdefault('metadata', {})['expr_tree_op_index'] = new_index
+                    elif action == 'undo':
+                        new_index = max(0, op_index - 1)
+                        if new_index == 0:
+                            base = reg_content.get('baseline_detailed_metrics') or {}
+                            if base:
+                                reg_content['detailed_metrics'] = base
+                                model.setdefault('metadata', {})['pearson_r_test'] = base.get('pearson_r_test')
+                                model['metadata']['pearson_r_training'] = base.get('pearson_r_training')
+                        else:
+                            # 对超过 15 的索引进行截断（>=15 视同第15次的指标），支持无限撤销
+                            idx = new_index if new_index <= 15 else 15
+                            seq_metrics = MOCK_INDICATORS_SEQUENCE[idx]
+                            if isinstance(seq_metrics, dict):
+                                reg_content['detailed_metrics'] = seq_metrics
+                                model.setdefault('metadata', {})['pearson_r_test'] = seq_metrics.get('pearson_r_test')
+                                model['metadata']['pearson_r_training'] = seq_metrics.get('pearson_r_training')
+                        model.setdefault('metadata', {})['expr_tree_op_index'] = new_index
+                    else:
+                        # 允许直接设置详细指标（不建议在表达式树操作路径外使用）
+                        if 'detailed_metrics' in data and isinstance(data['detailed_metrics'], dict):
+                            reg_content['detailed_metrics'] = data['detailed_metrics']
                     if 'updated_at' in data:
                         reg_content['updated_at'] = data['updated_at']
                     
                     # 写回文件
                     with open(reg_filepath, 'w', encoding='utf-8') as f:
                         json.dump(reg_content, f, ensure_ascii=False, indent=2)
+                    # 若有更新元数据（pearson_r_* / expr_tree_op_index），同步保存主模型文件
+                    save_data_model(model)
                     
                     logger.info(f"回归模型文件已更新: {reg_filename}")
-                    return jsonify({
-                        'success': True,
-                        'message': '回归模型文件更新成功'
-                    })
+                    return jsonify({'success': True, 'message': '回归模型文件更新成功'})
                 else:
                     return jsonify({
                         'success': False,
@@ -808,7 +1093,7 @@ def update_data_model(model_id):
         with open(filepath, 'r', encoding='utf-8') as f:
             model = json.load(f)
         
-        # 更新模型数据（允许写入/更新 MathJax 公式）
+        # 更新模型数据（允许写入/更新 MathJax 公式、性能指标等）
         allowed_fields = ['name', 'description', 'status', 'symbolic_regression', 'monte_carlo', 'metadata', 'feature_importance']
         for field in allowed_fields:
             if field in data:
@@ -1038,20 +1323,20 @@ def analyze():
         
         # 生成详细的性能指标
         detailed_metrics = {
-            "average_relative_error_test": round(random.uniform(8.0, 18.0), 2),
-            "average_relative_error_training": round(random.uniform(7.0, 16.0), 2),
-            "mean_absolute_error_test": round(random.uniform(0.15, 0.45), 3),
-            "mean_absolute_error_training": round(random.uniform(0.12, 0.40), 3),
-            "mean_squared_error_test": round(random.uniform(0.08, 0.25), 3),
-            "mean_squared_error_training": round(random.uniform(0.06, 0.20), 3),
-            "model_depth": random.randint(4, 12),
-            "model_length": random.randint(15, 35),
-            "normalized_mean_squared_error_test": round(random.uniform(0.06, 0.20), 3),
-            "normalized_mean_squared_error_training": round(random.uniform(0.05, 0.18), 3),
-            "pearson_r_test": round(random.uniform(0.85, 0.98), 3),
-            "pearson_r_training": round(random.uniform(0.86, 0.99), 3),
-            "root_mean_squared_error_test": round(random.uniform(0.25, 0.55), 3),
-            "root_mean_squared_error_training": round(random.uniform(0.22, 0.50), 3)
+            "average_relative_error_test": 2.75,
+            "average_relative_error_training": 2.36,
+            "mean_absolute_error_test": 0.0206,
+            "mean_absolute_error_training": 0.0182,
+            "mean_squared_error_test": 0.000735,
+            "mean_squared_error_training": 0.000537,
+            "model_depth": 14,
+            "model_length": 39,
+            "normalized_mean_squared_error_test": 0.1436,
+            "normalized_mean_squared_error_training": 0.1267,
+            "pearson_r_test": 0.8678,
+            "pearson_r_training": 0.8733,
+            "root_mean_squared_error_test": 0.0271,
+            "root_mean_squared_error_training": 0.0232
         }
         
         result = {
@@ -1060,8 +1345,6 @@ def analyze():
             "expression_latex": latex_expression,
             "target_variable": "HDL",
             "constants": constants,
-            "r2": round(random.uniform(0.7, 0.95), 3),
-            "mse": round(random.uniform(0.05, 0.25), 3),
             "feature_importance": feature_importance,
             "impact_tree": impact_tree,
             "predictions": predictions,
@@ -1123,14 +1406,13 @@ def analyze():
                 'expression_latex': _to_latex(expression, target_column or 'Y'),
                 'target_variable': target_column,
                 'constants': constants,
-                'r2': result['r2'],
-                'mse': result['mse'],
                 'feature_importance': result['feature_importance'],
                 'impact_tree': result['impact_tree'],
                 'predictions': result['predictions'],
                 'training_time': result['training_time'],
                 'model_complexity': result['model_complexity'],
                 'detailed_metrics': result['detailed_metrics'],
+                'baseline_detailed_metrics': result['detailed_metrics'],
                 'target_column': target_column,
                 'feature_columns': feature_columns,
                 'analysis_params': {
@@ -1198,8 +1480,9 @@ def analyze():
                     'has_monte_carlo_results': False,
                     'feature_count': feature_count,
                     'model_complexity': result['model_complexity'],
-                    'r2_score': result['r2'],
-                    'mse_score': result['mse']
+                    'pearson_r_test': result['detailed_metrics']['pearson_r_test'],
+                    'pearson_r_training': result['detailed_metrics']['pearson_r_training'],
+                    'expr_tree_op_index': 0
                 }
             }
             
