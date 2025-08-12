@@ -291,6 +291,41 @@ function setupEventListeners() {
         openRangeBtn.addEventListener('click', openRangeConfigDialog);
     }
     
+    // 表达式树数据模型选择框事件
+    const exprDataModelSelect = document.getElementById('expr-data-model');
+    if (exprDataModelSelect) {
+        exprDataModelSelect.addEventListener('change', async function() {
+            const selectedModelId = this.value;
+            if (selectedModelId) {
+                console.log('🌳 用户选择了表达式树数据模型:', selectedModelId);
+                showNotification('正在加载选择的模型数据...', 'info');
+                await renderExpressionTreePage();
+            } else {
+                console.log('🌳 用户清空了表达式树数据模型选择');
+                // 清空页面内容
+                const perfContainer = document.getElementById('expr-performance-container');
+                const detailedContainer = document.getElementById('expr-detailed-container');
+                const formulaContainer = document.getElementById('expr-formula-container');
+                const featureContainer = document.getElementById('expr-feature-container');
+                const canvas = document.getElementById('expression-tree-canvas');
+                
+                if (perfContainer) perfContainer.innerHTML = '<p>请先选择数据模型</p>';
+                if (detailedContainer) detailedContainer.innerHTML = '<p>请先选择数据模型</p>';
+                if (formulaContainer) formulaContainer.innerHTML = '<p>请先选择数据模型</p>';
+                if (featureContainer) featureContainer.innerHTML = '<p>请先选择数据模型</p>';
+                if (canvas) {
+                    const inner = canvas.querySelector('.expr-tree-inner') || canvas;
+                    inner.innerHTML = '<p>请先选择数据模型</p>';
+                }
+                
+                // 清除全局模型ID
+                window.__currentModelId__ = null;
+                window.currentExpressionAst = null;
+                window.__exprTreeUndo__ = [];
+            }
+        });
+    }
+    
     // 表达式语法选择checkbox事件处理
     setupGrammarCheckboxEvents();
     
@@ -461,6 +496,7 @@ function switchTab(tabName) {
     if (tabName === 'expression-tree') {
         console.log('🔍 切换到符号表达式树页面');
         setTimeout(() => {
+            loadDataModelsForExpressionTree();
             renderExpressionTreePage();
         }, 600);
     }
@@ -489,150 +525,112 @@ async function renderExpressionTreePage() {
     if (!perfContainer || !detailedContainer || !formulaContainer || !featureContainer) return;
 
     try {
-        perfContainer.innerHTML = '<p>正在加载模型信息...</p>';
-        detailedContainer.innerHTML = '';
-        formulaContainer.innerHTML = '';
-        featureContainer.innerHTML = '';
-        // 优先使用最新一次回归结果；否则直接从数据库获取最新数据
-        let summary = null;
-        if (window.currentRegressionResult) {
-            // 统一改为：即使有当前回归结果，也从数据库取回归文件，保证与数据库一致
-            try {
-                const modelId = window.currentRegressionResult.data_model_id;
-                if (modelId) {
-                    const regResp = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}/files/regression_model`);
-                    if (regResp.ok) {
-                        const regJson = await regResp.json();
-                        if (regJson && regJson.success && regJson.content) {
-                            const reg = JSON.parse(regJson.content);
-                            summary = {
-                                id: modelId,
-                                data_model_id: modelId,
-                                expression: reg.expression_text || reg.expression || '0',
-                                expression_latex: reg.expression_latex || '',
-                                target_variable: reg.target_variable || 'HDL',
-                                constants: reg.constants || {},
-                                pearson_r_test: reg.detailed_metrics?.pearson_r_test || 0,
-                                pearson_r_training: reg.detailed_metrics?.pearson_r_training || 0,
-                                feature_importance: reg.feature_importance || [],
-                                impact_tree: reg.impact_tree || null,
-                                detailed_metrics: reg.detailed_metrics || {},
-                                created_at: reg.created_at || Date.now()
-                            };
-                            console.log('🔍 构造的 summary 对象（当前回归结果）:', summary);
-                            console.log('🔍 reg.impact_tree（当前回归结果）:', reg.impact_tree);
-                            console.log('✅ 从数据库获取到当前回归结果的模型数据:', modelId);
-                        }
-                    }
-                }
-            } catch (err) {
-                console.error('从数据库加载当前回归结果模型失败:', err);
-            }
-        } else {
-            // 没有当前回归结果，直接从数据库获取最新数据
-            try {
-                const resp = await fetch(`${API_BASE_URL}/api/data-models/models`);
-                if (resp.ok) {
-                    const listJson = await resp.json();
-                    if (listJson && listJson.success && Array.isArray(listJson.models) && listJson.models.length > 0) {
-                        const latest = listJson.models[0];
-                        const modelId = latest.id;
-                        // 直接从数据库获取回归模型文件内容
-                        const regResp = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}/files/regression_model`);
-                        if (regResp.ok) {
-                            const regJson = await regResp.json();
-                            if (regJson && regJson.success && regJson.content) {
-                                const reg = JSON.parse(regJson.content);
-                                // 构造完整的摘要数据
-                                summary = {
-                                    id: modelId,
-                                    data_model_id: modelId,
-                                    expression: reg.expression_text || reg.expression || '0',
-                                    expression_latex: reg.expression_latex || '',
-                                    target_variable: reg.target_variable || 'HDL',
-                                    constants: reg.constants || {},
-                                    pearson_r_test: reg.detailed_metrics?.pearson_r_test || 0,
-                                    pearson_r_training: reg.detailed_metrics?.pearson_r_training || 0,
-                                    feature_importance: reg.feature_importance || [],
-                                    impact_tree: reg.impact_tree || null,
-                                    detailed_metrics: reg.detailed_metrics || {},
-                                    created_at: reg.created_at || Date.now()
-                                };
-                                console.log('🔍 构造的 summary 对象:', summary);
-                                console.log('🔍 reg.impact_tree:', reg.impact_tree);
-                                console.log('✅ 从数据库获取到最新数据:', modelId);
-                            }
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('从数据库获取数据失败:', error);
-            }
-        }
-        // 兜底：如果从数据库没有获取到数据，才使用后端模拟数据
-        if (!summary) {
-            console.warn('⚠️ 数据库中没有找到任何符号回归模型，无法渲染表达式树');
-            showNotification('数据库中没有找到符号回归模型，请先在"符号回归"页面完成一次分析', 'warning');
-            perfContainer.innerHTML = '<p class="text-muted">暂无模型</p>';
-            detailedContainer.innerHTML = '<p class="text-muted">暂无</p>';
-            formulaContainer.innerHTML = '<p class="text-muted">暂无公式</p>';
-            featureContainer.innerHTML = '<p class="text-muted">暂无特征影响力</p>';
+        perfContainer.innerHTML = '<p>请先选择数据模型</p>';
+        detailedContainer.innerHTML = '<p>请先选择数据模型</p>';
+        formulaContainer.innerHTML = '<p>请先选择数据模型</p>';
+        featureContainer.innerHTML = '<p>请先选择数据模型</p>';
+        
+        // 检查是否选择了数据模型
+        const dataModelSelect = document.getElementById('expr-data-model');
+        if (!dataModelSelect || !dataModelSelect.value) {
+            console.log('🌳 未选择数据模型，显示提示信息');
             return;
         }
-        // 确保数据完整性：验证expression字段
-        if (!summary.expression || summary.expression === '0') {
-            console.warn('⚠️ 数据不完整，尝试重新获取');
-            // 如果有模型ID，尝试重新获取数据
-            if (summary.id || summary.data_model_id) {
-                try {
-                    const modelId = summary.id || summary.data_model_id;
-                    const regResp = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}/files/regression_model`);
-                    if (regResp.ok) {
-                        const regJson = await regResp.json();
-                        if (regJson && regJson.success && regJson.content) {
-                            const reg = JSON.parse(regJson.content);
-                            summary.expression = reg.expression_text || reg.expression || summary.expression;
-                            console.log('✅ 重新获取到表达式数据:', summary.expression);
+        
+        const selectedModelId = dataModelSelect.value;
+        console.log('🌳 选择的表达式树数据模型ID:', selectedModelId);
+        
+        // 显示加载状态
+        perfContainer.innerHTML = '<p>正在加载模型信息...</p>';
+        detailedContainer.innerHTML = '<p>正在加载详细指标...</p>';
+        formulaContainer.innerHTML = '<p>正在加载回归表达式...</p>';
+        featureContainer.innerHTML = '<p>正在加载特征影响力...</p>';
+        
+        // 优先使用选择的模型ID，从数据库获取回归文件
+        try {
+            const regResp = await fetch(`${API_BASE_URL}/api/data-models/models/${selectedModelId}/files/regression_model`);
+            if (regResp.ok) {
+                const regJson = await regResp.json();
+                if (regJson && regJson.success && regJson.content) {
+                    const reg = JSON.parse(regJson.content);
+                    const summary = {
+                        id: selectedModelId,
+                        data_model_id: selectedModelId,
+                        expression: reg.expression_text || reg.expression || '0',
+                        expression_latex: reg.expression_latex || '',
+                        target_variable: reg.target_variable || 'HDL',
+                        constants: reg.constants || {},
+                        pearson_r_test: reg.detailed_metrics?.pearson_r_test || 0,
+                        pearson_r_training: reg.detailed_metrics?.pearson_r_training || 0,
+                        feature_importance: reg.feature_importance || [],
+                        impact_tree: reg.impact_tree || null,
+                        detailed_metrics: reg.detailed_metrics || {},
+                        created_at: reg.created_at || Date.now()
+                    };
+                    console.log('🔍 构造的 summary 对象（选择的模型）:', summary);
+                    console.log('🔍 reg.impact_tree（选择的模型）:', reg.impact_tree);
+                    console.log('✅ 从数据库获取到选择的模型数据:', selectedModelId);
+                    
+                    // 显示表达式树摘要
+                    displayExpressionTreeSummary(summary);
+                    
+                    // 设置全局模型ID，供表达式树操作使用
+                    window.__currentModelId__ = selectedModelId;
+                    
+                    // 渲染表达式树
+                    if (summary.expression && summary.expression !== '0') {
+                        try {
+                            const ast = ExprTree.parseExpression(summary.expression);
+                            window.currentExpressionAst = ast;
+                            window.__exprTreeUndo__ = [];
+                            
+                            const canvas = document.getElementById('expression-tree-canvas');
+                            const inner = canvas.querySelector('.expr-tree-inner') || canvas;
+                            inner.innerHTML = '';
+                            
+                            ExprTree.computeWeights(ast, { mode: 'coef' });
+                            const rect = canvas.getBoundingClientRect();
+                            const layoutInfo = ExprTree.layoutTree(ast, Math.max(rect.width, 900), { siblingGap: 24, vGap: 120, drawScale: 1.5 });
+                            const svg = ExprTree.renderSvgTree(inner, ast, { width: layoutInfo.width, config: layoutInfo.config, bounds: layoutInfo.bounds });
+                            wireToolbarActions(inner, () => svg);
+                            
+                            console.log('✅ 表达式树渲染完成');
+                        } catch (error) {
+                            console.error('❌ 表达式树渲染失败:', error);
+                            const canvas = document.getElementById('expression-tree-canvas');
+                            const inner = canvas.querySelector('.expr-tree-inner') || canvas;
+                            inner.innerHTML = '<p>表达式树渲染失败: ' + error.message + '</p>';
                         }
+                    } else {
+                        console.warn('⚠️ 选择的模型没有有效的表达式');
+                        const canvas = document.getElementById('expression-tree-canvas');
+                        const inner = canvas.querySelector('.expr-tree-inner') || canvas;
+                        inner.innerHTML = '<p>选择的模型没有有效的表达式</p>';
                     }
-                } catch (error) {
-                    console.error('重新获取数据失败:', error);
+                    
+                    return;
                 }
             }
+        } catch (err) {
+            console.error('从数据库加载选择的模型失败:', err);
         }
-        // 统一使用数据库中的 MathJax 作为单一真源来驱动 SVG：将 LaTeX 转为中缀
-        if (summary.expression_latex) {
-            const normalized = latexToInfix(summary.expression_latex, summary.constants);
-            if (normalized) summary.expression = normalized;
-        }
-        // 显示摘要信息
-        displayExpressionTreeSummary(summary);
-        // 渲染表达式树
-        try {
-            await renderExpressionTreeSVG(summary);
-        } catch (e) {
-            const canvas = document.getElementById('expression-tree-canvas');
-            if (canvas) canvas.innerHTML = `<p class="text-muted">表达式树渲染失败：${e.message}</p>`;
-        }
-        // 添加自动刷新功能：每5分钟自动刷新一次数据
-        if (window.__exprTreeAutoRefreshTimer__) {
-            clearInterval(window.__exprTreeAutoRefreshTimer__);
-        }
-        window.__exprTreeAutoRefreshTimer__ = setInterval(async () => {
-            console.log('🔄 自动刷新表达式树数据...');
-            try {
-                await renderExpressionTreePage();
-                showNotification('表达式树数据已自动刷新', 'info');
-            } catch (error) {
-                console.error('自动刷新失败:', error);
-            }
-        }, 5 * 60 * 1000); // 5分钟
-    } catch (e) {
-        console.error('表达式树概览加载失败', e);
-        perfContainer.innerHTML = `<p class="text-muted">加载失败：${e.message}</p>`;
-        showNotification('表达式树概览加载失败: ' + e.message, 'error');
+        
+        // 兜底：如果从数据库没有获取到数据，显示错误信息
+        console.warn('⚠️ 无法从选择的模型获取数据');
+        perfContainer.innerHTML = '<p class="text-muted">无法加载模型信息</p>';
+        detailedContainer.innerHTML = '<p class="text-muted">无法加载详细指标</p>';
+        formulaContainer.innerHTML = '<p class="text-muted">无法加载回归表达式</p>';
+        featureContainer.innerHTML = '<p class="text-muted">无法加载特征影响力</p>';
+        
+    } catch (error) {
+        console.error('❌ 渲染表达式树页面失败:', error);
+        perfContainer.innerHTML = '<p class="text-muted">渲染失败</p>';
+        detailedContainer.innerHTML = '<p class="text-muted">渲染失败</p>';
+        formulaContainer.innerHTML = '<p class="text-muted">渲染失败</p>';
+        featureContainer.innerHTML = '<p class="text-muted">渲染失败</p>';
     }
 }
+
 // LaTeX 转中缀表达式（全局复用，保持 SVG 与上方公式同源）
 function latexToInfix(latex, constantsMap) {
   if (!latex || typeof latex !== 'string') return '';
@@ -2584,6 +2582,76 @@ async function loadDataModelsForMonteCarlo() {
     
     if (!dataModelSelect) {
         console.error('找不到数据模型选择框');
+        return;
+    }
+    
+    // 显示加载状态
+    dataModelSelect.innerHTML = '<option value="">正在加载数据模型...</option>';
+    showNotification('正在加载数据模型列表...', 'info');
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/data-models/models`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Username': authManager.currentUser.username
+            }
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || '加载数据模型失败');
+        }
+        
+        console.log('🔍 从API获取到的原始数据模型列表:', result.models);
+        
+        // 过滤出有符号回归模型的数据模型
+        const modelsWithRegression = result.models.filter(model => 
+            model.metadata && model.metadata.has_regression_model
+        );
+        
+        console.log('🔍 过滤后有符号回归模型的数据模型:', modelsWithRegression);
+        
+        // 更新选择框
+        dataModelSelect.innerHTML = '<option value="">请选择数据模型</option>';
+        modelsWithRegression.forEach(model => {
+            const option = document.createElement('option');
+            option.value = model.id;
+            const featureCount = model.feature_columns ? model.feature_columns.length : 0;
+            option.textContent = `${model.name} (${model.target_column}, ${featureCount}个特征)`;
+            dataModelSelect.appendChild(option);
+        });
+        
+        console.log(`✅ 加载了 ${modelsWithRegression.length} 个可用的数据模型`);
+        
+        // 如果没有可用的模型，显示提示
+        if (modelsWithRegression.length === 0) {
+            dataModelSelect.innerHTML = '<option value="">没有可用的数据模型</option>';
+            showNotification('没有找到包含符号回归模型的数据模型，请先进行符号回归分析', 'warning');
+        } else {
+            showNotification(`数据模型列表加载完成，共 ${modelsWithRegression.length} 个可用模型`, 'success');
+        }
+        
+    } catch (error) {
+        console.error('❌ 加载数据模型失败:', error);
+        showNotification('加载数据模型失败: ' + error.message, 'error');
+        dataModelSelect.innerHTML = '<option value="">加载失败</option>';
+    }
+}
+
+// 为表达式树页面加载数据模型列表
+async function loadDataModelsForExpressionTree() {
+    console.log('🌳 为表达式树页面加载数据模型列表...');
+    const dataModelSelect = document.getElementById('expr-data-model');
+    
+    if (!dataModelSelect) {
+        console.error('找不到表达式树数据模型选择框');
         return;
     }
     
