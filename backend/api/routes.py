@@ -29,6 +29,8 @@ DATA_MODELS_DIR = os.path.join(os.path.dirname(__file__), '..', 'data_models')
 CSV_DATA_DIR = os.path.join(os.path.dirname(__file__), '..', 'csv_data')
 MODELS_DIR = os.path.join(os.path.dirname(__file__), '..', 'models')
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), '..', 'results')
+# docs 目录（用于读取初始的特征影响力）
+DOCS_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..', 'docs'))
 
 os.makedirs(DATA_MODELS_DIR, exist_ok=True)
 os.makedirs(CSV_DATA_DIR, exist_ok=True)
@@ -500,6 +502,8 @@ def update_data_model_file(model_id, file_type):
                         reg_content['expression_latex'] = data['expression_latex']
                     if 'expression' in data:
                         reg_content['expression'] = data['expression']
+                    if 'feature_importance' in data and isinstance(data['feature_importance'], list):
+                        reg_content['feature_importance'] = data['feature_importance']
                     if 'updated_at' in data:
                         reg_content['updated_at'] = data['updated_at']
                     
@@ -747,7 +751,7 @@ def update_data_model(model_id):
             model = json.load(f)
         
         # 更新模型数据（允许写入/更新 MathJax 公式）
-        allowed_fields = ['name', 'description', 'status', 'symbolic_regression', 'monte_carlo', 'metadata']
+        allowed_fields = ['name', 'description', 'status', 'symbolic_regression', 'monte_carlo', 'metadata', 'feature_importance']
         for field in allowed_fields:
             if field in data:
                 model[field] = data[field]
@@ -841,14 +845,25 @@ def analyze():
             r"\begin{align*} \nonumber HDL & =  \left(  \left(  \left(  \cfrac{  \left( c_{0}  \cdot\text{HYP} +  \left(  \left(  \left( c_{1}  \cdot\text{QA} + c_{2}  \cdot\text{HYP} \right)  + c_{3}  \cdot\text{CA} \right)  - c_{4} \right)  \right)  \cdot  \left( c_{5} + c_{6}  \cdot\text{MA} \cdot  \left(  \left(  \left( c_{7} + c_{8}  \cdot\text{OA} \right)  + c_{9}  \cdot\text{UA} \right)  + c_{10}  \cdot\text{UA} \right)  \right) }{c_{11}  \cdot\text{VR} }  -  \cfrac{ c_{12}}{c_{13}  \cdot\text{HYP} }  \right)  +  \cfrac{ c_{14}  \cdot\text{VR}}{ \left( c_{15} - c_{16}  \cdot\text{HYP} \right)  }  \right)  \cdot c_{17} + c_{18} \right) \end{align*}"
         )
         
-        # 生成特征重要性
+        # 生成特征影响力：从 docs/Impact.json 读取并固定返回，替代随机生成
         feature_importance = []
-        for i, feature in enumerate(feature_columns):
-            importance = max(0.1, 0.8 - i * 0.2)
-            feature_importance.append({
-                "feature": feature,
-                "importance": round(importance, 3)
-            })
+        try:
+            impact_path = os.path.join(DOCS_DIR, 'Impact.json')
+            with open(impact_path, 'r', encoding='utf-8') as f:
+                impact_map = json.load(f)
+            # 仅输出有值的项，按 JSON 中出现的顺序
+            for name, val in impact_map.items():
+                try:
+                    imp = float(val)
+                except Exception:
+                    continue
+                feature_importance.append({
+                    'feature': name,
+                    'importance': round(imp, 6)
+                })
+        except Exception as e:
+            logger.warning(f"读取 docs/Impact.json 失败，使用空的特征影响力: {e}")
+            feature_importance = []
         
         # 生成预测结果
         predictions = []

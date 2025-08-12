@@ -598,7 +598,7 @@
   ExprTree.formatNumberSci = formatNumberSci;
   
   // =============================
-  // 权重计算与颜色映射（V1）
+  // 影响力计算与颜色映射（V1）
   // =============================
   function computeWeights(root, options = {}) {
     const nodeList = [];
@@ -633,7 +633,7 @@
         return node.weight;
       }
       if (node.op === 'mul') {
-        // const * expr → 放大/缩小权重；多个非常量子树时，简化为常量积 * 非常量权重和
+        // const * expr → 放大/缩小影响力；多个非常量子树时，简化为常量积 * 非常量影响力和
         let constProduct = 1;
         let nonConstChildren = [];
         for (const ch of children) {
@@ -648,7 +648,7 @@
           node.weight = constProduct * (nonConstChildren[0].weight ?? 0);
           return node.weight;
         }
-        // 多个非常量：常量积 * 非常量权重之和（近似）
+        // 多个非常量：常量积 * 非常量影响力之和（近似）
         const sumNonConst = nonConstChildren.reduce((s, ch) => s + (ch.weight ?? 0), 0);
         node.weight = constProduct * sumNonConst;
         return node.weight;
@@ -661,7 +661,7 @@
           node.weight = (numerator ? (numerator.weight ?? 0) : 0) / (denomVal || 1);
           return node.weight;
         }
-        // 简化近似：分子权重 − 分母权重（方向性）
+        // 简化近似：分子影响力 − 分母影响力（方向性）
         node.weight = (numerator ? (numerator.weight ?? 0) : 0) - (denominator ? (denominator.weight ?? 0) : 0);
         return node.weight;
       }
@@ -732,6 +732,31 @@
 
   ExprTree.computeWeights = computeWeights;
   ExprTree.weightToColor = weightToColor;
+
+  // 将整棵树聚合为“特征影响力”列表（V1：按变量系数的绝对值累加并做归一化）
+  function computeFeatureImportance(root) {
+    const totals = new Map();
+    (function walk(n) {
+      if (!n) return;
+      if (n.kind === 'variable') {
+        const coef = (typeof n.coefficient === 'number') ? n.coefficient : 1;
+        const key = String(n.value);
+        const prev = totals.get(key) || 0;
+        totals.set(key, prev + Math.abs(Number(coef)));
+      }
+      (n.children || []).forEach(walk);
+    })(root);
+    const arr = Array.from(totals.entries()).map(([feature, s]) => ({ feature, importance: Number(s) }));
+    const total = arr.reduce((acc, x) => acc + x.importance, 0);
+    if (total > 0) {
+      for (const item of arr) {
+        item.importance = Number((item.importance / total).toFixed(6));
+      }
+    }
+    arr.sort((a, b) => b.importance - a.importance);
+    return arr;
+  }
+  ExprTree.computeFeatureImportance = computeFeatureImportance;
 
   // 运算符显示标签（布局与渲染共享）
   function operatorLabel(op) {
@@ -1119,7 +1144,7 @@
             <div class="expr-tooltip-expr">${exprHtml}</div>
             <div class="expr-tooltip-meta">
               <span class="expr-tooltip-dot" style="background:${dotColor}"></span>
-              <span>权重: ${weightStr}</span>
+              <span>影响力: ${weightStr}</span>
               ${cnHtml}
             </div>
           `;

@@ -522,7 +522,7 @@ async function renderExpressionTreePage() {
             perfContainer.innerHTML = '<p class="text-muted">暂无模型</p>';
             detailedContainer.innerHTML = '<p class="text-muted">暂无</p>';
             formulaContainer.innerHTML = '<p class="text-muted">暂无公式</p>';
-            featureContainer.innerHTML = '<p class="text-muted">暂无特征权重</p>';
+            featureContainer.innerHTML = '<p class="text-muted">暂无特征影响力</p>';
             return;
         }
         // 确保数据完整性：验证expression字段
@@ -669,6 +669,13 @@ function renderExpressionTreeSVG(summary) {
     const layoutInfo = ExprTree.layoutTree(ast, Math.max(rect.width, 900), { siblingGap: 24, vGap: 120, drawScale: 1.5 });
     const svg = ExprTree.renderSvgTree(inner, ast, { width: layoutInfo.width, config: layoutInfo.config, bounds: layoutInfo.bounds });
     wireToolbarActions(inner, () => svg);
+    // 树绘制后，若数据库未提供 feature_importance，则用前端计算并刷新右下卡片
+    try {
+        if (!Array.isArray(summary.feature_importance) || summary.feature_importance.length === 0) {
+            summary.feature_importance = ExprTree.computeFeatureImportance(ast);
+            displayExpressionTreeSummary(summary);
+        }
+    } catch (_) {}
 }
 
 function wireToolbarActions(container, getSvg) {
@@ -718,7 +725,8 @@ function wireToolbarActions(container, getSvg) {
                         symbolic_regression: {
                             expression_latex: expressionStr,
                             updated_at: Date.now()
-                        }
+                        },
+                        feature_importance: ExprTree.computeFeatureImportance(ast)
                     })
                 });
                 
@@ -733,6 +741,7 @@ function wireToolbarActions(container, getSvg) {
                     body: JSON.stringify({
                         expression_latex: expressionStr,
                         expression: expressionStr,
+                        feature_importance: ExprTree.computeFeatureImportance(ast),
                         updated_at: Date.now()
                     })
                 });
@@ -803,7 +812,7 @@ async function fetchExpressionTreeSummary(payload) {
     }
 }
 
-// 渲染左/右区域摘要（公式、性能、详细指标、特征权重）
+// 渲染左/右区域摘要（公式、性能、详细指标、特征影响力）
 function displayExpressionTreeSummary(result) {
     const perfContainer = document.getElementById('expr-performance-container');
     const detailedContainer = document.getElementById('expr-detailed-container');
@@ -901,7 +910,7 @@ function displayExpressionTreeSummary(result) {
         detailedContainer.innerHTML = '<p class="text-muted">无</p>';
     }
 
-    // 右下：特征权重
+    // 右下：特征影响力
     // 构造中文名映射（无外部函数时降级使用英文名）
     const getCn = (name) => {
         try {
@@ -1658,7 +1667,7 @@ function displayRegressionResults(result) {
         </div>
         
         <div class="result-item">
-            <h4>特征权重</h4>
+            <h4>特征影响力</h4>
             <div class="feature-importance">
                 ${result.feature_importance.map(f => `
                     <div class="feature-importance-item">
