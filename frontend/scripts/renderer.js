@@ -467,6 +467,7 @@ async function renderExpressionTreePage() {
                                 r2: reg.r2 || 0,
                                 mse: reg.mse || 0,
                                 feature_importance: reg.feature_importance || [],
+                                node_impacts_tree: reg.node_impacts_tree || null,
                                 detailed_metrics: reg.detailed_metrics || {},
                                 created_at: reg.created_at || Date.now()
                             };
@@ -503,6 +504,7 @@ async function renderExpressionTreePage() {
                                     r2: reg.r2 || 0,
                                     mse: reg.mse || 0,
                                     feature_importance: reg.feature_importance || [],
+                                    node_impacts_tree: reg.node_impacts_tree || null,
                                     detailed_metrics: reg.detailed_metrics || {},
                                     created_at: reg.created_at || Date.now()
                                 };
@@ -664,6 +666,8 @@ function renderExpressionTreeSVG(summary) {
     window.currentExpressionAst = ast;
     window.__exprTreeUndo__ = [];
     window.__currentModelId__ = summary.id || summary.data_model_id;
+    // 提供节点级影响力树给 ExprTree.computeWeights 使用
+    try { window.currentNodeImpactsTree = summary.node_impacts_tree || null; } catch (_) {}
     ExprTree.computeWeights(ast, { mode: 'coef' });
     const rect = canvas.getBoundingClientRect();
     const layoutInfo = ExprTree.layoutTree(ast, Math.max(rect.width, 900), { siblingGap: 24, vGap: 120, drawScale: 1.5 });

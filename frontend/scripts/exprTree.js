@@ -602,19 +602,46 @@
   // =============================
   function computeWeights(root, options = {}) {
     const nodeList = [];
+    // 若全局已提供节点级影响力树（来自数据库/后端），则优先使用该映射覆盖叶子节点影响力
+    let externalImpactTree = null;
+    try {
+      if (typeof window !== 'undefined' && window.currentNodeImpactsTree) {
+        externalImpactTree = window.currentNodeImpactsTree;
+      }
+    } catch (_) {}
+
+    // 将外部树结构拍平为“叶子表达式字符串 → 影响力”的映射
+    const externalMap = new Map();
+    if (externalImpactTree) {
+      (function flatten(obj) {
+        if (!obj || typeof obj !== 'object') return;
+        for (const [k, v] of Object.entries(obj)) {
+          if (v !== null && typeof v === 'object') flatten(v);
+          else externalMap.set(String(k), Number(v) || 0);
+        }
+      })(externalImpactTree);
+    }
 
     function dfs(node) {
       if (!node) return 0;
       nodeList.push(node);
 
       if (node.kind === 'constant') {
-        node.weight = 0;
+        // 叶子常数：若外部映射提供了具体叶子字符串，则覆盖
+        const key = formatLeafLabel(node);
+        if (externalMap.has(key)) node.weight = externalMap.get(key);
+        else node.weight = 0;
         return node.weight;
       }
 
       if (node.kind === 'variable') {
-        const coef = (typeof node.coefficient === 'number') ? node.coefficient : 1;
-        node.weight = coef;
+        const key = formatLeafLabel(node);
+        if (externalMap.has(key)) {
+          node.weight = externalMap.get(key);
+        } else {
+          const coef = (typeof node.coefficient === 'number') ? node.coefficient : 1;
+          node.weight = coef;
+        }
         return node.weight;
       }
 
@@ -641,7 +668,8 @@
           else nonConstChildren.push(ch);
         }
         if (nonConstChildren.length === 0) {
-          node.weight = 0; // 只有常数相乘
+          // 只有常数相乘，若外部映射叶子定义了该常数叶子的值，上面已覆盖；此处整枝为0
+          node.weight = 0;
           return node.weight;
         }
         if (nonConstChildren.length === 1) {
@@ -732,6 +760,20 @@
 
   ExprTree.computeWeights = computeWeights;
   ExprTree.weightToColor = weightToColor;
+
+  // 生成叶子节点显示标签（用于 externalMap 匹配）
+  function formatLeafLabel(n) {
+    if (!n) return '';
+    if (n.kind === 'constant') {
+      return String(formatNumberSci(Number(n.value), 4));
+    }
+    if (n.kind === 'variable') {
+      const coef = (typeof n.coefficient === 'number') ? n.coefficient : 1;
+      if (coef === 1) return String(n.value);
+      return `${formatNumberSci(coef, 4)} * ${n.value}`;
+    }
+    return '';
+  }
 
   // 将整棵树聚合为“特征影响力”列表（V1：按变量系数的绝对值累加并做归一化）
   function computeFeatureImportance(root) {

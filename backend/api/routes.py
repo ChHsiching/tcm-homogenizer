@@ -865,6 +865,15 @@ def analyze():
             logger.warning(f"读取 docs/Impact.json 失败，使用空的特征影响力: {e}")
             feature_importance = []
         
+        # 读取节点级影响力树：docs/tree.json（用于前端渲染节点颜色/影响力）
+        node_impacts_tree = None
+        try:
+            tree_path = os.path.join(DOCS_DIR, 'tree.json')
+            with open(tree_path, 'r', encoding='utf-8') as f:
+                node_impacts_tree = json.load(f)
+        except Exception as e:
+            logger.warning(f"读取 docs/tree.json 失败: {e}")
+
         # 生成预测结果
         predictions = []
         for i, row in enumerate(input_data):  # 处理所有数据行
@@ -927,6 +936,7 @@ def analyze():
             "r2": round(random.uniform(0.7, 0.95), 3),
             "mse": round(random.uniform(0.05, 0.25), 3),
             "feature_importance": feature_importance,
+            "node_impacts_tree": node_impacts_tree,
             "predictions": predictions,
             "training_time": round(random.uniform(3.0, 8.0), 1),
             "model_complexity": len(feature_columns[:min(3, len(feature_columns))]),
@@ -989,6 +999,7 @@ def analyze():
                 'r2': result['r2'],
                 'mse': result['mse'],
                 'feature_importance': result['feature_importance'],
+                'node_impacts_tree': node_impacts_tree,
                 'predictions': result['predictions'],
                 'training_time': result['training_time'],
                 'model_complexity': result['model_complexity'],
