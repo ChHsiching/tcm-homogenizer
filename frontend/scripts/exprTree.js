@@ -602,7 +602,8 @@
   // =============================
   function computeWeights(root, options = {}) {
     const nodeList = [];
-    // 若全局已提供节点级影响力树（来自数据库/后端），则优先使用该映射覆盖叶子节点影响力
+
+    // 若全局提供节点级影响力树（来自数据库/后端），优先用其覆盖叶子影响力
     let externalImpactTree = null;
     try {
       if (typeof window !== 'undefined' && window.currentNodeImpactsTree) {
@@ -627,7 +628,6 @@
       nodeList.push(node);
 
       if (node.kind === 'constant') {
-        // 叶子常数：若外部映射提供了具体叶子字符串，则覆盖
         const key = formatLeafLabel(node);
         if (externalMap.has(key)) node.weight = externalMap.get(key);
         else node.weight = 0;
