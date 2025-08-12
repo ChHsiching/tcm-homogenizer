@@ -1603,8 +1603,8 @@ input[type="checkbox"]:focus {
     border: 1px solid var(--border-color);
 }
 
-/* 仅在表达式树左侧的详细指标中，扩大可用宽度并水平居中 */
-#expr-detailed-container .detailed-metrics {
+/* 表达式树左侧-详细指标：直接让栅格容器居中且更宽 */
+#expr-detailed-container .metrics-grid {
     width: 96%;
     max-width: 980px;
     margin-left: auto;

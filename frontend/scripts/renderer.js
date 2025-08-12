@@ -986,8 +986,7 @@ function displayExpressionTreeSummary(result) {
     // 左侧：详细指标
     if (result.detailed_metrics) {
         detailedContainer.innerHTML = `
-            <div class="detailed-metrics">
-                <div class="metrics-grid">
+            <div class="metrics-grid">
                     <div class="metric-section">
                         <h6>误差指标</h6>
                         <div class="metric-list">
@@ -1011,7 +1010,6 @@ function displayExpressionTreeSummary(result) {
                             <div class="metric-item"><div class="metric-name-container"><span class="metric-name-cn">模型长度</span><span class="metric-name-en">Model Length</span></div><span class="metric-value">${detailed.model_length}</span></div>
                         </div>
                     </div>
-                </div>
             </div>
         `;
     } else {
