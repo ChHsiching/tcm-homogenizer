@@ -455,8 +455,8 @@ async function renderExpressionTreePage() {
                     const regResp = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}/files/regression_model`);
                     if (regResp.ok) {
                         const regJson = await regResp.json();
-            if (regJson && regJson.success && regJson.content) {
-                const reg = JSON.parse(regJson.content);
+                        if (regJson && regJson.success && regJson.content) {
+                            const reg = JSON.parse(regJson.content);
                             summary = {
                                 id: modelId,
                                 data_model_id: modelId,
@@ -467,10 +467,12 @@ async function renderExpressionTreePage() {
                                 r2: reg.r2 || 0,
                                 mse: reg.mse || 0,
                                 feature_importance: reg.feature_importance || [],
+                                impact_tree: reg.impact_tree || null,
                                 detailed_metrics: reg.detailed_metrics || {},
-                    created_at: reg.created_at || Date.now(),
-                    node_impacts_tree: reg.node_impacts_tree || null
+                                created_at: reg.created_at || Date.now()
                             };
+                            console.log('🔍 构造的 summary 对象（当前回归结果）:', summary);
+                            console.log('🔍 reg.impact_tree（当前回归结果）:', reg.impact_tree);
                             console.log('✅ 从数据库获取到当前回归结果的模型数据:', modelId);
                         }
                     }
@@ -504,10 +506,12 @@ async function renderExpressionTreePage() {
                                     r2: reg.r2 || 0,
                                     mse: reg.mse || 0,
                                     feature_importance: reg.feature_importance || [],
+                                    impact_tree: reg.impact_tree || null,
                                     detailed_metrics: reg.detailed_metrics || {},
-                                    created_at: reg.created_at || Date.now(),
-                                    node_impacts_tree: reg.node_impacts_tree || null
+                                    created_at: reg.created_at || Date.now()
                                 };
+                                console.log('🔍 构造的 summary 对象:', summary);
+                                console.log('🔍 reg.impact_tree:', reg.impact_tree);
                                 console.log('✅ 从数据库获取到最新数据:', modelId);
                             }
                         }
@@ -557,7 +561,7 @@ async function renderExpressionTreePage() {
         displayExpressionTreeSummary(summary);
         // 渲染表达式树
         try {
-            renderExpressionTreeSVG(summary);
+            await renderExpressionTreeSVG(summary);
         } catch (e) {
             const canvas = document.getElementById('expression-tree-canvas');
             if (canvas) canvas.innerHTML = `<p class="text-muted">表达式树渲染失败：${e.message}</p>`;
@@ -652,12 +656,36 @@ function latexToInfix(latex, constantsMap) {
   return s;
 }
 
-function renderExpressionTreeSVG(summary) {
+async function renderExpressionTreeSVG(summary) {
     const canvas = document.getElementById('expression-tree-canvas');
     if (!canvas) return;
     const inner = canvas.querySelector('.expr-tree-inner') || canvas;
     const expression = (summary && summary.expression) || '0';
     inner.innerHTML = '';
+    
+    // 调试信息：显示summary对象的内容
+    console.log('🔍 renderExpressionTreeSVG 接收到的 summary:', summary);
+    console.log('🔍 summary.impact_tree:', summary?.impact_tree);
+    
+    // 使用后端返回的 impact_tree 作为唯一来源（不再从 /docs 读取）
+    try {
+        if (summary && summary.impact_tree) {
+            window.TREE_IMPACT_DATA = summary.impact_tree;
+            console.log('✅ 已从回归模型数据加载影响力数据 (impact_tree)');
+            console.log('🔍 完整的 impact_tree 数据结构:', JSON.stringify(summary.impact_tree, null, 2));
+            console.log('🔍 impact_tree 的键:', Object.keys(summary.impact_tree));
+        } else {
+            // 若本次摘要未包含，则保留内存中的旧值，避免置空导致白色
+            if (!window.TREE_IMPACT_DATA) {
+                console.warn('⚠️ 本次摘要未包含 impact_tree 且内存无缓存，无法着色');
+            } else {
+                console.log('ℹ️ 本次摘要未包含 impact_tree，沿用内存中的影响力数据');
+            }
+        }
+    } catch (error) {
+        console.warn('⚠️ 影响力数据装载失败:', error);
+    }
+    
     try {
         const exprPreview = String(expression).slice(0, 120);
         console.log('[ExprTree] 使用表达式（已规范化）来源:', summary?.id || summary?.data_model_id || 'unknown', '| 预览:', exprPreview);
@@ -666,13 +694,6 @@ function renderExpressionTreeSVG(summary) {
     window.currentExpressionAst = ast;
     window.__exprTreeUndo__ = [];
     window.__currentModelId__ = summary.id || summary.data_model_id;
-    // 如果后端提供了节点级影响力树，挂到全局供 computeWeights 使用
-    try {
-        if (summary && summary.node_impacts_tree) {
-            window.currentNodeImpactsTree = summary.node_impacts_tree;
-        }
-    } catch (_) {}
-
     ExprTree.computeWeights(ast, { mode: 'coef' });
     const rect = canvas.getBoundingClientRect();
     const layoutInfo = ExprTree.layoutTree(ast, Math.max(rect.width, 900), { siblingGap: 24, vGap: 120, drawScale: 1.5 });
@@ -733,6 +754,7 @@ function wireToolbarActions(container, getSvg) {
                     body: JSON.stringify({
                         symbolic_regression: {
                             expression_latex: expressionStr,
+                            impact_tree: window.TREE_IMPACT_DATA,
                             updated_at: Date.now()
                         },
                         feature_importance: ExprTree.computeFeatureImportance(ast)
@@ -751,6 +773,7 @@ function wireToolbarActions(container, getSvg) {
                         expression_latex: expressionStr,
                         expression: expressionStr,
                         feature_importance: ExprTree.computeFeatureImportance(ast),
+                        impact_tree: window.TREE_IMPACT_DATA,
                         updated_at: Date.now()
                     })
                 });

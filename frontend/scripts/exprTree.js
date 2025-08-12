@@ -598,38 +598,225 @@
   ExprTree.formatNumberSci = formatNumberSci;
   
   // =============================
-  // 影响力计算与颜色映射（V1）
+  // 影响力计算与颜色映射（V3：直接读取tree.json并注入到树结构）
   // =============================
+  // 将tree.json的影响力数据直接注入到AST树结构中
+  function injectImpactData(root, impactTree) {
+    if (!root || !impactTree) return root;
+    
+    console.log('🔍 开始注入影响力数据到树结构');
+    console.log('🔍 影响力数据结构:', impactTree);
+    console.log('🔍 影响力数据结构键:', Object.keys(impactTree));
+    
+    // 运算符映射：AST op → tree.json 键
+    const opMapping = {
+      add: 'Addition',
+      sub: 'Subtraction',
+      mul: 'Multiplication',
+      div: 'Division',
+    };
+
+    // 生成数值字符串候选（用于对齐 tree.json 的小数位与截断）
+    function generateNumberCandidates(num) {
+      const candidates = new Set();
+      try {
+        const raw = String(num);
+        const fixed4 = Number(num).toFixed(4);
+        const fixed5 = Number(num).toFixed(5);
+        const trunc4 = (Math.sign(num) * Math.floor(Math.abs(num) * 1e4) / 1e4).toFixed(4);
+        const strip = (s) => s.replace(/\.0+$/, '').replace(/(\.[0-9]*?)0+$/, '$1');
+        [raw, fixed4, fixed5, trunc4, strip(fixed4), strip(fixed5), strip(trunc4)].forEach(v => candidates.add(v));
+      } catch (_) {
+        candidates.add(String(num));
+      }
+      return Array.from(candidates);
+    }
+
+    // 递归遍历树结构，根据位置注入影响力
+    function injectNode(node, impactPath, depth = 0) {
+      if (!node) return;
+      
+      const indent = '  '.repeat(depth);
+      console.log(`${indent}🔍 处理节点: ${node.kind} ${node.op || ''} ${node.value || ''}`);
+      
+      // 小工具
+      const operatorKeys = ['Addition','Subtraction','Multiplication','Division'];
+      const hasOwn = (obj, k) => Object.prototype.hasOwnProperty.call(obj || {}, k);
+      const listOpKeys = (obj) => Object.keys(obj || {}).filter(k => operatorKeys.includes(k));
+      const findUniqueOpChildForOp = (obj, targetOpKey) => {
+        const candidates = [];
+        for (const k of listOpKeys(obj)) {
+          const sub = obj[k];
+          if (sub && typeof sub === 'object' && hasOwn(sub, targetOpKey)) {
+            candidates.push(sub[targetOpKey]);
+          }
+        }
+        return candidates.length === 1 ? candidates[0] : null;
+      };
+      const findUniqueOpChildForLeaf = (obj, leafKeys) => {
+        const candidates = [];
+        for (const k of listOpKeys(obj)) {
+          const sub = obj[k];
+          if (!sub || typeof sub !== 'object') continue;
+          for (const key of leafKeys) {
+            if (hasOwn(sub, key)) { candidates.push(sub); break; }
+          }
+        }
+        return candidates.length === 1 ? candidates[0] : null;
+      };
+      const anyKeyIn = (obj, keys) => keys.some(key => hasOwn(obj, key));
+      
+      if (node.kind === 'constant') {
+        // 常数节点：尝试多种格式匹配（四舍五入/截断/去零）
+        let matched = null;
+        if (impactPath && typeof impactPath === 'object') {
+          const keys = generateNumberCandidates(node.value);
+          for (const key of keys) {
+            if (hasOwn(impactPath, key) && typeof impactPath[key] === 'number') {
+              matched = impactPath[key];
+              console.log(`${indent}✅ 注入常数影响力: ${key} = ${matched}`);
+              break;
+            }
+          }
+          if (matched === null) {
+            // 尝试在下一跳的唯一运算符子树中匹配
+            const sub = findUniqueOpChildForLeaf(impactPath, generateNumberCandidates(node.value));
+            if (sub) {
+              for (const key of generateNumberCandidates(node.value)) {
+                if (hasOwn(sub, key) && typeof sub[key] === 'number') { matched = sub[key]; break; }
+              }
+              if (matched !== null) console.log(`${indent}✅ 下钻一跳匹配常数: ${matched}`);
+            }
+          }
+        }
+        node.weight = Number(matched || 0);
+        return;
+      }
+      
+      if (node.kind === 'variable') {
+        // 变量节点：查找 "系数 * 变量名" 或 "系数*变量名"，含多种系数候选
+        const coefNum = (typeof node.coefficient === 'number') ? node.coefficient : 1;
+        const varName = String(node.value);
+        let matched = null;
+        if (impactPath && typeof impactPath === 'object') {
+          const coefCandidates = generateNumberCandidates(coefNum);
+          const leafKeys = [];
+          for (const c of coefCandidates) { leafKeys.push(`${c} * ${varName}`); leafKeys.push(`${c}*${varName}`); }
+          // 先在当前层匹配
+          for (const k of leafKeys) {
+            if (hasOwn(impactPath, k) && typeof impactPath[k] === 'number') { matched = impactPath[k]; console.log(`${indent}✅ 注入变量影响力: ${k} = ${matched}`); break; }
+          }
+          // 当前层没命中，尝试下一跳唯一运算符子树
+          if (matched === null) {
+            const sub = findUniqueOpChildForLeaf(impactPath, leafKeys);
+            if (sub) {
+              for (const k of leafKeys) { if (hasOwn(sub, k) && typeof sub[k] === 'number') { matched = sub[k]; break; } }
+              if (matched !== null) console.log(`${indent}✅ 下钻一跳匹配变量: ${matched}`);
+            }
+          }
+        }
+        if (matched === null) {
+          console.log(`${indent}⚠️ 变量影响力未找到: ${coefNum} * ${varName}，设为0`);
+        }
+        node.weight = Number(matched || 0);
+        return;
+      }
+      
+      // 运算符节点：递归处理子节点，然后计算聚合影响力
+      if (node.children && node.children.length > 0) {
+        const opKey = opMapping[node.op];
+        let currentPath = impactPath;
+        console.log(`${indent}🔍 运算符 ${node.op} 映射到键: ${opKey}`);
+        console.log(`${indent}🔍 当前路径键:`, Object.keys(impactPath || {}));
+
+        // 根层：直接按键下钻
+        if (depth === 0 && impactPath && typeof impactPath === 'object' && opKey && hasOwn(impactPath, opKey)) {
+          currentPath = impactPath[opKey];
+          console.log(`${indent}✅ 根层下钻到 ${opKey}，新路径键:`, Object.keys(currentPath || {}));
+        } else if (depth === 0) {
+          console.log(`${indent}⚠️ 根层未找到键 ${opKey}，保持当前路径`);
+        } else {
+          console.log(`${indent}ℹ️ 非根层不按键下钻，沿用父层已选路径`);
+        }
+
+        // 可用的运算符子键
+        const availableOpKeys = listOpKeys(currentPath);
+        console.log(`${indent}🔍 当前层可用运算符键:`, availableOpKeys);
+
+        let totalWeight = 0;
+        for (const child of node.children) {
+          let nextImpactPath = currentPath;
+          if (child.kind === 'operator') {
+            const want = opMapping[child.op];
+            if (nextImpactPath && typeof nextImpactPath === 'object' && want && hasOwn(nextImpactPath, want)) {
+              nextImpactPath = nextImpactPath[want];
+            } else {
+              // 兼容“本层先进入某个运算符分支，再在该分支内才出现子节点的运算符键”的结构
+              const bridged = findUniqueOpChildForOp(nextImpactPath, want);
+              if (bridged) nextImpactPath = bridged;
+              else if (availableOpKeys.length === 1) nextImpactPath = nextImpactPath[availableOpKeys[0]];
+            }
+          } else {
+            // 叶子：若本层没有该叶子键，尝试下一跳唯一运算符子树
+            if (child.kind === 'variable') {
+              const coefNum = (typeof child.coefficient === 'number') ? child.coefficient : 1;
+              const varName = String(child.value);
+              const leafKeys = [];
+              for (const c of generateNumberCandidates(coefNum)) { leafKeys.push(`${c} * ${varName}`); leafKeys.push(`${c}*${varName}`); }
+              if (!(nextImpactPath && anyKeyIn(nextImpactPath, leafKeys))) {
+                const sub = findUniqueOpChildForLeaf(nextImpactPath, leafKeys);
+                if (sub) nextImpactPath = sub;
+              }
+            } else if (child.kind === 'constant') {
+              const leafKeys = generateNumberCandidates(child.value);
+              if (!(nextImpactPath && anyKeyIn(nextImpactPath, leafKeys))) {
+                const sub = findUniqueOpChildForLeaf(nextImpactPath, leafKeys);
+                if (sub) nextImpactPath = sub;
+              }
+            }
+          }
+          injectNode(child, nextImpactPath, depth + 1);
+          totalWeight += child.weight || 0;
+        }
+        node.weight = totalWeight;
+        console.log(`${indent}✅ 计算运算符影响力: ${node.op} = ${totalWeight}`);
+      }
+    }
+    
+    // 开始注入
+    injectNode(root, impactTree);
+    return root;
+  }
+  
   function computeWeights(root, options = {}) {
     const nodeList = [];
+    let impactTree = null;
 
-    // 若提供了节点级影响力树（docs/tree.json 的结构），使用它来覆盖叶子节点的影响力
-    const externalMap = buildLeafImpactMapFromTree(GLOBAL.currentNodeImpactsTree);
+    // 尝试从全局获取tree.json影响力数据
+    try {
+      if (typeof window !== 'undefined' && window.TREE_IMPACT_DATA) {
+        impactTree = window.TREE_IMPACT_DATA;
+      }
+    } catch (_) {}
+
+    // 如果有影响力数据，直接注入到树结构中
+    if (impactTree) {
+      injectImpactData(root, impactTree);
+    }
 
     function dfs(node) {
       if (!node) return 0;
       nodeList.push(node);
 
       if (node.kind === 'constant') {
-        // 常数叶子优先使用外部映射（若存在精确匹配的格式化文本）
-        const key = formatLeafKey(node);
-        if (externalMap && externalMap.has(key)) {
-          node.weight = externalMap.get(key);
-        } else {
-          node.weight = 0;
-        }
+        // 影响力已经在injectImpactData中设置
+        if (node.weight === undefined) node.weight = 0;
         return node.weight;
       }
 
       if (node.kind === 'variable') {
-        // 变量叶子优先使用外部映射；否则按系数估计
-        const key = formatLeafKey(node);
-        if (externalMap && externalMap.has(key)) {
-          node.weight = externalMap.get(key);
-        } else {
-          const coef = (typeof node.coefficient === 'number') ? node.coefficient : 1;
-          node.weight = coef;
-        }
+        // 影响力已经在injectImpactData中设置
+        if (node.weight === undefined) node.weight = 0;
         return node.weight;
       }
 
@@ -637,51 +824,16 @@
       const children = node.children || [];
       const childWeights = children.map(ch => dfs(ch));
 
-      if (node.op === 'add') {
-        node.weight = childWeights.reduce((a, b) => a + b, 0);
-        return node.weight;
-      }
-      if (node.op === 'sub') {
-        if (childWeights.length === 0) { node.weight = 0; return node.weight; }
-        if (childWeights.length === 1) { node.weight = childWeights[0]; return node.weight; }
-        node.weight = childWeights[0] - childWeights[1];
-        return node.weight;
-      }
-      if (node.op === 'mul') {
-        // const * expr → 放大/缩小影响力；多个非常量子树时，简化为常量积 * 非常量影响力和
-        let constProduct = 1;
-        let nonConstChildren = [];
-        for (const ch of children) {
-          if (ch.kind === 'constant') constProduct *= Number(ch.value);
-          else nonConstChildren.push(ch);
+      // 约定：父节点影响力为子节点影响力之和
+      if (node.op === 'add' || node.op === 'sub' || node.op === 'mul' || node.op === 'div') {
+        // 影响力已经在injectImpactData中设置
+        if (node.weight === undefined) {
+          node.weight = childWeights.reduce((a, b) => a + b, 0);
         }
-        if (nonConstChildren.length === 0) {
-          node.weight = 0; // 只有常数相乘
-          return node.weight;
-        }
-        if (nonConstChildren.length === 1) {
-          node.weight = constProduct * (nonConstChildren[0].weight ?? 0);
-          return node.weight;
-        }
-        // 多个非常量：常量积 * 非常量影响力之和（近似）
-        const sumNonConst = nonConstChildren.reduce((s, ch) => s + (ch.weight ?? 0), 0);
-        node.weight = constProduct * sumNonConst;
-        return node.weight;
-      }
-      if (node.op === 'div') {
-        const [numerator, denominator] = children;
-        const denomIsConstOnly = denominator && isConstOnlySubtree(denominator);
-        if (denomIsConstOnly) {
-          const denomVal = evalConstSubtree(denominator);
-          node.weight = (numerator ? (numerator.weight ?? 0) : 0) / (denomVal || 1);
-          return node.weight;
-        }
-        // 简化近似：分子影响力 − 分母影响力（方向性）
-        node.weight = (numerator ? (numerator.weight ?? 0) : 0) - (denominator ? (denominator.weight ?? 0) : 0);
         return node.weight;
       }
 
-      node.weight = 0;
+      if (node.weight === undefined) node.weight = 0;
       return node.weight;
     }
 
@@ -716,20 +868,6 @@
     return { scale, nodes: nodeList };
   }
 
-  // 将 docs/tree.json 的嵌套对象拍平成 叶子表达式文本 → 影响力 的 Map
-  function buildLeafImpactMapFromTree(treeObj) {
-    if (!treeObj || typeof treeObj !== 'object') return null;
-    const map = new Map();
-    (function walk(obj) {
-      if (!obj || typeof obj !== 'object') return;
-      for (const [k, v] of Object.entries(obj)) {
-        if (v !== null && typeof v === 'object') walk(v);
-        else map.set(String(k), Number(v) || 0);
-      }
-    })(treeObj);
-    return map;
-  }
-
   function quantile(arr, q) {
     if (!arr || arr.length === 0) return 0;
     const a = [...arr].sort((x, y) => x - y);
@@ -762,16 +900,26 @@
   ExprTree.computeWeights = computeWeights;
   ExprTree.weightToColor = weightToColor;
 
-  // 将整棵树聚合为“特征影响力”列表（V1：按变量系数的绝对值累加并做归一化）
+  // 运算符显示标签（布局与渲染共享）
+  function operatorLabel(op) {
+    return op === 'add' ? 'Addition'
+      : op === 'sub' ? 'Subtraction'
+      : op === 'mul' ? 'Multiplication'
+      : op === 'div' ? 'Division'
+      : String(op || '?');
+  }
+
+  // 将整棵树聚合为“特征影响力”列表（V2：使用真实影响力数据）
   function computeFeatureImportance(root) {
     const totals = new Map();
     (function walk(n) {
       if (!n) return;
       if (n.kind === 'variable') {
-        const coef = (typeof n.coefficient === 'number') ? n.coefficient : 1;
+        // 使用节点上已计算的真实影响力值
+        const weight = n.weight || 0;
         const key = String(n.value);
         const prev = totals.get(key) || 0;
-        totals.set(key, prev + Math.abs(Number(coef)));
+        totals.set(key, prev + Math.abs(weight));
       }
       (n.children || []).forEach(walk);
     })(root);
@@ -786,29 +934,6 @@
     return arr;
   }
   ExprTree.computeFeatureImportance = computeFeatureImportance;
-  // 生成叶子表达式的匹配键：与 docs/tree.json 的叶子键一致
-  function formatLeafKey(n) {
-    if (!n) return '';
-    if (n.kind === 'constant') {
-      // docs/tree.json 中常数多以固定小数位，例如 "-10.458" 或 "0.0054"
-      return String(formatNumberSci(Number(n.value), 4));
-    }
-    if (n.kind === 'variable') {
-      const coef = (typeof n.coefficient === 'number') ? n.coefficient : 1;
-      if (coef === 1) return String(n.value);
-      return `${formatNumberSci(coef, 4)} * ${n.value}`;
-    }
-    return '';
-  }
-
-  // 运算符显示标签（布局与渲染共享）
-  function operatorLabel(op) {
-    return op === 'add' ? 'Addition'
-      : op === 'sub' ? 'Subtraction'
-      : op === 'mul' ? 'Multiplication'
-      : op === 'div' ? 'Division'
-      : String(op || '?');
-  }
 
   // =============================
   // 简化树布局（自顶向下）

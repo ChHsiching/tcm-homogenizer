@@ -130,6 +130,7 @@ def expression_tree_summary():
                         'r2': (reg_json or {}).get('r2') or model.get('metadata', {}).get('r2_score', 0.85),
                         'mse': (reg_json or {}).get('mse') or model.get('metadata', {}).get('mse_score', 0.12),
                         'feature_importance': (reg_json or {}).get('feature_importance') or model.get('feature_importance') or [],
+                        'impact_tree': (reg_json or {}).get('impact_tree') or model.get('symbolic_regression', {}).get('impact_tree') or None,
                         'detailed_metrics': (reg_json or {}).get('detailed_metrics') or model.get('detailed_metrics') or {
                             "average_relative_error_test": 12.3,
                             "average_relative_error_training": 10.8,
@@ -195,6 +196,63 @@ def expression_tree_summary():
                     {'feature': 'UA', 'importance': 0.45},
                     {'feature': 'MA', 'importance': 0.4},
                 ],
+                'impact_tree': {
+                    "Addition": {
+                        "Multiplication": {
+                            "Addition": {
+                                "Subtraction": {
+                                    "Division": {
+                                        "Multiplication": {
+                                            "Addition": {
+                                                "1.9105 * HYP": 0.0157069022188682,
+                                                "Subtraction": {
+                                                    "Addition": {
+                                                        "Addition": {
+                                                            "0.6015 * QA": 0.011758459632117,
+                                                            "0.4274 * HYP": 0.00120390671170711
+                                                        },
+                                                        "1.2977 * CA": 0.113928459255378
+                                                    },
+                                                    "-10.458": 0
+                                                }
+                                            },
+                                            "Addition": {
+                                                "-1.9323": 0,
+                                                "Multiplication": {
+                                                    "-0.0781 * MA": 0.108972688038807,
+                                                    "Addition": {
+                                                        "Addition": {
+                                                            "Addition": {
+                                                                "-1.9323": 0,
+                                                                "1.4812 * OA": 0.00688842480665608
+                                                            },
+                                                            "0.5974 * UA": 0.0111402882791509
+                                                        },
+                                                        "0.6078 * UA": 0.0120783966067667
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "2.9628 * VR": 0.279624923755846
+                                    },
+                                    "Division": {
+                                        "2.6756": 0,
+                                        "0.4083 * HYP": 0.0763517896756712
+                                    }
+                                },
+                                "Division": {
+                                    "1.2192 * VR": 0.0208902884673905,
+                                    "Subtraction": {
+                                        "5.4189": 0,
+                                        "1.9105 * HYP": 0.21010236004585
+                                    }
+                                }
+                            },
+                            "0.0054": 0
+                        },
+                        "0.9305": 0
+                    }
+                },
                 'detailed_metrics': {
                     "average_relative_error_test": 12.3,
                     "average_relative_error_training": 10.8,
@@ -661,7 +719,7 @@ def import_models_zip():
         with zipfile.ZipFile(in_mem, 'r') as zf:
             imported = process_zip(zf)
             if imported == 0:
-                # 兼容“总ZIP内嵌子ZIP”的情况
+                # 兼容"总ZIP内嵌子ZIP"的情况
                 for n in zf.namelist():
                     if n.lower().endswith('.zip'):
                         try:
@@ -865,6 +923,84 @@ def analyze():
             logger.warning(f"读取 docs/Impact.json 失败，使用空的特征影响力: {e}")
             feature_importance = []
         
+        # 生成节点影响力数据（写死到代码中，对应树结构）
+        # 注意：从上到下对应树分叉从左到右，同名节点不是同一个，要根据位置分配重要性
+        # 使用逐步构建的方法，避免语法错误
+        impact_tree = {}
+        
+        # 第一步：创建根节点
+        impact_tree["Addition"] = {}
+        
+        # 第二步：添加第二层
+        impact_tree["Addition"]["Multiplication"] = {}
+        
+        # 第三步：添加第三层
+        impact_tree["Addition"]["Multiplication"]["Addition"] = {}
+        
+        # 第四步：添加第四层
+        impact_tree["Addition"]["Multiplication"]["Addition"]["Subtraction"] = {}
+        
+        # 第五步：添加第五层
+        impact_tree["Addition"]["Multiplication"]["Addition"]["Subtraction"]["Division"] = {}
+        
+        # 第六步：添加第六层 - 这是缺失的关键层
+        impact_tree["Addition"]["Multiplication"]["Addition"]["Subtraction"]["Division"]["Multiplication"] = {}
+        
+        # 第七步：添加左侧子树
+        impact_tree["Addition"]["Multiplication"]["Addition"]["Subtraction"]["Division"]["Multiplication"]["Addition"] = {
+            "1.9105 * HYP": 0.0157069022188682,
+            "Subtraction": {
+                "Addition": {
+                    "Addition": {
+                        "0.6015 * QA": 0.011758459632117,
+                        "0.4274 * HYP": 0.00120390671170711
+                    },
+                    "1.2977 * CA": 0.113928459255378
+                },
+                "-10.458": 0
+            }
+        }
+        
+        # 第八步：添加右侧子树
+        impact_tree["Addition"]["Multiplication"]["Addition"]["Subtraction"]["Division"]["Multiplication"]["Addition"]["Addition"] = {
+            "-1.9323": 0,
+            "Multiplication": {
+                "-0.0781 * MA": 0.108972688038807,
+                "Addition": {
+                    "Addition": {
+                        "Addition": {
+                            "-1.9323": 0,
+                            "1.4812 * OA": 0.00688842480665608
+                        },
+                        "0.5974 * UA": 0.0111402882791509
+                    },
+                    "0.6078 * UA": 0.0120783966067667
+                }
+            }
+        }
+        
+        # 第九步：添加VR节点
+        impact_tree["Addition"]["Multiplication"]["Addition"]["Subtraction"]["Division"]["2.9628 * VR"] = 0.279624923755846
+        
+        # 第十步：添加其他Division节点
+        impact_tree["Addition"]["Multiplication"]["Addition"]["Subtraction"]["Division"]["Division"] = {
+            "2.6756": 0,
+            "0.4083 * HYP": 0.0763517896756712
+        }
+        
+        # 第十一步：添加其他Division节点
+        impact_tree["Addition"]["Multiplication"]["Addition"]["Division"] = {
+            "1.2192 * VR": 0.0208902884673905,
+            "Subtraction": {
+                "5.4189": 0,
+                "1.9105 * HYP": 0.21010236004585
+            }
+        }
+        
+        # 最后：添加常数节点
+        impact_tree["Addition"]["Multiplication"]["0.0054"] = 0
+        impact_tree["Addition"]["0.9305"] = 0
+        
         # 生成预测结果
         predictions = []
         for i, row in enumerate(input_data):  # 处理所有数据行
@@ -927,6 +1063,7 @@ def analyze():
             "r2": round(random.uniform(0.7, 0.95), 3),
             "mse": round(random.uniform(0.05, 0.25), 3),
             "feature_importance": feature_importance,
+            "impact_tree": impact_tree,
             "predictions": predictions,
             "training_time": round(random.uniform(3.0, 8.0), 1),
             "model_complexity": len(feature_columns[:min(3, len(feature_columns))]),
@@ -989,8 +1126,7 @@ def analyze():
                 'r2': result['r2'],
                 'mse': result['mse'],
                 'feature_importance': result['feature_importance'],
-                # 可选：把节点级影响力树写进回归文件，供前端读用
-                # 'node_impacts_tree': node_impacts_tree,
+                'impact_tree': result['impact_tree'],
                 'predictions': result['predictions'],
                 'training_time': result['training_time'],
                 'model_complexity': result['model_complexity'],
@@ -1034,6 +1170,11 @@ def analyze():
                 'created_at': time.time(),
                 'updated_at': time.time(),
                 'status': 'active',
+                'symbolic_regression': {
+                    'expression_latex': _to_latex(expression, target_column or 'Y'),
+                    'feature_importance': result['feature_importance'],
+                    'impact_tree': result['impact_tree']
+                },
                 'analysis_params': {
                     'population_size': population_size,
                     'generations': generations,
@@ -1090,20 +1231,6 @@ def analyze():
             'message': str(e),
             'details': traceback.format_exc()
         }), 500
-
-@symbolic_regression_bp.route('/node-impacts-tree', methods=['GET'])
-def get_node_impacts_tree():
-    """返回 docs/tree.json 的节点级影响力树（用于前端渲染表达式树节点影响力）。"""
-    try:
-        tree_path = os.path.join(DOCS_DIR, 'tree.json')
-        if not os.path.exists(tree_path):
-            return jsonify({'success': False, 'error': 'tree.json 不存在'}), 404
-        with open(tree_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        return jsonify({'success': True, 'tree': data})
-    except Exception as e:
-        logger.error(f"读取节点影响力树失败: {e}")
-        return jsonify({'success': False, 'error': '读取节点影响力树失败', 'message': str(e)}), 500
 
 def _generate_model_name(target_column, feature_columns, data_source=None, analysis_type="符号回归", model_id=None):
     """生成有区分度的模型名称"""
