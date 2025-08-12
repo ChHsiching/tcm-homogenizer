@@ -1541,10 +1541,42 @@
       // 初始化全局计数
       if (typeof window.__exprOpCount__ !== 'number') window.__exprOpCount__ = 0;
 
+      // 统一按钮主题：根据按钮ID设定颜色（红/蓝/绿/黄），保持项目主题风格
+      function getButtonTheme(id) {
+        switch (id) {
+          case 'btn-delete': // 红色
+            return {
+              start: '#ef4444', end: '#f87171',
+              shadow: 'rgba(239,68,68,0.30)', hoverShadow: 'rgba(239,68,68,0.40)'
+            };
+          case 'btn-simplify': // 绿色
+            return {
+              start: '#10b981', end: '#34d399',
+              shadow: 'rgba(16,185,129,0.30)', hoverShadow: 'rgba(16,185,129,0.40)'
+            };
+          case 'btn-optimize': // 蓝色（采用全局主题色）
+            return {
+              start: 'var(--accent-primary)', end: 'var(--accent-secondary)',
+              shadow: 'rgba(74,158,255,0.30)', hoverShadow: 'rgba(74,158,255,0.40)'
+            };
+          case 'btn-undo': // 黄色
+            return {
+              start: '#f59e0b', end: '#fbbf24',
+              shadow: 'rgba(245,158,11,0.30)', hoverShadow: 'rgba(245,158,11,0.40)'
+            };
+          default:
+            return {
+              start: 'var(--accent-primary)', end: 'var(--accent-secondary)',
+              shadow: 'rgba(74,158,255,0.30)', hoverShadow: 'rgba(74,158,255,0.40)'
+            };
+        }
+      }
+
       const buildButton = (b) => {
         const el = document.createElement('button');
         el.textContent = b.text;
-        el.style.background = 'linear-gradient(135deg, rgba(74,158,255,1) 0%, rgba(107,182,255,1) 100%)';
+        const theme = getButtonTheme(b.id);
+        el.style.background = `linear-gradient(135deg, ${theme.start} 0%, ${theme.end} 100%)`;
         el.style.border = 'none';
         el.style.color = '#fff';
         el.style.padding = '10px 18px';
@@ -1552,10 +1584,10 @@
         el.style.cursor = 'pointer';
         el.style.fontWeight = '600';
         el.style.fontSize = '14px';
-        el.style.boxShadow = '0 4px 12px rgba(74,158,255,0.3)';
+        el.style.boxShadow = `0 4px 12px ${theme.shadow}`;
         el.style.transition = 'all 0.2s ease';
-        el.onmouseenter = () => { el.style.transform = 'translateY(-2px)'; el.style.boxShadow = '0 6px 16px rgba(74,158,255,0.4)'; };
-        el.onmouseleave = () => { el.style.transform = 'translateY(0)'; el.style.boxShadow = '0 4px 12px rgba(74,158,255,0.3)'; };
+        el.onmouseenter = () => { el.style.transform = 'translateY(-2px)'; el.style.boxShadow = `0 6px 16px ${theme.hoverShadow}`; };
+        el.onmouseleave = () => { el.style.transform = 'translateY(0)'; el.style.boxShadow = `0 4px 12px ${theme.shadow}`; };
         el.id = b.id;
         btnGroup.appendChild(el);
         return el;
