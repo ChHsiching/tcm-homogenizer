@@ -132,6 +132,10 @@ async function openRangeConfigDialog() {
             }).join('');
             modalBody.innerHTML = `<div>${header}${rows}</div>`;
         }
+        
+        // 显示加载完成的消息
+        showNotification(`变量范围配置已加载完成，共 ${features.length || 2} 个变量`, 'success');
+        
         if (modalOverlay) {
             modalOverlay.style.display = 'flex';
         // 右上角叉号关闭（取消）
@@ -159,12 +163,13 @@ async function openRangeConfigDialog() {
                         window.__mcRanges__[k] = ranges[k];
                     });
                     authManager.hideModal();
-                    showNotification('变量范围已设置', 'success');
+                    showNotification('变量范围已设置并保存到本地存储', 'success');
                 };
             }
             if (cancelBtn) {
                 cancelBtn.onclick = () => {
                     authManager.hideModal();
+                    showNotification('变量范围设置已取消', 'info');
                 };
             }
         }
@@ -896,7 +901,24 @@ function wireToolbarActions(container, getSvg) {
                 }
 
                 console.log('✅ 表达式树修改已同步到数据库并刷新指标');
-                showNotification('表达式树修改已同步到数据库并刷新指标', 'success');
+                
+                // 根据操作类型显示不同的成功消息
+                let operationName = '修改';
+                switch (action) {
+                    case 'delete':
+                        operationName = '删除操作';
+                        break;
+                    case 'simplify':
+                        operationName = '简化操作';
+                        break;
+                    case 'optimize':
+                        operationName = '优化操作';
+                        break;
+                    case 'undo':
+                        operationName = '撤销操作';
+                        break;
+                }
+                showNotification(`${operationName}已完成，数据已同步到数据库`, 'success');
                 
             } catch (error) {
                 console.error('❌ 数据库同步失败:', error);
@@ -909,7 +931,10 @@ function wireToolbarActions(container, getSvg) {
 
     if (btnDel) btnDel.onclick = () => {
         const id = getSelectedId();
-        if (!id) return;
+        if (!id) {
+            showNotification('请先选择要删除的节点', 'warning');
+            return;
+        }
         window.__exprTreeUndo__.push(ExprTree.cloneAst(window.currentExpressionAst));
         const next = ExprTree.deleteNodeById(window.currentExpressionAst, id);
         window.currentExpressionAst = ExprTree.simplifyAst(next);
@@ -918,7 +943,10 @@ function wireToolbarActions(container, getSvg) {
         rerender(window.currentExpressionAst, 'delete');
     };
     if (btnUndo) btnUndo.onclick = () => {
-        if (!window.__exprTreeUndo__ || window.__exprTreeUndo__.length === 0) return;
+        if (!window.__exprTreeUndo__ || window.__exprTreeUndo__.length === 0) {
+            showNotification('没有可撤销的操作', 'warning');
+            return;
+        }
         const prev = window.__exprTreeUndo__.pop();
         window.currentExpressionAst = prev;
         showNotification('正在撤销操作...', 'info');
@@ -2561,6 +2589,7 @@ async function loadDataModelsForMonteCarlo() {
     
     // 显示加载状态
     dataModelSelect.innerHTML = '<option value="">正在加载数据模型...</option>';
+    showNotification('正在加载数据模型列表...', 'info');
     
     try {
         const response = await fetch(`${API_BASE_URL}/api/data-models/models`, {
@@ -2608,7 +2637,7 @@ async function loadDataModelsForMonteCarlo() {
             dataModelSelect.innerHTML = '<option value="">没有可用的数据模型</option>';
             showNotification('没有找到包含符号回归模型的数据模型，请先进行符号回归分析', 'warning');
         } else {
-            showNotification(`成功加载 ${modelsWithRegression.length} 个数据模型`, 'success');
+            showNotification(`数据模型列表加载完成，共 ${modelsWithRegression.length} 个可用模型`, 'success');
         }
         
     } catch (error) {
