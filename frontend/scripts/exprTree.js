@@ -1512,7 +1512,8 @@
       toolbar.style.display = 'flex';
       toolbar.style.gap = '12px';
       toolbar.style.marginTop = '12px';
-      toolbar.style.justifyContent = 'flex-end';
+      toolbar.style.justifyContent = 'space-between';
+      toolbar.style.alignItems = 'center';
 
       const btns = [
         { text: '删除节点/子树', color: '#ef4444', id: 'btn-delete' },
@@ -1520,7 +1521,13 @@
         { text: '优化', color: '#3b82f6', id: 'btn-optimize' },
         { text: '撤销', color: '#f59e0b', id: 'btn-undo' },
       ];
-      // 操作计数器（右对齐同一行）
+      // 左侧按钮分组（左对齐）
+      const btnGroup = document.createElement('div');
+      btnGroup.className = 'expr-tree-btns';
+      btnGroup.style.display = 'flex';
+      btnGroup.style.gap = '12px';
+
+      // 操作计数器（同一行右对齐）
       const counter = document.createElement('div');
       counter.id = 'expr-op-counter';
       counter.textContent = '操作次数：0';
@@ -1550,12 +1557,13 @@
         el.onmouseenter = () => { el.style.transform = 'translateY(-2px)'; el.style.boxShadow = '0 6px 16px rgba(74,158,255,0.4)'; };
         el.onmouseleave = () => { el.style.transform = 'translateY(0)'; el.style.boxShadow = '0 4px 12px rgba(74,158,255,0.3)'; };
         el.id = b.id;
-        toolbar.appendChild(el);
+        btnGroup.appendChild(el);
         return el;
       };
 
       const created = {};
       btns.forEach(b => { created[b.id] = buildButton(b); });
+      toolbar.appendChild(btnGroup);
       toolbar.appendChild(counter);
       // 将按钮条插入到容器(非SVG)下方
       if (containerEl && containerEl.parentElement) {
