@@ -1023,19 +1023,7 @@ input.readonly-not-allowed {
     transform: translateZ(0);
 }
 
-.expr-tooltip::after {
-    content: '';
-    position: absolute;
-    width: 10px;
-    height: 10px;
-    background: inherit;
-    border-left: 1px solid var(--border-color);
-    border-top: 1px solid var(--border-color);
-    transform: rotate(45deg);
-    top: -6px;
-    left: 14px;
-    border-radius: 2px;
-}
+
 
 .expr-tooltip-expr {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
