@@ -656,61 +656,6 @@ function latexToInfix(latex, constantsMap) {
   return s;
 }
 
-// 将MathJax公式中的具体数字替换为常数代号
-function replaceNumbersWithConstants(latex, constants) {
-  if (!latex || !constants || Object.keys(constants).length === 0) return latex;
-  
-  let result = latex;
-  
-  // 创建数值到常数代号的映射
-  const valueToConstant = new Map();
-  const constantEntries = Object.entries(constants);
-  
-  // 按数值排序，确保匹配的准确性
-  constantEntries.sort((a, b) => {
-    const valA = parseFloat(a[1]);
-    const valB = parseFloat(b[1]);
-    return valB - valA; // 从大到小排序，避免小数被大数误匹配
-  });
-  
-  // 为每个常数创建数值到代号的映射
-  constantEntries.forEach(([constantKey, constantValue]) => {
-    const match = constantKey.match(/^c(?:_|\{)?(\d+)\}?$/i);
-    if (match) {
-      const index = match[1];
-      const value = parseFloat(constantValue);
-      if (!isNaN(value)) {
-        valueToConstant.set(value, `c_{${index}}`);
-      }
-    }
-  });
-  
-  // 替换公式中的具体数字为常数代号
-  // 使用正则表达式匹配数字（包括负数和小数）
-  const numberPattern = /(-?\d+\.?\d*)/g;
-  
-  result = result.replace(numberPattern, (match, numberStr) => {
-    const number = parseFloat(numberStr);
-    if (isNaN(number)) return match;
-    
-    // 查找最接近的常数
-    let bestMatch = null;
-    let minDifference = Infinity;
-    
-    for (const [value, constant] of valueToConstant) {
-      const difference = Math.abs(value - number);
-      if (difference < minDifference && difference < 1e-10) { // 使用很小的容差
-        minDifference = difference;
-        bestMatch = constant;
-      }
-    }
-    
-    return bestMatch || match;
-  });
-  
-  return result;
-}
-
 async function renderExpressionTreeSVG(summary) {
     const canvas = document.getElementById('expression-tree-canvas');
     if (!canvas) return;
@@ -785,14 +730,71 @@ function wireToolbarActions(container, getSvg) {
         const svg = ExprTree.renderSvgTree(inner, ast, { width: layoutInfo.width, config: layoutInfo.config, bounds: layoutInfo.bounds });
         wireToolbarActions(inner, () => svg);
         
-        // 同步上方公式：使用与后端一致的 MathJax（带 HDL &= 前缀）
-        const expressionStr = ExprTree.astToLatex(ast, 'HDL');
+        // 从AST中提取常量信息，保持常量模块显示
+        const extractConstantsFromAst = (node) => {
+            // 使用与generateLatexFormula完全相同的逻辑：按照数值在表达式中出现的顺序分配常量代号
+            const constants = {};
+            const usedNumbers = new Set();
+            
+            // 首先将AST转换为表达式字符串，然后按照数字出现的顺序分配常量代号
+            const expressionStr = ExprTree.astToExpression(node);
+            
+            // 使用与generateLatexFormula相同的数字匹配逻辑
+            const numberPattern = /-?\d+\.?\d*/g;
+            const numbers = expressionStr.match(numberPattern) || [];
+            
+            numbers.forEach((num) => {
+                const numValue = parseFloat(num);
+                if (!usedNumbers.has(numValue)) {
+                    const index = Object.keys(constants).length;
+                    const key = `c_${index}`;
+                    constants[key] = numValue;
+                    usedNumbers.add(numValue);
+                }
+            });
+            
+            return constants;
+        };
+        
+        const constants = extractConstantsFromAst(ast);
+        
+        // 生成LaTeX公式，保持常量模块显示
+        const expressionStr = ExprTree.astToLatexWithConstants(ast, 'HDL', constants);
         const formulaContainer = document.getElementById('expr-formula-container');
         if (formulaContainer) {
+            // 保持与displayExpressionTreeSummary完全一致的渲染逻辑
+            const formatConstantsForDisplay = (consts) => {
+                const entries = Object.entries(consts || {}).map(([k, v]) => {
+                    const m = String(k).match(/^c(?:_|\{)?(\d+)\}?$/i);
+                    const idx = m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER;
+                    const latexKey = m ? `c_{${m[1]}}` : String(k);
+                    return { idx, key: latexKey, value: v };
+                });
+                entries.sort((a, b) => a.idx - b.idx);
+                return entries;
+            };
+            
+            // 完全复制displayExpressionTreeSummary的HTML结构
             formulaContainer.innerHTML = `
                 <div class="regression-formula-container">
                     <div class="regression-formula">$${expressionStr}$</div>
-                </div>`;
+                    ${Object.keys(constants).length ? `
+                    <div class="regression-constants">
+                        <h5>常数定义</h5>
+                        <div class="constant-list">
+                            ${formatConstantsForDisplay(constants).map(item => `<div class="constant-item">$${item.key} = ${item.value}$</div>`).join('')}
+                        </div>
+                    </div>` : ''}
+                </div>
+                <div class="result-actions" style="margin-top: 10px;">
+                    <button class="btn-secondary" onclick="switchTab('regression')">返回回归</button>
+                    <button class="btn-primary" onclick="refreshExpressionTreeData()" style="margin-left: 10px;">
+                        刷新数据
+                    </button>
+                </div>
+            `;
+            
+            // 确保MathJax渲染，包括常量模块
             if (window.MathJax && window.MathJax.typesetPromise) {
                 MathJax.typesetPromise([formulaContainer]).catch(()=>{});
             }
@@ -827,6 +829,7 @@ function wireToolbarActions(container, getSvg) {
                     body: JSON.stringify({
                         expression_latex: expressionStr,
                         expression: expressionStr,
+                        constants: constants, // 添加常量信息
                         feature_importance: ExprTree.computeFeatureImportance(ast),
                         impact_tree: window.TREE_IMPACT_DATA,
                         updated_at: Date.now()
@@ -911,14 +914,9 @@ function displayExpressionTreeSummary(result) {
     const targetVariable = result.target_variable || 'Y';
     const constants = result.constants || {};
     // 若后端提供了 LaTeX 公式，则直接使用；否则由表达式生成
-    let latexFormula = result.expression_latex
+    const latexFormula = result.expression_latex
         ? result.expression_latex
         : generateLatexFormula(expression, targetVariable, constants);
-    
-    // 将公式中的具体数字替换为常数代号，提升用户体验
-    if (latexFormula && Object.keys(constants).length > 0) {
-        latexFormula = replaceNumbersWithConstants(latexFormula, constants);
-    }
     const detailed = result.detailed_metrics || {};
 
     // 帮助：常数排序与 LaTeX 格式化
@@ -1567,14 +1565,9 @@ function displayRegressionResults(result) {
     const constants = result.constants || {};
     
     // 生成LaTeX公式（若后端已提供 expression_latex 则直接使用）
-    let latexFormula = result.expression_latex
+    const latexFormula = result.expression_latex
         ? result.expression_latex
         : generateLatexFormula(expression, targetVariable, constants);
-    
-    // 将公式中的具体数字替换为常数代号，提升用户体验
-    if (latexFormula && Object.keys(constants).length > 0) {
-        latexFormula = replaceNumbersWithConstants(latexFormula, constants);
-    }
     
     // 常数排序（与表达式树页面一致）
     const formatConstantsForDisplay = (consts) => {

@@ -503,7 +503,7 @@
     return '0';
   }
 
-  // 在减法中用于格式化右侧被减数，移除其“自身携带的负号”，保留减法运算符的负号语义
+  // 在减法中用于格式化右侧被减数，移除其"自身携带的负号"，保留减法运算符的负号语义
   function expressionForSubRight(n) {
     if (!n) return '0';
     // 常数：输出绝对值
@@ -581,6 +581,63 @@
     return `\\begin{align*} \\nonumber ${target} &= ${body} \\end{align*}`;
   }
   ExprTree.astToLatex = astToLatex;
+
+  // 生成 LaTeX（使用常量代号替换数字）
+  function astToLatexWithConstants(ast, target = 'Y', constants = {}) {
+    // 归一化数值为稳定字符串键，避免浮点误差
+    const normKey = (num) => {
+      const n = Number(num);
+      if (!isFinite(n)) return String(num);
+      // 统一到 6 位小数并去除结尾多余的 0
+      const s = n.toFixed(6);
+      return s.replace(/\.0+$/, '').replace(/(\.[0-9]*?)0+$/, '$1');
+    };
+
+    // 创建常量映射：规范化数值键 -> 常量代号
+    const valueToConstant = {};
+    Object.entries(constants || {}).forEach(([key, value]) => {
+      valueToConstant[normKey(value)] = key;
+    });
+
+    function core(n, parentOp) {
+      if (!n) return '0';
+      if (n.kind === 'constant') {
+        const k = normKey(n.value);
+        const constantKey = valueToConstant[k];
+        if (constantKey) {
+          const match = constantKey.match(/^c(?:_|\{)?(\d+)\}?$/i);
+          return match ? `c_{${match[1]}}` : constantKey;
+        }
+        return String(n.value);
+      }
+      if (n.kind === 'variable') {
+        const coef = (typeof n.coefficient === 'number') ? n.coefficient : 1;
+        if (coef === 1) return String(n.value);
+        if (coef === -1) return `-1 \\cdot ${n.value}`;
+        const k = normKey(coef);
+        const constantKey = valueToConstant[k];
+        if (constantKey) {
+          const match = constantKey.match(/^c(?:_|\{)?(\d+)\}?$/i);
+          return match ? `c_{${match[1]}} \\cdot ${n.value}` : `${constantKey} \\cdot ${n.value}`;
+        }
+        return `${formatNumberSci(coef, 6)} \\cdot ${n.value}`;
+      }
+      const a = core(n.children[0], n.op);
+      const b = core(n.children[1], n.op);
+      if (n.op === 'add') return `${a} + ${b}`;
+      if (n.op === 'sub') return `${a} - ${b}`;
+      if (n.op === 'mul') {
+        const la = (n.children[0].kind === 'operator' && (n.children[0].op === 'add' || n.children[0].op === 'sub')) ? `\\left(${a}\\right)` : a;
+        const rb = (n.children[1].kind === 'operator' && (n.children[1].op === 'add' || n.children[1].op === 'sub')) ? `\\left(${b}\\right)` : b;
+        return `${la} \\cdot ${rb}`;
+      }
+      if (n.op === 'div') return `\\cfrac{${a}}{${b}}`;
+      return `${a} ${n.op} ${b}`;
+    }
+    const body = core(ast, null);
+    return `\\begin{align*} \\nonumber ${target} &= ${body} \\end{align*}`;
+  }
+  ExprTree.astToLatexWithConstants = astToLatexWithConstants;
 
   // =============================
   // 公开 API
@@ -751,7 +808,7 @@
             if (nextImpactPath && typeof nextImpactPath === 'object' && want && hasOwn(nextImpactPath, want)) {
               nextImpactPath = nextImpactPath[want];
             } else {
-              // 兼容“本层先进入某个运算符分支，再在该分支内才出现子节点的运算符键”的结构
+              // 兼容"本层先进入某个运算符分支，再在该分支内才出现子节点的运算符键"的结构
               const bridged = findUniqueOpChildForOp(nextImpactPath, want);
               if (bridged) nextImpactPath = bridged;
               else if (availableOpKeys.length === 1) nextImpactPath = nextImpactPath[availableOpKeys[0]];
@@ -909,7 +966,7 @@
       : String(op || '?');
   }
 
-  // 将整棵树聚合为“特征影响力”列表（V2：使用真实影响力数据）
+  // 将整棵树聚合为"特征影响力"列表（V2：使用真实影响力数据）
   function computeFeatureImportance(root) {
     const totals = new Map();
     (function walk(n) {
@@ -981,7 +1038,7 @@
       });
       if (!node.children || node.children.length === 0) return left + lw;
 
-      // 将同级子树按“子树块宽 + siblingGap”对称排列，父节点位于子块中心，保证不交叉
+      // 将同级子树按"子树块宽 + siblingGap"对称排列，父节点位于子块中心，保证不交叉
       const childrenSumW = node.children.reduce((s, ch) => s + (ch.layout?.w || ch.layout?.wSelf || selfW), 0);
       const block = childrenSumW + cfg.siblingGap * (node.children.length - 1);
       let cursor = centerX - block / 2; // 子块的最左
@@ -1388,7 +1445,7 @@
             e.preventDefault();
             e.stopPropagation();
             ctxMenu.style.display = 'none';
-            // 触发底部红色“删除节点/子树”按钮（已由外层绑定真实逻辑）
+            // 触发底部红色"删除节点/子树"按钮（已由外层绑定真实逻辑）
             const btn = tooltipHost.querySelector('#btn-delete');
             if (btn && typeof btn.click === 'function') btn.click();
           };
