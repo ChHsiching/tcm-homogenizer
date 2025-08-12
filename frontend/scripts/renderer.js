@@ -740,7 +740,6 @@ function wireToolbarActions(container, getSvg) {
                     body: JSON.stringify({
                         symbolic_regression: {
                             expression_latex: expressionStr,
-                            impact_tree: window.TREE_IMPACT_DATA,
                             updated_at: Date.now()
                         },
                         feature_importance: ExprTree.computeFeatureImportance(ast),
@@ -761,7 +760,6 @@ function wireToolbarActions(container, getSvg) {
                         expression: expressionStr,
                         constants: constants, // 添加常量信息
                         feature_importance: ExprTree.computeFeatureImportance(ast),
-                        impact_tree: window.TREE_IMPACT_DATA,
                         updated_at: Date.now(),
                         expr_tree_action: action
                     })
@@ -775,9 +773,9 @@ function wireToolbarActions(container, getSvg) {
                 try {
                     const updated = await fetchExpressionTreeSummary({ model_id: modelId });
                     if (updated) {
-                        displayExpressionTreeSummary(updated);
+                        await renderExpressionTree(updated);
                     }
-    } catch (e) {
+                } catch (e) {
                     console.warn('刷新表达式树摘要失败（将继续显示旧指标）:', e);
                 }
 
