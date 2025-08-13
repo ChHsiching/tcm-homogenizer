@@ -689,6 +689,7 @@ MOCK_WEIGHTS_SEQUENCE = [None] + [
 MOCK_IMPACT_TREE_SEQUENCE = [None] + [
     # 1
     {
+        'Addition': {
         '1': 0,
         '-28.494 * HYP': 0.076351789675616,
         '0.40832 * HYP': 0.076351789675616,
@@ -707,9 +708,11 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '0.0053559': 0,
         '2.9628 * VR': 0.279624923755845,
         '0.93054': 0
+    }
     },
     # 2
     {
+        'Addition': {
         '1': 0,
         '-28.494 * HYP': 0.0763517896756718,
         '0.40832 * HYP': 0.0763517896756718,
@@ -728,9 +731,11 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '0.0053559': 0,
         '2.9628 * VR': 0.279624923755845,
         '0.93054': 0
+    }
     },
     # 3
     {
+        'Addition': {
         '1': 0,
         '-28.494 * HYP': 0.076351789675672,
         '0.40832 * HYP': 0.076351789675672,
@@ -749,9 +754,11 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '0.0053559': 0,
         '2.9628 * VR': 0.279624923755845,
         '0.93054': 0
+    }
     },
     # 4
     {
+        'Addition': {
         '1': 0,
         '-28.494 * HYP': 0.0763517896756716,
         '0.40832 * HYP': 0.0763517896756716,
@@ -770,9 +777,11 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '0.0053559': 0,
         '2.9628 * VR': 0.279624923755845,
         '0.93054': 0
+    }
     },
     # 5
     {
+        'Addition': {
         '1': 0,
         '-28.494 * HYP': 0.0733317696147618,
         '0.40832 * HYP': 0.0733317696147618,
@@ -789,9 +798,11 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '2.9628 * VR': 0.275874028734677,
         '0.0053559': 0,
         '0.93054': 0
+    }
     },
     # 6
     {
+        'Addition': {
         '1': 0,
         '-24.78 * HYP': 0.0733317696147628,
         '0.40832 * HYP': 0.0733317696147628,
@@ -808,9 +819,11 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '2.9628 * VR': 0.275874028734678,
         '0.0061587': 0,
         '0.92566': 0
+    }
     },
     # 7
     {
+        'Addition': {
         '1': 0,
         '-24.78 * HYP': 0.0996617689752506,
         '0.40832 * HYP': 0.0996617689752506,
@@ -826,9 +839,11 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '2.9628 * VR': 0.264262090594079,
         '0.0061587': 0,
         '0.92566': 0
+    }
     },
     # 8
     {
+        'Addition': {
         '1': 0,
         '-23.318 * HYP': 0.0996617689752501,
         '0.40832 * HYP': 0.0996617689752501,
@@ -844,9 +859,11 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '2.9628 * VR': 0.264262090594078,
         '0.0065447': 0,
         '0.92369': 0
+    }
     },
     # 9
     {
+        'Addition': {
         '1': 0,
         '-23.318 * HYP': 0.0996617689752507,
         '0.40832 * HYP': 0.0996617689752507,
@@ -862,9 +879,11 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '2.9628 * VR': 0.264262090594078,
         '0.0065447': 0,
         '0.92369': 0
+    }
     },
     # 10
     {
+        'Addition': {
         '1': 0,
         '-23.318 * HYP': 0.0996617689752504,
         '0.40832 * HYP': 0.0996617689752504,
@@ -880,9 +899,11 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '2.9628 * VR': 0.264262090594078,
         '0.0065447': 0,
         '0.92369': 0
+    }
     },
     # 11
     {
+        'Addition': {
         '1': 0,
         '-23.318 * HYP': 0.0996617689752501,
         '0.40832 * HYP': 0.0996617689752501,
@@ -898,9 +919,11 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '2.9628 * VR': 0.264262090594078,
         '0.0065447': 0,
         '0.92369': 0
+    }
     },
     # 12
     {
+        'Addition': {
         '1': 0,
         '-23.318 * HYP': 0.0996617689752507,
         '0.40832 * HYP': 0.0996617689752507,
@@ -916,9 +939,11 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '2.9628 * VR': 0.264262090594078,
         '0.0065447': 0,
         '0.92369': 0
+    }
     },
     # 13
     {
+        'Addition': {
         '1': 0,
         '-23.318 * HYP': 0.0996617689752504,
         '0.40832 * HYP': 0.0996617689752504,
@@ -934,9 +959,11 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '2.9628 * VR': 0.264262090594078,
         '0.0065447': 0,
         '0.92369': 0
+    }
     },
     # 14
     {
+        'Addition': {
         '1': 0,
         '-23.318 * HYP': 0.0996617689752501,
         '0.40832 * HYP': 0.0996617689752501,
@@ -952,9 +979,11 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '2.9628 * VR': 0.264262090594078,
         '0.0065447': 0,
         '0.92369': 0
+    }
     },
     # 15
     {
+        'Addition': {
         '1': 0,
         '-23.318 * HYP': 0.0996617689752507,
         '0.40832 * HYP': 0.0996617689752507,
@@ -970,6 +999,7 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '2.9628 * VR': 0.264262090594078,
         '0.0065447': 0,
         '0.92369': 0
+    }
     },
 ]
 
@@ -1511,7 +1541,11 @@ def update_data_model_file(model_id, file_type):
                     if 'baseline_feature_importance' not in reg_content:
                         reg_content['baseline_feature_importance'] = reg_content.get('feature_importance') or []
                     if 'baseline_impact_tree' not in reg_content:
-                        reg_content['baseline_impact_tree'] = reg_content.get('impact_tree') or {}
+                        # 规范化：若已有 impact_tree 不是以 Addition 根包裹，包裹之
+                        base_it = reg_content.get('impact_tree') or {}
+                        if base_it and 'Addition' not in base_it and isinstance(base_it, dict):
+                            base_it = {'Addition': base_it}
+                        reg_content['baseline_impact_tree'] = base_it
                     op_index = int(model.get('metadata', {}).get('expr_tree_op_index', 0) or 0)
                     new_index = op_index
                     if action in ('delete', 'simplify', 'optimize'):
@@ -1529,7 +1563,8 @@ def update_data_model_file(model_id, file_type):
                             if isinstance(seq_weights, list):
                                 reg_content['feature_importance'] = seq_weights
                             if isinstance(seq_impact, dict):
-                                reg_content['impact_tree'] = seq_impact
+                                # 统一包裹为 { 'Addition': { ... } } 结构
+                                reg_content['impact_tree'] = seq_impact if 'Addition' in seq_impact else {'Addition': seq_impact}
                         model.setdefault('metadata', {})['expr_tree_op_index'] = new_index
                     elif action == 'undo':
                         new_index = max(0, op_index - 1)
@@ -1544,7 +1579,7 @@ def update_data_model_file(model_id, file_type):
                             if base_weights:
                                 reg_content['feature_importance'] = base_weights
                             if isinstance(base_impact, dict):
-                                reg_content['impact_tree'] = base_impact
+                                reg_content['impact_tree'] = base_impact if 'Addition' in base_impact else {'Addition': base_impact}
                         else:
                             # 对超过 15 的索引进行截断（>=15 视同第15次的指标），支持无限撤销
                             idx = new_index if new_index <= 15 else 15
@@ -1558,7 +1593,7 @@ def update_data_model_file(model_id, file_type):
                             if isinstance(seq_weights, list):
                                 reg_content['feature_importance'] = seq_weights
                             if isinstance(seq_impact, dict):
-                                reg_content['impact_tree'] = seq_impact
+                                reg_content['impact_tree'] = seq_impact if 'Addition' in seq_impact else {'Addition': seq_impact}
                         model.setdefault('metadata', {})['expr_tree_op_index'] = new_index
                     else:
                         # 允许直接设置详细指标（不建议在表达式树操作路径外使用）
@@ -1567,7 +1602,8 @@ def update_data_model_file(model_id, file_type):
                         if 'feature_importance' in data and isinstance(data['feature_importance'], list):
                             reg_content['feature_importance'] = data['feature_importance']
                         if direct_set_impact_tree:
-                            reg_content['impact_tree'] = data['impact_tree']
+                            it = data['impact_tree']
+                            reg_content['impact_tree'] = it if (isinstance(it, dict) and 'Addition' in it) else {'Addition': it}
                     if 'updated_at' in data:
                         reg_content['updated_at'] = data['updated_at']
                     
