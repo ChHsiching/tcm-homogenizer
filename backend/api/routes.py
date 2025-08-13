@@ -37,280 +37,6 @@ os.makedirs(CSV_DATA_DIR, exist_ok=True)
 os.makedirs(MODELS_DIR, exist_ok=True)
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
-# 符号表达式树的模拟“结构+表达式”序列（不要从文件读取，直接内嵌）
-# 下标1..15分别对应第1~15次树结构变更后应展示的 impact_tree 以及对应的表达式 expression；下标0为None表示不覆盖。
-MOCK_IMPACT_SEQUENCE = [None] + [
-    {
-        'expression': "(((((MA + (1.2053 * UA) + 0.078141)) + 0.0053559) * 2.9628 * VR) / (0.93054))",
-        'impact_tree': {
-            'Addition': {
-                'Division': {
-                    'Multiplication': {
-                        'Addition': {
-                            'Multiplication': {
-                                'MA': 0.108972688038807,
-                                'Addition': {
-                                    '1.2053 * UA': 0.108144059957083,
-                                    '1.4812 * OA': 0.00688842480665586,
-                                    '-1.9323': 0
-                                },
-                                '0.078141': 0
-                            }
-                        },
-                        '0.0053559': 0
-                    },
-                    '2.9628 * VR': 0.279624923755845
-                },
-                '0.93054': 0
-            }
-        }
-    },
-    {
-        'expression': "((0.00653 * VR + (-1.9105 * HYP)) / (0.93054))",
-        'impact_tree': {
-            'Addition': {
-                'Division': {
-                    '0.00653 * VR': 0.0208902884673899,
-                    'Addition': {
-                        '-1.9105 * HYP': 0.210102360045851,
-                        '5.4189': 0
-                    }
-                },
-                '0.93054': 0
-            }
-        }
-    },
-    {
-        'expression': "((1) / (0.93054))",
-        'impact_tree': {
-            'Addition': {
-                'Division': {
-                    '1': 0,
-                    '-28.494 * HYP': 0.076351789675672
-                },
-                '0.93054': 0
-            }
-        }
-    },
-    {
-        'expression': "(((((MA + (1.2053 * UA) + -0.078141) * -1.9323) + 0.0053559) * 2.9628 * VR) / (0.93054))",
-        'impact_tree': {
-            'Addition': {
-                'Division': {
-                    'Multiplication': {
-                        'Addition': {
-                            'Multiplication': {
-                                'MA': 0.108972688038807,
-                                'Addition': {
-                                    '1.2053 * UA': 0.108144059957083,
-                                    '1.4812 * OA': 0.00688842480665586,
-                                    '-1.9323': 0
-                                },
-                                '-0.078141': 0
-                            },
-                            '-1.9323': 0
-                        },
-                        '0.0053559': 0
-                    },
-                    '2.9628 * VR': 0.279624923755845
-                },
-                '0.93054': 0
-            }
-        }
-    },
-    {
-        'expression': "(((((((MA + (1.2053 * UA) + -0.078141) * -1.9323) + 0.0053559) * 2.9628 * VR) / (0.93054)) + 1.1499) * -0.14436)",
-        'impact_tree': {
-            'Addition': {
-                'Multiplication': {
-                    'Addition': {
-                        'Division': {
-                            'Multiplication': {
-                                'Addition': {
-                                    'Multiplication': {
-                                        'MA': 0.0812579052747987,
-                                        'Addition': {
-                                            '1.2053 * UA': 0.137119380648784,
-                                            '-1.9323': 0
-                                        },
-                                        '-0.078141': 0
-                                    },
-                                    '-1.9323': 0
-                                },
-                                '0.0053559': 0
-                            },
-                            '2.9628 * VR': 0.275874028734677
-                        },
-                        '0.93054': 0
-                    },
-                    '1.1499': 0
-                },
-                '-0.14436': 0
-            }
-        }
-    },
-    {
-        'expression': "((1) / (0.92566))",
-        'impact_tree': {
-            'Addition': {
-                'Division': {
-                    '1': 0,
-                    '-24.78 * HYP': 0.0733317696147628
-                },
-                '0.92566': 0
-            }
-        }
-    },
-    {
-        'expression': "((((1) / (0.92566)) + 1.0627) * -0.059992)",
-        'impact_tree': {
-            'Addition': {
-                'Multiplication': {
-                    'Addition': {
-                        'Division': {
-                            '1': 0,
-                            '-24.78 * HYP': 0.0996617689752506
-                        },
-                        '0.92566': 0
-                    },
-                    '1.0627': 0
-                },
-                '-0.059992': 0
-            }
-        }
-    },
-    {
-        'expression': "((0.0079795 * VR + (-1.9105 * HYP)) / (0.92369))",
-        'impact_tree': {
-            'Addition': {
-                'Division': {
-                    '0.0079795 * VR': 0.0196564510771611,
-                    'Addition': {
-                        '-1.9105 * HYP': 0.255861250843903,
-                        '5.4189': 0
-                    }
-                },
-                '0.92369': 0
-            }
-        }
-    },
-    {
-        'expression': "((1) / (0.92369))",
-        'impact_tree': {
-            'Addition': {
-                'Division': {
-                    '1': 0,
-                    '-23.318 * HYP': 0.0996617689752507
-                },
-                '0.92369': 0
-            }
-        }
-    },
-    {
-        'expression': "(((((MA + (1.2053 * UA) + -0.078141) * -1.9323) + 0.0065447) * 2.9628 * VR) / (0.92369))",
-        'impact_tree': {
-            'Addition': {
-                'Division': {
-                    'Multiplication': {
-                        'Addition': {
-                            'Multiplication': {
-                                'MA': 0.0915664689038371,
-                                'Addition': {
-                                    '1.2053 * UA': 0.139791872958965,
-                                    '-1.9323': 0
-                                },
-                                '-0.078141': 0
-                            },
-                            '-1.9323': 0
-                        },
-                        '0.0065447': 0
-                    },
-                    '2.9628 * VR': 0.264262090594078
-                },
-                '0.92369': 0
-            }
-        }
-    },
-    {
-        'expression': "((0.0079795 * VR + (-1.9105 * HYP)) / (0.92369))",
-        'impact_tree': {
-            'Addition': {
-                'Division': {
-                    '0.0079795 * VR': 0.0196564510771611,
-                    'Addition': {
-                        '-1.9105 * HYP': 0.255861250843903,
-                        '5.4189': 0
-                    }
-                },
-                '0.92369': 0
-            }
-        }
-    },
-    {
-        'expression': "((1) / (0.92369))",
-        'impact_tree': {
-            'Addition': {
-                'Division': {
-                    '1': 0,
-                    '-23.318 * HYP': 0.0996617689752507
-                },
-                '0.92369': 0
-            }
-        }
-    },
-    {
-        'expression': "(((((MA + (1.2053 * UA) + -0.078141) * -1.9323) + 0.0065447) * 2.9628 * VR) / (0.92369))",
-        'impact_tree': {
-            'Addition': {
-                'Division': {
-                    'Multiplication': {
-                        'Addition': {
-                            'Multiplication': {
-                                'MA': 0.0915664689038371,
-                                'Addition': {
-                                    '1.2053 * UA': 0.139791872958965,
-                                    '-1.9323': 0
-                                },
-                                '-0.078141': 0
-                            },
-                            '-1.9323': 0
-                        },
-                        '0.0065447': 0
-                    },
-                    '2.9628 * VR': 0.264262090594078
-                },
-                '0.92369': 0
-            }
-        }
-    },
-    {
-        'expression': "((0.0079795 * VR + (-1.9105 * HYP)) / (0.92369))",
-        'impact_tree': {
-            'Addition': {
-                'Division': {
-                    '0.0079795 * VR': 0.0196564510771611,
-                    'Addition': {
-                        '-1.9105 * HYP': 0.255861250843903,
-                        '5.4189': 0
-                    }
-                },
-                '0.92369': 0
-            }
-        }
-    },
-    {
-        'expression': "((1) / (0.92369))",
-        'impact_tree': {
-            'Addition': {
-                'Division': {
-                    '1': 0,
-                    '-23.318 * HYP': 0.0996617689752507
-                },
-                '0.92369': 0
-            }
-        }
-    }
-]
 # 符号表达式树操作的模拟指标序列（不要从文件读取，直接内嵌）
 # 下标1..15分别对应第1~15次树结构变更后的指标；下标0表示基线，不覆盖。
 MOCK_INDICATORS_SEQUENCE = [None] + [
@@ -954,6 +680,299 @@ MOCK_WEIGHTS_SEQUENCE = [None] + [
     ]
 ]
 
+# 符号表达式树操作的模拟 SVG 影响力树序列（不要从文件读取，直接内嵌）
+# 说明：为避免运行时解析 docs/mock/impact 下的说明性 JSON，本序列以“扁平叶子映射”的形式提供。
+# - 键：叶子节点的名称（常量值，或 "系数 * 变量名"），与前端 AST 节点匹配策略一致
+# - 值：对应叶子节点的影响力（用于着色）；父节点影响力由前端按子节点求和得到
+# - 为了兼容表达式中的原始系数，像 "-28.494 * HYP" 这类键同时提供等价的 "0.40832 * HYP" 键，以便匹配
+# 下标1..15分别对应第1~15次树操作的模拟数据；下标0留空（表示基线由模型文件现状决定）
+MOCK_IMPACT_TREE_SEQUENCE = [None] + [
+    # 1
+    {
+        '1': 0,
+        '-28.494 * HYP': 0.076351789675616,
+        '0.40832 * HYP': 0.076351789675616,
+        '0.00653 * VR': 0.0208902884673897,
+        '1.2192 * VR': 0.0208902884673897,
+        '-1.9105 * HYP': 0.210102360045851,
+        '5.4189': 0,
+        '0.6015 * QA': 0.0117584596321174,
+        '2.3379 * HYP': 0.0228735360067907,
+        '1.2977 * CA': 0.113928459255378,
+        '10.458': 0,
+        '-0.078141 * MA': 0.108972688038807,
+        '1.2053 * UA': 0.108144059957083,
+        '1.4812 * OA': 0.00688842480665586,
+        '-1.9323': 0,
+        '0.0053559': 0,
+        '2.9628 * VR': 0.279624923755845,
+        '0.93054': 0
+    },
+    # 2
+    {
+        '1': 0,
+        '-28.494 * HYP': 0.0763517896756718,
+        '0.40832 * HYP': 0.0763517896756718,
+        '0.00653 * VR': 0.0208902884673899,
+        '1.2192 * VR': 0.0208902884673899,
+        '-1.9105 * HYP': 0.210102360045851,
+        '5.4189': 0,
+        '0.6015 * QA': 0.0117584596321172,
+        '2.3379 * HYP': 0.0228735360067907,
+        '1.2977 * CA': 0.113928459255378,
+        '10.458': 0,
+        '-0.078141 * MA': 0.108972688038807,
+        '1.2053 * UA': 0.108144059957083,
+        '1.4812 * OA': 0.00688842480665564,
+        '-1.9323': 0,
+        '0.0053559': 0,
+        '2.9628 * VR': 0.279624923755845,
+        '0.93054': 0
+    },
+    # 3
+    {
+        '1': 0,
+        '-28.494 * HYP': 0.076351789675672,
+        '0.40832 * HYP': 0.076351789675672,
+        '0.00653 * VR': 0.0208902884673897,
+        '1.2192 * VR': 0.0208902884673897,
+        '-1.9105 * HYP': 0.210102360045851,
+        '5.4189': 0,
+        '0.6015 * QA': 0.0117584596321172,
+        '2.3379 * HYP': 0.0245600888604458,
+        '1.2977 * CA': 0.113928459255379,
+        '10.458': 0,
+        '-0.078141 * MA': 0.108972688038807,
+        '1.2053 * UA': 0.108144059957083,
+        '1.4812 * OA': 0.00688842480665564,
+        '-1.9323': 0,
+        '0.0053559': 0,
+        '2.9628 * VR': 0.279624923755845,
+        '0.93054': 0
+    },
+    # 4
+    {
+        '1': 0,
+        '-28.494 * HYP': 0.0763517896756716,
+        '0.40832 * HYP': 0.0763517896756716,
+        '0.00653 * VR': 0.0208902884673897,
+        '1.2192 * VR': 0.0208902884673897,
+        '-1.9105 * HYP': 0.210102360045851,
+        '5.4189': 0,
+        '0.6015 * QA': 0.0117584596321174,
+        '2.3379 * HYP': 0.0228735360067907,
+        '1.2977 * CA': 0.113928459255378,
+        '10.458': 0,
+        '-0.078141 * MA': 0.108972688038807,
+        '1.2053 * UA': 0.108144059957083,
+        '1.4812 * OA': 0.00688842480665586,
+        '-1.9323': 0,
+        '0.0053559': 0,
+        '2.9628 * VR': 0.279624923755845,
+        '0.93054': 0
+    },
+    # 5
+    {
+        '1': 0,
+        '-28.494 * HYP': 0.0733317696147618,
+        '0.40832 * HYP': 0.0733317696147618,
+        '0.00653 * VR': 0.0208950935373927,
+        '1.2192 * VR': 0.0208950935373927,
+        '-1.9105 * HYP': 0.247577708475269,
+        '5.4189': 0,
+        '0.6015 * QA': 0.00534718638286213,
+        '2.3379 * HYP': 0.0283254630009195,
+        '1.2977 * CA': 0.121817221428969,
+        '10.458': 0,
+        '-0.078141 * MA': 0.0812579052747987,
+        '1.2053 * UA': 0.137119380648784,
+        '2.9628 * VR': 0.275874028734677,
+        '0.0053559': 0,
+        '0.93054': 0
+    },
+    # 6
+    {
+        '1': 0,
+        '-24.78 * HYP': 0.0733317696147628,
+        '0.40832 * HYP': 0.0733317696147628,
+        '0.0075089 * VR': 0.0208950935373935,
+        '1.2192 * VR': 0.0208950935373935,
+        '-1.9105 * HYP': 0.24757770847527,
+        '5.4189': 0,
+        '0.6015 * QA': 0.0053471863828628,
+        '2.3379 * HYP': 0.0283254630009203,
+        '1.2977 * CA': 0.121817221428969,
+        '10.458': 0,
+        '-0.078141 * MA': 0.0812579052747997,
+        '1.2053 * UA': 0.137119380648785,
+        '2.9628 * VR': 0.275874028734678,
+        '0.0061587': 0,
+        '0.92566': 0
+    },
+    # 7
+    {
+        '1': 0,
+        '-24.78 * HYP': 0.0996617689752506,
+        '0.40832 * HYP': 0.0996617689752506,
+        '0.0075089 * VR': 0.0196564510771616,
+        '1.2192 * VR': 0.0196564510771616,
+        '-1.9105 * HYP': 0.255861250843903,
+        '5.4189': 0,
+        '2.3379 * HYP': 0.0245600888604456,
+        '1.2977 * CA': 0.134997651842973,
+        '10.458': 0,
+        '-0.078141 * MA': 0.0915664689038374,
+        '1.2053 * UA': 0.139791872958965,
+        '2.9628 * VR': 0.264262090594079,
+        '0.0061587': 0,
+        '0.92566': 0
+    },
+    # 8
+    {
+        '1': 0,
+        '-23.318 * HYP': 0.0996617689752501,
+        '0.40832 * HYP': 0.0996617689752501,
+        '0.0079795 * VR': 0.0196564510771611,
+        '1.2192 * VR': 0.0196564510771611,
+        '-1.9105 * HYP': 0.255861250843903,
+        '5.4189': 0,
+        '2.3379 * HYP': 0.0245600888604455,
+        '1.2977 * CA': 0.134997651842973,
+        '10.458': 0,
+        '-0.078141 * MA': 0.0915664689038371,
+        '1.2053 * UA': 0.139791872958965,
+        '2.9628 * VR': 0.264262090594078,
+        '0.0065447': 0,
+        '0.92369': 0
+    },
+    # 9
+    {
+        '1': 0,
+        '-23.318 * HYP': 0.0996617689752507,
+        '0.40832 * HYP': 0.0996617689752507,
+        '0.0079795 * VR': 0.0196564510771614,
+        '1.2192 * VR': 0.0196564510771614,
+        '-1.9105 * HYP': 0.255861250843903,
+        '5.4189': 0,
+        '2.3379 * HYP': 0.0245600888604458,
+        '1.2977 * CA': 0.134997651842973,
+        '10.458': 0,
+        '-0.078141 * MA': 0.091566468903837,
+        '1.2053 * UA': 0.139791872958965,
+        '2.9628 * VR': 0.264262090594078,
+        '0.0065447': 0,
+        '0.92369': 0
+    },
+    # 10
+    {
+        '1': 0,
+        '-23.318 * HYP': 0.0996617689752504,
+        '0.40832 * HYP': 0.0996617689752504,
+        '0.0079795 * VR': 0.0196564510771611,
+        '1.2192 * VR': 0.0196564510771611,
+        '-1.9105 * HYP': 0.255861250843903,
+        '5.4189': 0,
+        '2.3379 * HYP': 0.0245600888604455,
+        '1.2977 * CA': 0.134997651842973,
+        '10.458': 0,
+        '-0.078141 * MA': 0.0915664689038371,
+        '1.2053 * UA': 0.139791872958965,
+        '2.9628 * VR': 0.264262090594078,
+        '0.0065447': 0,
+        '0.92369': 0
+    },
+    # 11
+    {
+        '1': 0,
+        '-23.318 * HYP': 0.0996617689752501,
+        '0.40832 * HYP': 0.0996617689752501,
+        '0.0079795 * VR': 0.0196564510771611,
+        '1.2192 * VR': 0.0196564510771611,
+        '-1.9105 * HYP': 0.255861250843903,
+        '5.4189': 0,
+        '2.3379 * HYP': 0.0245600888604455,
+        '1.2977 * CA': 0.134997651842973,
+        '10.458': 0,
+        '-0.078141 * MA': 0.0915664689038371,
+        '1.2053 * UA': 0.139791872958965,
+        '2.9628 * VR': 0.264262090594078,
+        '0.0065447': 0,
+        '0.92369': 0
+    },
+    # 12
+    {
+        '1': 0,
+        '-23.318 * HYP': 0.0996617689752507,
+        '0.40832 * HYP': 0.0996617689752507,
+        '0.0079795 * VR': 0.0196564510771614,
+        '1.2192 * VR': 0.0196564510771614,
+        '-1.9105 * HYP': 0.255861250843903,
+        '5.4189': 0,
+        '2.3379 * HYP': 0.0245600888604458,
+        '1.2977 * CA': 0.134997651842973,
+        '10.458': 0,
+        '-0.078141 * MA': 0.091566468903837,
+        '1.2053 * UA': 0.139791872958965,
+        '2.9628 * VR': 0.264262090594078,
+        '0.0065447': 0,
+        '0.92369': 0
+    },
+    # 13
+    {
+        '1': 0,
+        '-23.318 * HYP': 0.0996617689752504,
+        '0.40832 * HYP': 0.0996617689752504,
+        '0.0079795 * VR': 0.0196564510771611,
+        '1.2192 * VR': 0.0196564510771611,
+        '-1.9105 * HYP': 0.255861250843903,
+        '5.4189': 0,
+        '2.3379 * HYP': 0.0245600888604455,
+        '1.2977 * CA': 0.134997651842973,
+        '10.458': 0,
+        '-0.078141 * MA': 0.0915664689038371,
+        '1.2053 * UA': 0.139791872958965,
+        '2.9628 * VR': 0.264262090594078,
+        '0.0065447': 0,
+        '0.92369': 0
+    },
+    # 14
+    {
+        '1': 0,
+        '-23.318 * HYP': 0.0996617689752501,
+        '0.40832 * HYP': 0.0996617689752501,
+        '0.0079795 * VR': 0.0196564510771611,
+        '1.2192 * VR': 0.0196564510771611,
+        '-1.9105 * HYP': 0.255861250843903,
+        '5.4189': 0,
+        '2.3379 * HYP': 0.0245600888604455,
+        '1.2977 * CA': 0.134997651842973,
+        '10.458': 0,
+        '-0.078141 * MA': 0.0915664689038371,
+        '1.2053 * UA': 0.139791872958965,
+        '2.9628 * VR': 0.264262090594078,
+        '0.0065447': 0,
+        '0.92369': 0
+    },
+    # 15
+    {
+        '1': 0,
+        '-23.318 * HYP': 0.0996617689752507,
+        '0.40832 * HYP': 0.0996617689752507,
+        '0.0079795 * VR': 0.0196564510771614,
+        '1.2192 * VR': 0.0196564510771614,
+        '-1.9105 * HYP': 0.255861250843903,
+        '5.4189': 0,
+        '2.3379 * HYP': 0.0245600888604458,
+        '1.2977 * CA': 0.134997651842973,
+        '10.458': 0,
+        '-0.078141 * MA': 0.091566468903837,
+        '1.2053 * UA': 0.139791872958965,
+        '2.9628 * VR': 0.264262090594078,
+        '0.0065447': 0,
+        '0.92369': 0
+    },
+]
+
 def load_data_models():
     """加载所有数据模型"""
     models = []
@@ -1481,22 +1500,18 @@ def update_data_model_file(model_id, file_type):
                         reg_content['constants'] = data['constants']
                     if 'feature_importance' in data and isinstance(data['feature_importance'], list):
                         reg_content['feature_importance'] = data['feature_importance']
-                    if 'impact_tree' in data:
-                        reg_content['impact_tree'] = data['impact_tree']
+                    # impact_tree 将在表达式树操作分支中由模拟序列统一覆盖；
+                    # 仅当非表达式树操作路径时，才考虑直接写入
+                    direct_set_impact_tree = 'impact_tree' in data
                     # 表达式树操作驱动的指标轮换/撤销
                     action = (data or {}).get('expr_tree_action')
-                    # 初始化基线 impact_tree 与 expression（用于撤销回到初始状态）
-                    if 'baseline_impact_tree' not in reg_content and reg_content.get('impact_tree') is not None:
-                        reg_content['baseline_impact_tree'] = reg_content.get('impact_tree')
-                    if 'baseline_expression' not in reg_content and reg_content.get('expression'):
-                        reg_content['baseline_expression'] = reg_content.get('expression')
-                    if 'baseline_expression_text' not in reg_content and reg_content.get('expression_text'):
-                        reg_content['baseline_expression_text'] = reg_content.get('expression_text')
-                    # 初始化基线指标和特征权重
+                    # 初始化基线：指标、特征权重、影响力树
                     if 'baseline_detailed_metrics' not in reg_content:
                         reg_content['baseline_detailed_metrics'] = reg_content.get('detailed_metrics') or {}
                     if 'baseline_feature_importance' not in reg_content:
                         reg_content['baseline_feature_importance'] = reg_content.get('feature_importance') or []
+                    if 'baseline_impact_tree' not in reg_content:
+                        reg_content['baseline_impact_tree'] = reg_content.get('impact_tree') or {}
                     op_index = int(model.get('metadata', {}).get('expr_tree_op_index', 0) or 0)
                     new_index = op_index
                     if action in ('delete', 'simplify', 'optimize'):
@@ -1506,7 +1521,7 @@ def update_data_model_file(model_id, file_type):
                         if idx > 0:
                             seq_metrics = MOCK_INDICATORS_SEQUENCE[idx]
                             seq_weights = MOCK_WEIGHTS_SEQUENCE[idx]
-                            seq_impact = MOCK_IMPACT_SEQUENCE[idx]
+                            seq_impact = MOCK_IMPACT_TREE_SEQUENCE[idx]
                             if isinstance(seq_metrics, dict):
                                 reg_content['detailed_metrics'] = seq_metrics
                                 model.setdefault('metadata', {})['pearson_r_test'] = seq_metrics.get('pearson_r_test')
@@ -1514,42 +1529,28 @@ def update_data_model_file(model_id, file_type):
                             if isinstance(seq_weights, list):
                                 reg_content['feature_importance'] = seq_weights
                             if isinstance(seq_impact, dict):
-                                # 同步SVG树与表达式
-                                reg_content['impact_tree'] = seq_impact.get('impact_tree')
-                                expr = seq_impact.get('expression')
-                                if expr:
-                                    reg_content['expression'] = expr
-                                    # 为避免前端优先使用旧的 LaTeX 覆盖 expression，这里清空 expression_latex
-                                    reg_content['expression_latex'] = ''
-                                    reg_content['expression_text'] = expr
+                                reg_content['impact_tree'] = seq_impact
                         model.setdefault('metadata', {})['expr_tree_op_index'] = new_index
                     elif action == 'undo':
                         new_index = max(0, op_index - 1)
                         if new_index == 0:
                             base = reg_content.get('baseline_detailed_metrics') or {}
                             base_weights = reg_content.get('baseline_feature_importance') or []
-                            base_impact = reg_content.get('baseline_impact_tree')
-                            base_expr = reg_content.get('baseline_expression')
+                            base_impact = reg_content.get('baseline_impact_tree') or {}
                             if base:
                                 reg_content['detailed_metrics'] = base
                                 model.setdefault('metadata', {})['pearson_r_test'] = base.get('pearson_r_test')
                                 model['metadata']['pearson_r_training'] = base.get('pearson_r_training')
                             if base_weights:
                                 reg_content['feature_importance'] = base_weights
-                            if base_impact is not None:
+                            if isinstance(base_impact, dict):
                                 reg_content['impact_tree'] = base_impact
-                            if base_expr:
-                                reg_content['expression'] = base_expr
-                            # 基线恢复同样清空 expression_latex，交由前端根据 expression 生成
-                            reg_content['expression_latex'] = ''
-                            if reg_content.get('baseline_expression_text'):
-                                reg_content['expression_text'] = reg_content['baseline_expression_text']
                         else:
                             # 对超过 15 的索引进行截断（>=15 视同第15次的指标），支持无限撤销
                             idx = new_index if new_index <= 15 else 15
                             seq_metrics = MOCK_INDICATORS_SEQUENCE[idx]
                             seq_weights = MOCK_WEIGHTS_SEQUENCE[idx]
-                            seq_impact = MOCK_IMPACT_SEQUENCE[idx]
+                            seq_impact = MOCK_IMPACT_TREE_SEQUENCE[idx]
                             if isinstance(seq_metrics, dict):
                                 reg_content['detailed_metrics'] = seq_metrics
                                 model.setdefault('metadata', {})['pearson_r_test'] = seq_metrics.get('pearson_r_test')
@@ -1557,12 +1558,7 @@ def update_data_model_file(model_id, file_type):
                             if isinstance(seq_weights, list):
                                 reg_content['feature_importance'] = seq_weights
                             if isinstance(seq_impact, dict):
-                                reg_content['impact_tree'] = seq_impact.get('impact_tree')
-                                expr = seq_impact.get('expression')
-                                if expr:
-                                    reg_content['expression'] = expr
-                                    reg_content['expression_latex'] = ''
-                                    reg_content['expression_text'] = expr
+                                reg_content['impact_tree'] = seq_impact
                         model.setdefault('metadata', {})['expr_tree_op_index'] = new_index
                     else:
                         # 允许直接设置详细指标（不建议在表达式树操作路径外使用）
@@ -1570,6 +1566,8 @@ def update_data_model_file(model_id, file_type):
                             reg_content['detailed_metrics'] = data['detailed_metrics']
                         if 'feature_importance' in data and isinstance(data['feature_importance'], list):
                             reg_content['feature_importance'] = data['feature_importance']
+                        if direct_set_impact_tree:
+                            reg_content['impact_tree'] = data['impact_tree']
                     if 'updated_at' in data:
                         reg_content['updated_at'] = data['updated_at']
                     
