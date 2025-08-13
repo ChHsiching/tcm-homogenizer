@@ -771,19 +771,24 @@ function wireToolbarActions(container, getSvg) {
                     throw new Error(`回归模型文件更新失败: ${regModelResp.status}`);
                 }
                 
-                // 3. 读取最新摘要以刷新左侧性能与详细指标，并使用后端的模拟树与表达式重渲染SVG
+                // 优先使用后端直接返回的统一摘要，避免额外请求
+                let updatedSummary = null;
                 try {
-                    const updated = await fetchExpressionTreeSummary({ model_id: modelId });
-                    if (updated) {
-                        if (updated.impact_tree) {
-                            window.TREE_IMPACT_DATA = updated.impact_tree;
-                        } else {
-                            window.TREE_IMPACT_DATA = null;
-                        }
-                        await renderExpressionTree(updated);
+                    const sj = await regModelResp.json();
+                    if (sj && sj.success && sj.result) {
+                        updatedSummary = sj.result;
                     }
-    } catch (e) {
-                    console.warn('刷新表达式树摘要失败（将继续显示旧指标）:', e);
+                } catch (_) {}
+                
+                // 3. 读取最新摘要以刷新左侧性能与详细指标
+                try {
+                    const summaryToUse = updatedSummary || await fetchExpressionTreeSummary({ model_id: modelId });
+                    if (summaryToUse) {
+                        displayExpressionTreeSummary(summaryToUse);
+                        await renderExpressionTree(summaryToUse);
+                    }
+                } catch (e2) {
+                    console.warn('刷新摘要失败，已忽略:', e2);
                 }
 
                 console.log('✅ 表达式树修改已同步到数据库并刷新指标');
