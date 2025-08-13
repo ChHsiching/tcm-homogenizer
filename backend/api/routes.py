@@ -17,6 +17,7 @@ import io
 import zipfile
 from werkzeug.utils import secure_filename
 import shutil
+import re
 
 # 创建蓝图
 symbolic_regression_bp = Blueprint('symbolic_regression', __name__)
@@ -296,16 +297,820 @@ MOCK_WEIGHTS_BASELINE = [
     {'feature': 'CRA', 'importance': 0},
     {'feature': 'EPI', 'importance': 0},
     {'feature': 'PC1', 'importance': 0},
-    {'feature': 'PB2', 'importance': 0},
-    {'feature': 'VG', 'importance': 0},
-    {'feature': 'RUT', 'importance': 0},
-    {'feature': 'GUA', 'importance': 0},
-    {'feature': 'AST', 'importance': 0},
-    {'feature': 'PIS', 'importance': 0},
-    {'feature': 'CCGA', 'importance': 0},
-    {'feature': 'CGA', 'importance': 0},
-    {'feature': 'NCGA', 'importance': 0}
+    {'feature': 'PB2', 'importance': 0}
 ]
+
+# 基线SVG符号表达式树的初始影响力数据（对应docs/tree.json）
+BASELINE_IMPACT_TREE = {
+    "Addition": {
+        "Multiplication": {
+            "Addition": {
+                "Subtraction": {
+                    "Division": {
+                        "Multiplication": {
+                            "Addition": {
+                                "1.9105 * HYP": 0.0157069022188682,
+                                "Subtraction": {
+                                    "Addition": {
+                                        "Addition": {
+                                            "0.6015 * QA": 0.011758459632117,
+                                            "0.4274 * HYP": 0.00120390671170711
+                                        },
+                                        "1.2977 * CA": 0.113928459255378
+                                    },
+                                    "-10.458": 0
+                                }
+                            },
+                            "Addition": {
+                                "-1.9323": 0,
+                                "Multiplication": {
+                                    "-0.0781 * MA": 0.108972688038807,
+                                    "Addition": {
+                                        "Addition": {
+                                            "Addition": {
+                                                "-1.9323": 0,
+                                                "1.4812 * OA": 0.00688842480665608
+                                            },
+                                            "0.5974 * UA": 0.0111402882791509
+                                        },
+                                        "0.6078 * UA": 0.0120783966067667
+                                    }
+                                }
+                            }
+                        },
+                        "2.9628 * VR": 0.279624923755846
+                    },
+                    "Division": {
+                        "2.6756": 0,
+                        "0.4083 * HYP": 0.0763517896756712
+                    }
+                },
+                "Division": {
+                    "1.2192 * VR": 0.0208902884673905,
+                    "Subtraction": {
+                        "5.4189": 0,
+                        "1.9105 * HYP": 0.21010236004585
+                    }
+                }
+            },
+            "0.0054": 0
+        },
+        "0.9305": 0
+    }
+}
+
+# 符号表达式树操作的模拟树结构序列（不要从文件读取，直接内嵌）
+# 下标1..15分别对应第1~15次树结构变更后的树结构；下标0表示基线，不覆盖。
+MOCK_IMPACT_TREES_SEQUENCE = [None] + [
+    # 第1次操作后的树结构 - 原始impact-1.json，转换为纯嵌套字典格式
+    {
+        "Addition": {
+            "Division": {
+                "1": 0,
+                "-28.494 * HYP": 0.076351789675616
+            },
+            "Addition": {
+                "Division": {
+                    "0.00653 * VR": 0.0208902884673897,
+                    "Addition": {
+                        "-1.9105 * HYP": 0.210102360045851,
+                        "5.4189": 0
+                    }
+                },
+                "Addition": {
+                    "Division": {
+                        "Multiplication": {
+                            "Addition": {
+                                "0.6015 * QA": 0.0117584596321174,
+                                "2.3379 * HYP": 0.0228735360067907,
+                                "1.2977 * CA": 0.113928459255378,
+                                "10.458": 0
+                            },
+                            "Addition": {
+                                "Multiplication": {
+                                    "MA": 0.108972688038807,
+                                    "Addition": {
+                                        "1.2053 * UA": 0.108144059957083,
+                                        "1.4812 * OA": 0.00688842480665586,
+                                        "-1.9323": 0
+                                    },
+                                    "0.078141": 0
+                                }
+                            },
+                            "0.0053559": 0
+                        },
+                        "2.9628 * VR": 0.279624923755845
+                    },
+                    "0.93054": 0
+                }
+            }
+        }
+    },
+    # 第2次操作后的树结构 - 原始impact-2.json，转换为纯嵌套字典格式
+    {
+        "Addition": {
+            "Division": {
+                "Multiplication": {
+                    "Addition": {
+                        "1.2977 * CA": 0.113928459255378,
+                        "0.6015 * QA": 0.0117584596321172,
+                        "2.3379 * HYP": 0.0228735360067907,
+                        "10.458": 0
+                    },
+                    "Addition": {
+                        "Multiplication": {
+                            "MA": 0.108972688038807,
+                            "Addition": {
+                                "1.2053 * UA": 0.108144059957083,
+                                "1.4812 * OA": 0.00688842480665564,
+                                "-1.9323": 0
+                            },
+                            "-0.078141": 0
+                        },
+                        "-1.9323": 0
+                    },
+                    "0.0053559": 0
+                },
+                "2.9628 * VR": 0.279624923755845
+            },
+            "Addition": {
+                "Division": {
+                    "1": 0,
+                    "-28.494 * HYP": 0.0763517896756718
+                },
+                "Addition": {
+                    "Division": {
+                        "0.00653 * VR": 0.0208902884673899,
+                        "Addition": {
+                            "-1.9105 * HYP": 0.210102360045851,
+                            "5.4189": 0
+                        }
+                    },
+                    "0.93054": 0
+                }
+            }
+        }
+    },
+    # 第3次操作后的树结构 - 原始impact-3.json，转换为纯嵌套字典格式
+    {
+        "Addition": {
+            "Division": {
+                "0.00653 * VR": 0.0208902884673897,
+                "Addition": {
+                    "-1.9105 * HYP": 0.210102360045851,
+                    "5.4189": 0
+                }
+            },
+            "Addition": {
+                "Division": {
+                    "Multiplication": {
+                        "Addition": {
+                            "2.3379 * HYP": 0.0228735360067904,
+                            "1.2977 * CA": 0.113928459255379,
+                            "0.6015 * QA": 0.0117584596321172,
+                            "10.458": 0
+                        },
+                        "Addition": {
+                            "Multiplication": {
+                                "MA": 0.108972688038807,
+                                "Addition": {
+                                    "1.2053 * UA": 0.108144059957083,
+                                    "1.4812 * OA": 0.00688842480665564,
+                                    "-1.9323": 0
+                                },
+                                "-0.078141": 0
+                            },
+                            "-1.9323": 0
+                        },
+                        "0.0053559": 0
+                    },
+                    "2.9628 * VR": 0.279624923755845
+                },
+                "Addition": {
+                    "Division": {
+                        "1": 0,
+                        "-28.494 * HYP": 0.076351789675672
+                    },
+                    "0.93054": 0
+                }
+            }
+        }
+    },
+    # 第4次操作后的树结构 - 原始impact-4.json，转换为纯嵌套字典格式（避免重复键）
+    {
+        "Addition": {
+            "Division": {
+                "1": 0,
+                "-28.494 * HYP": 0.0763517896756716
+            },
+            "Addition": {
+                "Division": {
+                    "0.00653 * VR": 0.0208902884673897,
+                    "Addition": {
+                        "-1.9105 * HYP": 0.210102360045851,
+                        "5.4189": 0
+                    }
+                },
+                "Addition": {
+                    "Division": {
+                        "Multiplication": {
+                            "Addition": {
+                                "0.6015 * QA": 0.0117584596321174,
+                                "2.3379 * HYP": 0.0228735360067907,
+                                "1.2977 * CA": 0.113928459255378,
+                                "10.458": 0
+                            },
+                            "Addition": {
+                                "Multiplication": {
+                                    "MA": 0.108972688038807,
+                                    "Addition": {
+                                        "1.2053 * UA": 0.108144059957083,
+                                        "1.4812 * OA": 0.00688842480665586,
+                                        "-1.9323": 0
+                                    },
+                                    "-0.078141": 0
+                                },
+                                "-1.9323": 0
+                            },
+                            "0.0053559": 0
+                        },
+                        "2.9628 * VR": 0.279624923755845
+                    },
+                    "0.93054": 0
+                }
+            }
+        }
+    },
+    # 第5次操作后的树结构 - 原始impact-5.json，转换为纯嵌套字典格式
+    {
+        "Addition": {
+            "Multiplication": {
+                "Addition": {
+                    "Division": {
+                        "1": 0,
+                        "-28.494 * HYP": 0.0733317696147618
+                    },
+                    "Addition": {
+                        "Division": {
+                            "0.00653 * VR": 0.0208950935373927,
+                            "Addition": {
+                                "-1.9105 * HYP": 0.247577708475269,
+                                "5.4189": 0
+                            }
+                        },
+                        "Addition": {
+                            "Division": {
+                                "Multiplication": {
+                                    "Addition": {
+                                        "0.6015 * QA": 0.00534718638286213,
+                                        "2.3379 * HYP": 0.0283254630009195,
+                                        "1.2977 * CA": 0.121817221428969,
+                                        "10.458": 0
+                                    },
+                                    "Addition": {
+                                        "Multiplication": {
+                                            "MA": 0.0812579052747987,
+                                            "Addition": {
+                                                "1.2053 * UA": 0.137119380648784,
+                                                "-1.9323": 0
+                                            },
+                                            "-0.078141": 0
+                                        },
+                                        "-1.9323": 0
+                                    },
+                                    "0.0053559": 0
+                                },
+                                "2.9628 * VR": 0.275874028734677
+                            },
+                            "0.93054": 0
+                        }
+                    }
+                },
+                "1.1499": 0
+            },
+            "-0.14436": 0
+        }
+    },
+    # 第6次操作后的树结构 - 原始impact-6.json，转换为纯嵌套字典格式
+    {
+        "Addition": {
+            "Division": {
+                "0.0075089 * VR": 0.0208950935373935,
+                "Addition": {
+                    "-1.9105 * HYP": 0.24757770847527,
+                    "5.4189": 0
+                }
+            },
+            "Addition": {
+                "Division": {
+                    "Multiplication": {
+                        "Addition": {
+                            "2.3379 * HYP": 0.0283254630009203,
+                            "1.2977 * CA": 0.121817221428969,
+                            "0.6015 * QA": 0.0053471863828628,
+                            "10.458": 0
+                        },
+                        "Addition": {
+                            "Multiplication": {
+                                "MA": 0.0812579052747997,
+                                "Addition": {
+                                    "1.2053 * UA": 0.137119380648785,
+                                    "-1.9323": 0
+                                },
+                                "-0.078141": 0
+                            },
+                            "-1.9323": 0
+                        },
+                        "0.0061587": 0
+                    },
+                    "2.9628 * VR": 0.275874028734678
+                },
+                "Addition": {
+                    "Division": {
+                        "1": 0,
+                        "-24.78 * HYP": 0.0733317696147628
+                    },
+                    "0.92566": 0
+                }
+            }
+        }
+    },
+    # 第7次操作后的树结构 - 原始impact-7.json，转换为纯嵌套字典格式
+    {
+        "Addition": {
+            "Multiplication": {
+                "Addition": {
+                    "Division": {
+                        "0.0075089 * VR": 0.0196564510771616,
+                        "Addition": {
+                            "-1.9105 * HYP": 0.255861250843903,
+                            "5.4189": 0
+                        }
+                    },
+                    "Addition": {
+                        "Division": {
+                            "Multiplication": {
+                                "Addition": {
+                                    "2.3379 * HYP": 0.0245600888604456,
+                                    "1.2977 * CA": 0.134997651842973,
+                                    "10.458": 0
+                                },
+                                "Addition": {
+                                    "Multiplication": {
+                                        "MA": 0.0915664689038374,
+                                        "Addition": {
+                                            "1.2053 * UA": 0.139791872958965,
+                                            "-1.9323": 0
+                                        },
+                                        "-0.078141": 0
+                                    },
+                                    "-1.9323": 0
+                                },
+                                "0.0061587": 0
+                            },
+                            "2.9628 * VR": 0.264262090594079
+                        },
+                        "Addition": {
+                            "Division": {
+                                "1": 0,
+                                "-24.78 * HYP": 0.0996617689752506
+                            },
+                            "0.92566": 0
+                        }
+                    }
+                },
+                "1.0627": 0
+            },
+            "-0.059992": 0
+        }
+    },
+    # 第8次操作后的树结构 - 原始impact-8.json，转换为纯嵌套字典格式
+    {
+        "Addition": {
+            "Division": {
+                "Multiplication": {
+                    "Addition": {
+                        "2.3379 * HYP": 0.0245600888604455,
+                        "1.2977 * CA": 0.134997651842973,
+                        "10.458": 0
+                    },
+                    "Addition": {
+                        "Multiplication": {
+                            "MA": 0.0915664689038371,
+                            "Addition": {
+                                "1.2053 * UA": 0.139791872958965,
+                                "-1.9323": 0
+                            },
+                            "-0.078141": 0
+                        },
+                        "-1.9323": 0
+                    },
+                    "0.0065447": 0
+                },
+                "2.9628 * VR": 0.264262090594078
+            },
+            "Addition": {
+                "Division": {
+                    "1": 0,
+                    "-23.318 * HYP": 0.0996617689752501
+                },
+                "Addition": {
+                    "Division": {
+                        "0.0079795 * VR": 0.0196564510771611,
+                        "Addition": {
+                            "-1.9105 * HYP": 0.255861250843903,
+                            "5.4189": 0
+                        }
+                    },
+                    "0.92369": 0
+                }
+            }
+        }
+    },
+    # 第9次操作后的树结构 - 原始impact-9.json，转换为纯嵌套字典格式
+    {
+        "Addition": {
+            "Division": {
+                "0.0079795 * VR": 0.0196564510771614,
+                "Addition": {
+                    "-1.9105 * HYP": 0.255861250843903,
+                    "5.4189": 0
+                }
+            },
+            "Addition": {
+                "Division": {
+                    "Multiplication": {
+                        "Addition": {
+                            "2.3379 * HYP": 0.0245600888604458,
+                            "1.2977 * CA": 0.134997651842973,
+                            "10.458": 0
+                        },
+                        "Addition": {
+                            "Multiplication": {
+                                "MA": 0.091566468903837,
+                                "Addition": {
+                                    "1.2053 * UA": 0.139791872958965,
+                                    "-1.9323": 0
+                                },
+                                "-0.078141": 0
+                            },
+                            "-1.9323": 0
+                        },
+                        "0.0065447": 0
+                    },
+                    "2.9628 * VR": 0.264262090594078
+                },
+                "Addition": {
+                    "Division": {
+                        "1": 0,
+                        "-23.318 * HYP": 0.0996617689752507
+                    },
+                    "0.92369": 0
+                }
+            }
+        }
+    },
+    # 第10次操作后的树结构 - 原始impact-10.json，转换为纯嵌套字典格式
+    {
+        "Addition": {
+            "Division": {
+                "1": 0,
+                "-23.318 * HYP": 0.0996617689752504
+            },
+            "Addition": {
+                "Division": {
+                    "0.0079795 * VR": 0.0196564510771611,
+                    "Addition": {
+                        "-1.9105 * HYP": 0.255861250843903,
+                        "5.4189": 0
+                    }
+                },
+                "Addition": {
+                    "Division": {
+                        "Multiplication": {
+                            "Addition": {
+                                "2.3379 * HYP": 0.0245600888604455,
+                                "1.2977 * CA": 0.134997651842973,
+                                "10.458": 0
+                            },
+                            "Addition": {
+                                "Multiplication": {
+                                    "MA": 0.0915664689038371,
+                                    "Addition": {
+                                        "1.2053 * UA": 0.139791872958965,
+                                        "-1.9323": 0
+                                    },
+                                    "-0.078141": 0
+                                },
+                                "-1.9323": 0
+                            },
+                            "0.0065447": 0
+                        },
+                        "2.9628 * VR": 0.264262090594078
+                    },
+                    "0.92369": 0
+                }
+            }
+        }
+    },
+    # 第11次操作后的树结构 - 原始impact-11.json，转换为纯嵌套字典格式
+    {
+        "Addition": {
+            "Division": {
+                "Multiplication": {
+                    "Addition": {
+                        "2.3379 * HYP": 0.0245600888604455,
+                        "1.2977 * CA": 0.134997651842973,
+                        "10.458": 0
+                    },
+                    "Addition": {
+                        "Multiplication": {
+                            "MA": 0.0915664689038371,
+                            "Addition": {
+                                "1.2053 * UA": 0.139791872958965,
+                                "-1.9323": 0
+                            },
+                            "-0.078141": 0
+                        },
+                        "-1.9323": 0
+                    },
+                    "0.0065447": 0
+                },
+                "2.9628 * VR": 0.264262090594078
+            },
+            "Addition": {
+                "Division": {
+                    "1": 0,
+                    "-23.318 * HYP": 0.0996617689752501
+                },
+                "Addition": {
+                    "Division": {
+                        "0.0079795 * VR": 0.0196564510771611,
+                        "Addition": {
+                            "-1.9105 * HYP": 0.255861250843903,
+                            "5.4189": 0
+                        }
+                    },
+                    "0.92369": 0
+                }
+            }
+        }
+    },
+    # 第12次操作后的树结构 - 原始impact-12.json，转换为纯嵌套字典格式
+    {
+        "Addition": {
+            "Division": {
+                "0.0079795 * VR": 0.0196564510771614,
+                "Addition": {
+                    "-1.9105 * HYP": 0.255861250843903,
+                    "5.4189": 0
+                }
+            },
+            "Addition": {
+                "Division": {
+                    "Multiplication": {
+                        "Addition": {
+                            "2.3379 * HYP": 0.0245600888604458,
+                            "1.2977 * CA": 0.134997651842973,
+                            "10.458": 0
+                        },
+                        "Addition": {
+                            "Multiplication": {
+                                "MA": 0.091566468903837,
+                                "Addition": {
+                                    "1.2053 * UA": 0.139791872958965,
+                                    "-1.9323": 0
+                                },
+                                "-0.078141": 0
+                            },
+                            "-1.9323": 0
+                        },
+                        "0.0065447": 0
+                    },
+                    "2.9628 * VR": 0.264262090594078
+                },
+                "Addition": {
+                    "Division": {
+                        "1": 0,
+                        "-23.318 * HYP": 0.0996617689752507
+                    },
+                    "0.92369": 0
+                }
+            }
+        }
+    },
+    # 第13次操作后的树结构 - 原始impact-13.json，转换为纯嵌套字典格式
+    {
+        "Addition": {
+            "Division": {
+                "1": 0,
+                "-23.318 * HYP": 0.0996617689752504
+            },
+            "Addition": {
+                "Division": {
+                    "0.0079795 * VR": 0.0196564510771611,
+                    "Addition": {
+                        "-1.9105 * HYP": 0.255861250843903,
+                        "5.4189": 0
+                    }
+                },
+                "Addition": {
+                    "Division": {
+                        "Multiplication": {
+                            "Addition": {
+                                "2.3379 * HYP": 0.0245600888604455,
+                                "1.2977 * CA": 0.134997651842973,
+                                "10.458": 0
+                            },
+                            "Addition": {
+                                "Multiplication": {
+                                    "MA": 0.0915664689038371,
+                                    "Addition": {
+                                        "1.2053 * UA": 0.139791872958965,
+                                        "-1.9323": 0
+                                    },
+                                    "-0.078141": 0
+                                },
+                                "-1.9323": 0
+                            },
+                            "0.0065447": 0
+                        },
+                        "2.9628 * VR": 0.264262090594078
+                    },
+                    "0.92369": 0
+                }
+            }
+        }
+    },
+    # 第14次操作后的树结构 - 原始impact-14.json，转换为纯嵌套字典格式
+    {
+        "Addition": {
+            "Division": {
+                "Multiplication": {
+                    "Addition": {
+                        "2.3379 * HYP": 0.0245600888604455,
+                        "1.2977 * CA": 0.134997651842973,
+                        "10.458": 0
+                    },
+                    "Addition": {
+                        "Multiplication": {
+                            "MA": 0.0915664689038371,
+                            "Addition": {
+                                "1.2053 * UA": 0.139791872958965,
+                                "-1.9323": 0
+                            },
+                            "-0.078141": 0
+                        },
+                        "-1.9323": 0
+                    },
+                    "0.0065447": 0
+                },
+                "2.9628 * VR": 0.264262090594078
+            },
+            "Addition": {
+                "Division": {
+                    "1": 0,
+                    "-23.318 * HYP": 0.0996617689752501
+                },
+                "Addition": {
+                    "Division": {
+                        "0.0079795 * VR": 0.0196564510771611,
+                        "Addition": {
+                            "-1.9105 * HYP": 0.255861250843903,
+                            "5.4189": 0
+                        }
+                    },
+                    "0.92369": 0
+                }
+            }
+        }
+    },
+    # 第15次操作后的树结构 - 原始impact-15.json，转换为纯嵌套字典格式
+    {
+        "Addition": {
+            "Division": {
+                "0.0079795 * VR": 0.0196564510771614,
+                "Addition": {
+                    "-1.9105 * HYP": 0.255861250843903,
+                    "5.4189": 0
+                }
+            },
+            "Addition": {
+                "Division": {
+                    "Multiplication": {
+                        "Addition": {
+                            "2.3379 * HYP": 0.0245600888604458,
+                            "1.2977 * CA": 0.134997651842973,
+                            "10.458": 0
+                        },
+                        "Addition": {
+                            "Multiplication": {
+                                "MA": 0.091566468903837,
+                                "Addition": {
+                                    "1.2053 * UA": 0.139791872958965,
+                                    "-1.9323": 0
+                                },
+                                "-0.078141": 0
+                            },
+                            "-1.9323": 0
+                        },
+                        "0.0065447": 0
+                    },
+                    "2.9628 * VR": 0.264262090594078
+                },
+                "Addition": {
+                    "Division": {
+                        "1": 0,
+                        "-23.318 * HYP": 0.0996617689752507
+                    },
+                    "0.92369": 0
+                }
+            }
+        }
+    }
+]
+
+# 基于 impact_tree 生成中缀表达式（仅用于模拟）
+_OP_SYMBOL = {
+    "Addition": "+",
+    "Subtraction": "-",
+    "Multiplication": "*",
+    "Division": "/",
+}
+
+_VAR_RE = re.compile(r"^\s*([+-]?[0-9]*\.?[0-9]+)\s*\*\s*([A-Za-z_][A-Za-z0-9_]*)\s*$")
+
+
+def _term_to_expr(key: str) -> str:
+    try:
+        m = _VAR_RE.match(str(key))
+        if m:
+            coef, var = m.groups()
+            return f"({coef} * {var})"
+        float(key)
+        return str(key)
+    except Exception:
+        return str(key)
+
+
+def _build_expression_from_tree(node) -> str:
+    """
+    将 impact_tree 的嵌套字典结构转换为数学表达式字符串
+    
+    格式与 docs/tree.json 完全一致:
+    {"Addition": {"Division": {...}, "Addition": {...}, "0.93054": 0}}
+    """
+    if not isinstance(node, dict) or not node:
+        return "0"
+    
+    # 如果只有一个键
+    if len(node) == 1:
+        key = next(iter(node.keys()))
+        value = node[key]
+        
+        if key in _OP_SYMBOL:
+            # 这是一个操作符节点，value 包含子节点
+            if not isinstance(value, dict):
+                return "0"
+            
+            # 递归处理每个子节点
+            parts = []
+            for child_key, child_value in value.items():
+                if child_key in _OP_SYMBOL:
+                    # 子节点也是操作符，递归处理
+                    parts.append(_build_expression_from_tree({child_key: child_value}))
+                else:
+                    # 子节点是叶子节点（常数或变量）
+                    parts.append(_term_to_expr(child_key))
+            
+            if not parts:
+                return "0"
+            
+            # 根据操作符类型组合表达式
+            if key == "Addition":
+                return f"({(' + ').join(parts)})"
+            elif key == "Subtraction":
+                if len(parts) == 1:
+                    return f"(-{parts[0]})"
+                return f"({parts[0]} - {(' - ').join(parts[1:])})"
+            elif key == "Multiplication":
+                return f"({(' * ').join(parts)})"
+            elif key == "Division":
+                if len(parts) >= 2:
+                    # 除法：第一个是分子，其余的依次作为分母
+                    result = parts[0]
+                    for denom in parts[1:]:
+                        result = f"({result} / {denom})"
+                    return result
+                else:
+                    return f"({parts[0]})" if parts else "0"
+        else:
+            # 这是一个叶子节点
+            return _term_to_expr(key)
+    
+    # 如果有多个键，选择第一个键处理
+    first_key = next(iter(node.keys()))
+    return _build_expression_from_tree({first_key: node[first_key]})
 
 # 符号表达式树操作的模拟特征权重序列（不要从文件读取，直接内嵌）
 # 下标1..15分别对应第1~15次树结构变更后的特征权重；下标0表示基线，不覆盖。
@@ -739,7 +1544,7 @@ def expression_tree_summary():
                     # 合并字段：优先使用回归模型JSON，其次模型元数据，最后给出合理兜底
                     result = {
                         'id': model.get('id'),
-                        'expression': (reg_json or {}).get('expression_text') or (reg_json or {}).get('expression') or model.get('expression') or (
+                        'expression': (reg_json or {}).get('expression') or (reg_json or {}).get('expression_text') or model.get('expression') or (
                             "(((((1.9105 * HYP + ((((0.6015 * QA + 0.42745 * HYP) + 1.2977 * CA) - (-10.458))))"
                             " * (-1.9323 + -0.078141 * MA * (((-1.9323 + 1.4812 * OA) + 0.59744 * UA) + 0.60783 * UA)))"
                             " / (2.9628 * VR) - 2.6756 / (0.40832 * HYP)) + (1.2192 * VR) / (5.4189 - 1.9105 * HYP))"
@@ -790,6 +1595,11 @@ def expression_tree_summary():
                             "pearson_r_training": 0.87333644430924906,
                             "root_mean_squared_error_test": 0.027104360908430703,
                             "root_mean_squared_error_training": 0.023170651562649292
+                        },
+                        'metadata': {
+                            'expr_tree_op_index': model.get('metadata', {}).get('expr_tree_op_index', 0),
+                            'pearson_r_test': model.get('metadata', {}).get('pearson_r_test'),
+                            'pearson_r_training': model.get('metadata', {}).get('pearson_r_training')
                         },
                         'data_model_id': model.get('id')
                     }
@@ -1211,11 +2021,14 @@ def update_data_model_file(model_id, file_type):
                         reg_content['impact_tree'] = data['impact_tree']
                     # 表达式树操作驱动的指标轮换/撤销
                     action = (data or {}).get('expr_tree_action')
-                    # 初始化基线指标和特征权重
+                    # 初始化基线指标、特征权重和树结构
                     if 'baseline_detailed_metrics' not in reg_content:
                         reg_content['baseline_detailed_metrics'] = reg_content.get('detailed_metrics') or {}
                     if 'baseline_feature_importance' not in reg_content:
                         reg_content['baseline_feature_importance'] = reg_content.get('feature_importance') or []
+                    if 'baseline_impact_tree' not in reg_content:
+                        # 确保基线impact_tree总是使用正确的初始树结构数据
+                        reg_content['baseline_impact_tree'] = BASELINE_IMPACT_TREE
                     op_index = int(model.get('metadata', {}).get('expr_tree_op_index', 0) or 0)
                     new_index = op_index
                     if action in ('delete', 'simplify', 'optimize'):
@@ -1225,35 +2038,55 @@ def update_data_model_file(model_id, file_type):
                         if idx > 0:
                             seq_metrics = MOCK_INDICATORS_SEQUENCE[idx]
                             seq_weights = MOCK_WEIGHTS_SEQUENCE[idx]
+                            seq_tree = MOCK_IMPACT_TREES_SEQUENCE[idx]
                             if isinstance(seq_metrics, dict):
                                 reg_content['detailed_metrics'] = seq_metrics
                                 model.setdefault('metadata', {})['pearson_r_test'] = seq_metrics.get('pearson_r_test')
                                 model['metadata']['pearson_r_training'] = seq_metrics.get('pearson_r_training')
                             if isinstance(seq_weights, list):
                                 reg_content['feature_importance'] = seq_weights
+                            if isinstance(seq_tree, dict):
+                                reg_content['impact_tree'] = seq_tree
+                                # 同步表达式（用于前端以表达式为源生成 AST），并清空旧的 LaTeX 以避免覆盖
+                                try:
+                                    reg_content['expression'] = _build_expression_from_tree(seq_tree)
+                                    reg_content['expression_latex'] = ''
+                                except Exception:
+                                    reg_content['expression_latex'] = ''
                         model.setdefault('metadata', {})['expr_tree_op_index'] = new_index
                     elif action == 'undo':
                         new_index = max(0, op_index - 1)
                         if new_index == 0:
                             base = reg_content.get('baseline_detailed_metrics') or {}
                             base_weights = reg_content.get('baseline_feature_importance') or []
+                            base_tree = reg_content.get('baseline_impact_tree') or {}
                             if base:
                                 reg_content['detailed_metrics'] = base
                                 model.setdefault('metadata', {})['pearson_r_test'] = base.get('pearson_r_test')
                                 model['metadata']['pearson_r_training'] = base.get('pearson_r_training')
                             if base_weights:
                                 reg_content['feature_importance'] = base_weights
+                            if base_tree:
+                                reg_content['impact_tree'] = base_tree
                         else:
                             # 对超过 15 的索引进行截断（>=15 视同第15次的指标），支持无限撤销
                             idx = new_index if new_index <= 15 else 15
                             seq_metrics = MOCK_INDICATORS_SEQUENCE[idx]
                             seq_weights = MOCK_WEIGHTS_SEQUENCE[idx]
+                            seq_tree = MOCK_IMPACT_TREES_SEQUENCE[idx]
                             if isinstance(seq_metrics, dict):
                                 reg_content['detailed_metrics'] = seq_metrics
                                 model.setdefault('metadata', {})['pearson_r_test'] = seq_metrics.get('pearson_r_test')
                                 model['metadata']['pearson_r_training'] = seq_metrics.get('pearson_r_training')
                             if isinstance(seq_weights, list):
                                 reg_content['feature_importance'] = seq_weights
+                            if isinstance(seq_tree, dict):
+                                reg_content['impact_tree'] = seq_tree
+                                try:
+                                    reg_content['expression'] = _build_expression_from_tree(seq_tree)
+                                    reg_content['expression_latex'] = ''
+                                except Exception:
+                                    reg_content['expression_latex'] = ''
                         model.setdefault('metadata', {})['expr_tree_op_index'] = new_index
                     else:
                         # 允许直接设置详细指标（不建议在表达式树操作路径外使用）
@@ -1261,6 +2094,8 @@ def update_data_model_file(model_id, file_type):
                             reg_content['detailed_metrics'] = data['detailed_metrics']
                         if 'feature_importance' in data and isinstance(data['feature_importance'], list):
                             reg_content['feature_importance'] = data['feature_importance']
+                        if 'impact_tree' in data and isinstance(data['impact_tree'], dict):
+                            reg_content['impact_tree'] = data['impact_tree']
                     if 'updated_at' in data:
                         reg_content['updated_at'] = data['updated_at']
                     

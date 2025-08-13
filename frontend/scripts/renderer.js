@@ -725,13 +725,19 @@ function wireToolbarActions(container, getSvg) {
             
             // 确保MathJax渲染，包括常量模块
             if (window.MathJax && window.MathJax.typesetPromise) {
-                MathJax.typesetPromise([formulaContainer]).catch(()=>{});
+                setTimeout(() => {
+                    MathJax.typesetPromise([formulaContainer]).then(() => {
+                        console.log('✅ 表达式载入MathJax渲染完成');
+                    }).catch(err => {
+                        console.error('❌ 表达式载入MathJax渲染失败:', err);
+                    });
+                }, 200);
             }
         }
         
         // 写回数据库：同步更新到后端（包含表达式树操作类型以驱动后端指标轮换/撤销）
         const modelId = window.__currentModelId__;
-        if (modelId) {
+                if (modelId) {
             try {
                 // 1. 更新主数据模型
                 const mainModelResp = await fetch(`${API_BASE_URL}/api/data-models/models/${modelId}`, {
@@ -771,11 +777,126 @@ function wireToolbarActions(container, getSvg) {
                     throw new Error(`回归模型文件更新失败: ${regModelResp.status}`);
                 }
                 
-                // 3. 读取最新摘要以刷新左侧性能与详细指标
+                // 3. 读取最新摘要以刷新左侧性能与详细指标，并获取新的树结构数据
                 try {
                     const updated = await fetchExpressionTreeSummary({ model_id: modelId });
                     if (updated) {
                         displayExpressionTreeSummary(updated);
+                        
+                        // 如果后端返回了新的树结构数据，更新前端并重新渲染
+                        if (updated.impact_tree && typeof updated.impact_tree === 'object') {
+                            console.log('🔄 检测到新的树结构数据，正在更新前端...');
+                            window.TREE_IMPACT_DATA = updated.impact_tree;
+                            
+                            // 🚨 关键修复：检查是否有新的表达式，如果有则重新解析AST
+                            let newAst = ast; // 默认使用当前AST
+                            if (updated.expression && updated.expression !== ExprTree.astToExpression(ast)) {
+                                console.log('🔄 检测到新的表达式，重新解析AST...');
+                                console.log('📝 旧表达式:', ExprTree.astToExpression(ast));
+                                console.log('📝 新表达式:', updated.expression);
+                                
+                                // 使用新表达式重新解析AST
+                                newAst = ExprTree.normalizeAst(ExprTree.parseExpressionToAst(updated.expression));
+                                window.currentExpressionAst = newAst; // 更新全局AST
+                                console.log('✅ AST已根据新表达式重新解析');
+                            }
+                            
+                            // 重新渲染SVG树以应用新的树结构和AST
+                            const canvas = document.getElementById('expression-tree-canvas');
+                            const inner = canvas.querySelector('.expr-tree-inner') || canvas;
+                            if (inner) {
+                                inner.innerHTML = '';
+                                ExprTree.computeWeights(newAst, { mode: 'coef' }); // 使用新AST
+                                const rect = canvas.getBoundingClientRect();
+                                const layoutInfo = ExprTree.layoutTree(newAst, Math.max(rect.width, 900), { siblingGap: 24, vGap: 120, drawScale: 1.5 });
+                                const svg = ExprTree.renderSvgTree(inner, newAst, { width: layoutInfo.width, config: layoutInfo.config, bounds: layoutInfo.bounds });
+                                wireToolbarActions(inner, () => svg);
+                                console.log('✅ SVG树已使用新的AST和树结构数据重新渲染');
+                                
+                                // 🚨 关键修复：同步更新上方的表达式显示
+                                try {
+                                    // 从新的AST提取常量信息
+                                    const newConstants = {};
+                                    const usedNumbers = new Set();
+                                    const newExpressionStr = ExprTree.astToExpression(newAst);
+                                    const numberPattern = /-?\d+\.?\d*/g;
+                                    const numbers = newExpressionStr.match(numberPattern) || [];
+                                    
+                                    numbers.forEach((num) => {
+                                        const numValue = parseFloat(num);
+                                        if (!usedNumbers.has(numValue)) {
+                                            const index = Object.keys(newConstants).length;
+                                            const key = `c_${index}`;
+                                            newConstants[key] = numValue;
+                                            usedNumbers.add(numValue);
+                                        }
+                                    });
+                                    
+                                    // 生成新的LaTeX公式
+                                    const newExpressionLatex = ExprTree.astToLatexWithConstants(newAst, 'HDL', newConstants);
+                                    const formulaContainer = document.getElementById('expr-formula-container');
+                                    if (formulaContainer) {
+                                        const formatConstantsForDisplay = (consts) => {
+                                            const entries = Object.entries(consts || {}).map(([k, v]) => {
+                                                const m = String(k).match(/^c(?:_|\{)?(\d+)\}?$/i);
+                                                const idx = m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER;
+                                                const latexKey = m ? `c_{${m[1]}}` : String(k);
+                                                return { idx, key: latexKey, value: v };
+                                            });
+                                            entries.sort((a, b) => a.idx - b.idx);
+                                            return entries;
+                                        };
+                                        
+                                        formulaContainer.innerHTML = `
+                                            <div class="regression-formula-container">
+                                                <div class="regression-formula">$${newExpressionLatex}$</div>
+                                                ${Object.keys(newConstants).length ? `
+                                                <div class="regression-constants">
+                                                    <h5>常数定义</h5>
+                                                    <div class="constant-list">
+                                                        ${formatConstantsForDisplay(newConstants).map(item => `<div class="constant-item">$${item.key} = ${item.value}$</div>`).join('')}
+                                                    </div>
+                                                </div>` : ''}
+                                            </div>
+                                            <div class="result-actions" style="margin-top: 10px;">
+                                                <button class="btn-secondary" onclick="switchTab('regression')">返回回归</button>
+                                                <button class="btn-primary" onclick="refreshExpressionTreeData()" style="margin-left: 10px;">
+                                                    刷新数据
+                                                </button>
+                                            </div>
+                                        `;
+                                        
+                                        // 确保MathJax重新渲染新的表达式
+                                        if (window.MathJax && window.MathJax.typesetPromise) {
+                                            setTimeout(() => {
+                                                MathJax.typesetPromise([formulaContainer]).then(() => {
+                                                    console.log('✅ rerender函数MathJax渲染完成');
+                                                }).catch(err => {
+                                                    console.error('❌ rerender函数MathJax渲染失败:', err);
+                                                });
+                                            }, 200);
+                                        }
+                                        
+                                        console.log('✅ 上方表达式显示已与SVG树同步更新');
+                                    }
+                                } catch (expressionUpdateError) {
+                                    console.warn('⚠️ 更新上方表达式显示失败:', expressionUpdateError);
+                                }
+                            }
+                        }
+                        
+                        // 更新操作计数器显示
+                        if (updated.metadata && typeof updated.metadata.expr_tree_op_index === 'number') {
+                            const opIndex = updated.metadata.expr_tree_op_index;
+                            window.__exprOpCount__ = opIndex;
+                            
+                            // 更新计数器显示
+                            const counterEl = document.querySelector('#expr-op-counter');
+                            if (counterEl) {
+                                counterEl.textContent = `操作次数：${opIndex}`;
+                                console.log(`🔄 操作计数器已更新为：${opIndex}`);
+                            }
+                        }
                     }
     } catch (e) {
                     console.warn('刷新表达式树摘要失败（将继续显示旧指标）:', e);
@@ -1001,16 +1122,27 @@ function displayExpressionTreeSummary(result) {
 
     // 只对右上公式区做 MathJax 渲染（带兜底重试，确保切页后首次也能渲染）
     if (window.MathJax && window.MathJax.typesetPromise) {
-        MathJax.typesetPromise([formulaContainer]).catch(err => console.error('MathJax渲染错误:', err));
+        setTimeout(() => {
+            MathJax.typesetPromise([formulaContainer]).then(() => {
+                console.log('✅ 符号表达式树页面MathJax渲染完成');
+            }).catch(err => {
+                console.error('❌ 符号表达式树页面MathJax渲染失败:', err);
+            });
+        }, 200);
     } else {
+        console.warn('⚠️ MathJax未加载，准备重试');
         const retryTypeset = () => {
             if (window.MathJax && window.MathJax.typesetPromise) {
-                MathJax.typesetPromise([formulaContainer]).catch(err => console.error('MathJax渲染错误:', err));
+                MathJax.typesetPromise([formulaContainer]).then(() => {
+                    console.log('✅ 符号表达式树页面MathJax重试渲染完成');
+                }).catch(err => {
+                    console.error('❌ 符号表达式树页面MathJax重试渲染失败:', err);
+                });
             } else {
                 setTimeout(retryTypeset, 100);
             }
         };
-        setTimeout(retryTypeset, 100);
+        setTimeout(retryTypeset, 300);
     }
 }
 
@@ -1717,17 +1849,17 @@ function displayRegressionResults(result) {
                     .filter(f => Number(f.importance || 0) > 0)
                     .sort((a, b) => Number(b.importance || 0) - Number(a.importance || 0))
                     .map(f => `
-                        <div class="feature-importance-item">
-                            <div class="feature-name-container">
-                                <div class="feature-name-en">${f.feature}</div>
-                                <div class="feature-name-cn">${getComponentChineseName(f.feature)}</div>
-                            </div>
-                            <div class="importance-bar">
-                                <div class="importance-fill" style="width: ${f.importance * 100}%"></div>
-                            </div>
-                            <div class="importance-value">${f.importance}</div>
+                    <div class="feature-importance-item">
+                        <div class="feature-name-container">
+                            <div class="feature-name-en">${f.feature}</div>
+                            <div class="feature-name-cn">${getComponentChineseName(f.feature)}</div>
                         </div>
-                    `).join('')}
+                        <div class="importance-bar">
+                            <div class="importance-fill" style="width: ${f.importance * 100}%"></div>
+                        </div>
+                            <div class="importance-value">${f.importance}</div>
+                    </div>
+                `).join('')}
             </div>
         </div>
         
@@ -3033,6 +3165,52 @@ function showFileContent(content, filename, fileType) {
     });
 }
 
+// 生成公式显示HTML（复用符号表达式树页面的渲染逻辑）
+function generateFormulaDisplayHTML(data) {
+    const expression = data.expression || '';
+    const targetVariable = data.target_variable || data.target_column || 'Y';
+    const constants = data.constants || {};
+    
+    // 若后端提供了 LaTeX 公式，则直接使用；否则由表达式生成
+    const latexFormula = data.expression_latex
+        ? data.expression_latex
+        : (typeof generateLatexFormula === 'function' ? generateLatexFormula(expression, targetVariable, constants) : expression);
+    
+    // 帮助：常数排序与 LaTeX 格式化（与displayExpressionTreeSummary完全一致）
+    const formatConstantsForDisplay = (consts) => {
+        const entries = Object.entries(consts || {}).map(([k, v]) => {
+            const m = String(k).match(/^c(?:_|\{)?(\d+)\}?$/i);
+            const idx = m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER;
+            const latexKey = m ? `c_{${m[1]}}` : String(k);
+            return { idx, key: latexKey, value: v };
+        });
+        entries.sort((a, b) => a.idx - b.idx);
+        return entries;
+    };
+    
+    // 如果有表达式才渲染，否则返回空字符串
+    if (!expression && !data.expression_latex && !data.expression_text) {
+        return '';
+    }
+    
+    // 使用与符号表达式树页面完全相同的HTML结构
+    return `
+        <div class="expression-box">
+            <div class="expression-label">模型表达式</div>
+            <div class="regression-formula-container">
+                <div class="regression-formula">$${latexFormula}$</div>
+                ${Object.keys(constants).length ? `
+                <div class="regression-constants">
+                    <h5>常数定义</h5>
+                    <div class="constant-list">
+                        ${formatConstantsForDisplay(constants).map(item => `<div class="constant-item">$${item.key} = ${item.value}$</div>`).join('')}
+                    </div>
+                </div>` : ''}
+            </div>
+        </div>
+    `;
+}
+
 // 渲染美化视图
 function renderBeautifiedFileContent(container, content, filename, fileType) {
     if (!container) return;
@@ -3084,7 +3262,7 @@ function renderBeautifiedFileContent(container, content, filename, fileType) {
                     <div class="metric-card"><div class="metric-label">皮尔逊相关系数(训练)</div><div class="metric-value">${dm.pearson_r_training ?? '-'}</div></div>
                     <div class="metric-card"><div class="metric-label">复杂度</div><div class="metric-value">${json.model_complexity ?? '-'}</div></div>
                 </div>
-                ${json.expression_latex ? `<div class="expression-box"><div class="expression-label">模型表达式（MathJax）</div><div class="expression-value">$${json.expression_latex}$</div></div>` : (json.expression ? `<div class="expression-box"><div class="expression-label">模型表达式（MathJax）</div><div class="expression-value">$${json.expression}$</div></div>` : (json.expression_text ? `<div class="expression-box"><div class="expression-label">模型表达式（文本）</div><div class="expression-value">${json.expression_text}</div></div>` : ''))}
+                ${generateFormulaDisplayHTML(json)}
 
                 <div class="section-subtitle">详细指标</div>
                 <div class="metrics-grid">
@@ -3120,22 +3298,43 @@ function renderBeautifiedFileContent(container, content, filename, fileType) {
                         .filter(item => Number(item.importance || 0) > 0)
                         .sort((a, b) => Number(b.importance || 0) - Number(a.importance || 0))
                         .map(item => `
-                            <div class="importance-row">
-                                <div class="imp-name">${item.feature}</div>
-                                <div class="imp-bar"><span style="width:${Math.min(100, Math.round((item.importance || 0) * 100))}%"></span></div>
+                        <div class="importance-row">
+                            <div class="imp-name">${item.feature}</div>
+                            <div class="imp-bar"><span style="width:${Math.min(100, Math.round((item.importance || 0) * 100))}%"></span></div>
                                 <div class="imp-value">${item.importance ?? 0}</div>
-                            </div>
-                        `).join('')}
+                        </div>
+                    `).join('')}
                 </div>` : ''}
             </div>
         `;
         container.innerHTML = html;
-        // 对 MathJax 公式进行渲染（无论是 expression_latex 还是 expression）
-        if ((json.expression_latex || json.expression) && window.MathJax && window.MathJax.typesetPromise) {
-            // 等待 DOM 渲染完成后执行 MathJax
-            setTimeout(() => {
-                MathJax.typesetPromise([container]).catch(()=>{});
-            }, 100);
+        // 对 MathJax 公式进行渲染（检查是否有公式内容）
+        if ((json.expression_latex || json.expression || json.expression_text)) {
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                // 等待 DOM 渲染完成后执行 MathJax
+                setTimeout(() => {
+                    MathJax.typesetPromise([container]).then(() => {
+                        console.log('✅ 数据管理页面MathJax渲染完成');
+                    }).catch(err => {
+                        console.error('❌ 数据管理页面MathJax渲染失败:', err);
+                    });
+                }, 200);
+            } else {
+                // MathJax尚未加载，等待并重试
+                console.warn('⚠️ MathJax未加载，准备重试');
+                const retryTypeset = () => {
+                    if (window.MathJax && window.MathJax.typesetPromise) {
+                        MathJax.typesetPromise([container]).then(() => {
+                            console.log('✅ 数据管理页面MathJax重试渲染完成');
+                        }).catch(err => {
+                            console.error('❌ 数据管理页面MathJax重试渲染失败:', err);
+                        });
+                    } else {
+                        setTimeout(retryTypeset, 100);
+                    }
+                };
+                setTimeout(retryTypeset, 300);
+            }
         }
         return;
     }
@@ -3204,12 +3403,12 @@ function renderBeautifiedFileContent(container, content, filename, fileType) {
                             .filter(item => Number(item.importance || 0) > 0)
                             .sort((a, b) => Number(b.importance || 0) - Number(a.importance || 0))
                             .map(item => `
-                                <div class="importance-row">
-                                    <div class="imp-name">${item.feature}</div>
-                                    <div class="imp-bar"><span style="width:${Math.min(100, Math.round((item.importance || 0) * 100))}%"></span></div>
+                            <div class="importance-row">
+                                <div class="imp-name">${item.feature}</div>
+                                <div class="imp-bar"><span style="width:${Math.min(100, Math.round((item.importance || 0) * 100))}%"></span></div>
                                     <div class="imp-value">${item.importance ?? 0}</div>
-                                </div>
-                            `).join('')}
+                            </div>
+                        `).join('')}
                     </div>` : ''}
                     ${sims.length ? `
                     <div class="section-subtitle">模拟样本（前5条）</div>
@@ -3613,6 +3812,15 @@ async function loadExpressionTreeData(modelId) {
         
         // 显示数据
         displayExpressionTreeSummary(summary);
+        
+        // 设置操作计数器
+        if (summary.metadata && typeof summary.metadata.expr_tree_op_index === 'number') {
+            window.__exprOpCount__ = summary.metadata.expr_tree_op_index;
+            console.log(`🔄 初始化操作计数器为：${summary.metadata.expr_tree_op_index}`);
+        } else {
+            window.__exprOpCount__ = 0;
+            console.log('🔄 初始化操作计数器为：0');
+        }
         
         // 渲染表达式树
         await renderExpressionTree(summary);
