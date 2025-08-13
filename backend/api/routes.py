@@ -37,6 +37,280 @@ os.makedirs(CSV_DATA_DIR, exist_ok=True)
 os.makedirs(MODELS_DIR, exist_ok=True)
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
+# 符号表达式树的模拟“结构+表达式”序列（不要从文件读取，直接内嵌）
+# 下标1..15分别对应第1~15次树结构变更后应展示的 impact_tree 以及对应的表达式 expression；下标0为None表示不覆盖。
+MOCK_IMPACT_SEQUENCE = [None] + [
+    {
+        'expression': "(((((MA + (1.2053 * UA) + 0.078141)) + 0.0053559) * 2.9628 * VR) / (0.93054))",
+        'impact_tree': {
+            'Addition': {
+                'Division': {
+                    'Multiplication': {
+                        'Addition': {
+                            'Multiplication': {
+                                'MA': 0.108972688038807,
+                                'Addition': {
+                                    '1.2053 * UA': 0.108144059957083,
+                                    '1.4812 * OA': 0.00688842480665586,
+                                    '-1.9323': 0
+                                },
+                                '0.078141': 0
+                            }
+                        },
+                        '0.0053559': 0
+                    },
+                    '2.9628 * VR': 0.279624923755845
+                },
+                '0.93054': 0
+            }
+        }
+    },
+    {
+        'expression': "((0.00653 * VR + (-1.9105 * HYP)) / (0.93054))",
+        'impact_tree': {
+            'Addition': {
+                'Division': {
+                    '0.00653 * VR': 0.0208902884673899,
+                    'Addition': {
+                        '-1.9105 * HYP': 0.210102360045851,
+                        '5.4189': 0
+                    }
+                },
+                '0.93054': 0
+            }
+        }
+    },
+    {
+        'expression': "((1) / (0.93054))",
+        'impact_tree': {
+            'Addition': {
+                'Division': {
+                    '1': 0,
+                    '-28.494 * HYP': 0.076351789675672
+                },
+                '0.93054': 0
+            }
+        }
+    },
+    {
+        'expression': "(((((MA + (1.2053 * UA) + -0.078141) * -1.9323) + 0.0053559) * 2.9628 * VR) / (0.93054))",
+        'impact_tree': {
+            'Addition': {
+                'Division': {
+                    'Multiplication': {
+                        'Addition': {
+                            'Multiplication': {
+                                'MA': 0.108972688038807,
+                                'Addition': {
+                                    '1.2053 * UA': 0.108144059957083,
+                                    '1.4812 * OA': 0.00688842480665586,
+                                    '-1.9323': 0
+                                },
+                                '-0.078141': 0
+                            },
+                            '-1.9323': 0
+                        },
+                        '0.0053559': 0
+                    },
+                    '2.9628 * VR': 0.279624923755845
+                },
+                '0.93054': 0
+            }
+        }
+    },
+    {
+        'expression': "(((((((MA + (1.2053 * UA) + -0.078141) * -1.9323) + 0.0053559) * 2.9628 * VR) / (0.93054)) + 1.1499) * -0.14436)",
+        'impact_tree': {
+            'Addition': {
+                'Multiplication': {
+                    'Addition': {
+                        'Division': {
+                            'Multiplication': {
+                                'Addition': {
+                                    'Multiplication': {
+                                        'MA': 0.0812579052747987,
+                                        'Addition': {
+                                            '1.2053 * UA': 0.137119380648784,
+                                            '-1.9323': 0
+                                        },
+                                        '-0.078141': 0
+                                    },
+                                    '-1.9323': 0
+                                },
+                                '0.0053559': 0
+                            },
+                            '2.9628 * VR': 0.275874028734677
+                        },
+                        '0.93054': 0
+                    },
+                    '1.1499': 0
+                },
+                '-0.14436': 0
+            }
+        }
+    },
+    {
+        'expression': "((1) / (0.92566))",
+        'impact_tree': {
+            'Addition': {
+                'Division': {
+                    '1': 0,
+                    '-24.78 * HYP': 0.0733317696147628
+                },
+                '0.92566': 0
+            }
+        }
+    },
+    {
+        'expression': "((((1) / (0.92566)) + 1.0627) * -0.059992)",
+        'impact_tree': {
+            'Addition': {
+                'Multiplication': {
+                    'Addition': {
+                        'Division': {
+                            '1': 0,
+                            '-24.78 * HYP': 0.0996617689752506
+                        },
+                        '0.92566': 0
+                    },
+                    '1.0627': 0
+                },
+                '-0.059992': 0
+            }
+        }
+    },
+    {
+        'expression': "((0.0079795 * VR + (-1.9105 * HYP)) / (0.92369))",
+        'impact_tree': {
+            'Addition': {
+                'Division': {
+                    '0.0079795 * VR': 0.0196564510771611,
+                    'Addition': {
+                        '-1.9105 * HYP': 0.255861250843903,
+                        '5.4189': 0
+                    }
+                },
+                '0.92369': 0
+            }
+        }
+    },
+    {
+        'expression': "((1) / (0.92369))",
+        'impact_tree': {
+            'Addition': {
+                'Division': {
+                    '1': 0,
+                    '-23.318 * HYP': 0.0996617689752507
+                },
+                '0.92369': 0
+            }
+        }
+    },
+    {
+        'expression': "(((((MA + (1.2053 * UA) + -0.078141) * -1.9323) + 0.0065447) * 2.9628 * VR) / (0.92369))",
+        'impact_tree': {
+            'Addition': {
+                'Division': {
+                    'Multiplication': {
+                        'Addition': {
+                            'Multiplication': {
+                                'MA': 0.0915664689038371,
+                                'Addition': {
+                                    '1.2053 * UA': 0.139791872958965,
+                                    '-1.9323': 0
+                                },
+                                '-0.078141': 0
+                            },
+                            '-1.9323': 0
+                        },
+                        '0.0065447': 0
+                    },
+                    '2.9628 * VR': 0.264262090594078
+                },
+                '0.92369': 0
+            }
+        }
+    },
+    {
+        'expression': "((0.0079795 * VR + (-1.9105 * HYP)) / (0.92369))",
+        'impact_tree': {
+            'Addition': {
+                'Division': {
+                    '0.0079795 * VR': 0.0196564510771611,
+                    'Addition': {
+                        '-1.9105 * HYP': 0.255861250843903,
+                        '5.4189': 0
+                    }
+                },
+                '0.92369': 0
+            }
+        }
+    },
+    {
+        'expression': "((1) / (0.92369))",
+        'impact_tree': {
+            'Addition': {
+                'Division': {
+                    '1': 0,
+                    '-23.318 * HYP': 0.0996617689752507
+                },
+                '0.92369': 0
+            }
+        }
+    },
+    {
+        'expression': "(((((MA + (1.2053 * UA) + -0.078141) * -1.9323) + 0.0065447) * 2.9628 * VR) / (0.92369))",
+        'impact_tree': {
+            'Addition': {
+                'Division': {
+                    'Multiplication': {
+                        'Addition': {
+                            'Multiplication': {
+                                'MA': 0.0915664689038371,
+                                'Addition': {
+                                    '1.2053 * UA': 0.139791872958965,
+                                    '-1.9323': 0
+                                },
+                                '-0.078141': 0
+                            },
+                            '-1.9323': 0
+                        },
+                        '0.0065447': 0
+                    },
+                    '2.9628 * VR': 0.264262090594078
+                },
+                '0.92369': 0
+            }
+        }
+    },
+    {
+        'expression': "((0.0079795 * VR + (-1.9105 * HYP)) / (0.92369))",
+        'impact_tree': {
+            'Addition': {
+                'Division': {
+                    '0.0079795 * VR': 0.0196564510771611,
+                    'Addition': {
+                        '-1.9105 * HYP': 0.255861250843903,
+                        '5.4189': 0
+                    }
+                },
+                '0.92369': 0
+            }
+        }
+    },
+    {
+        'expression': "((1) / (0.92369))",
+        'impact_tree': {
+            'Addition': {
+                'Division': {
+                    '1': 0,
+                    '-23.318 * HYP': 0.0996617689752507
+                },
+                '0.92369': 0
+            }
+        }
+    }
+]
 # 符号表达式树操作的模拟指标序列（不要从文件读取，直接内嵌）
 # 下标1..15分别对应第1~15次树结构变更后的指标；下标0表示基线，不覆盖。
 MOCK_INDICATORS_SEQUENCE = [None] + [
@@ -680,393 +954,6 @@ MOCK_WEIGHTS_SEQUENCE = [None] + [
     ]
 ]
 
-# =============================
-# 表达式树（SVG）十五步模拟：内嵌定义
-# =============================
-# 说明：这组数据对应 docs/mock/impact/impact-*.json 中的15步模拟树。
-# 为避免 JSON 重复键的二义性，这里采用“规范化树”结构进行内嵌：
-# - 叶子：
-#   { 'type': 'var',  'name': 'HYP', 'coef': -1.9105, 'w': 0.21010 }  → 变量（含系数、用于生成“coef * VAR”形式）
-#   { 'type': 'const','value': 0.93054, 'w': 0 }                      → 常量
-# - 运算：
-#   { 'type': 'op', 'op': 'add'|'sub'|'mul'|'div', 'children': [ ... ] }
-#
-# 我们提供辅助函数将该结构：
-# - 转换为用于前端上色的 impact_tree（一个“叶子标签→影响力”的字典，叶子标签如“0.00653 * VR”、“-1.9105 * HYP”、“5.4189”）。
-# - 转换为可渲染的表达式字符串（expression_text），以及 LaTeX（expression_latex）。
-
-def _node_var(name: str, coef: float = None, w: float = None):
-    return {'type': 'var', 'name': str(name), 'coef': coef, 'w': w}
-
-def _node_const(value: float, w: float = None):
-    return {'type': 'const', 'value': float(value), 'w': w}
-
-def _node_op(op: str, *children):
-    # 扁平化相同运算符，避免不必要的嵌套
-    flat_children = []
-    for ch in children:
-        if isinstance(ch, dict) and ch.get('type') == 'op' and ch.get('op') == op:
-            flat_children.extend(ch.get('children') or [])
-        else:
-            flat_children.append(ch)
-    return {'type': 'op', 'op': op, 'children': flat_children}
-
-def _fmt_num(x: float) -> str:
-    # 去除末尾无意义的0；保留必要的小数
-    s = ("%0.10f" % float(x)).rstrip('0').rstrip('.')
-    # 避免 -0
-    if s == '-0':
-        s = '0'
-    return s
-
-def _leaf_label(node: dict) -> str:
-    # 生成 impact_tree 的叶子键名
-    if node.get('type') == 'var':
-        coef = node.get('coef', None)
-        name = node.get('name', '')
-        if coef is None or coef == 1:
-            return f"{name}"
-        return f"{_fmt_num(coef)} * {name}"
-    if node.get('type') == 'const':
-        return _fmt_num(node.get('value', 0))
-    return '?'  # 不应出现
-
-def _collect_impact_map(node: dict, mapping: dict):
-    if not isinstance(node, dict):
-        return
-    tp = node.get('type')
-    if tp in ('var', 'const'):
-        label = _leaf_label(node)
-        w = node.get('w', 0)
-        if isinstance(w, (int, float)):
-            mapping[label] = float(w)
-        else:
-            mapping[label] = 0.0
-        return
-    if tp == 'op':
-        for ch in node.get('children') or []:
-            _collect_impact_map(ch, mapping)
-
-def _expr_of(node: dict) -> str:
-    # 生成纯文本表达式，使用括号保证优先级
-    tp = node.get('type')
-    if tp == 'var':
-        coef = node.get('coef', None)
-        name = node.get('name')
-        if coef is None:
-            return f"{name}"
-        return f"({_fmt_num(coef)} * {name})"
-    if tp == 'const':
-        return _fmt_num(node.get('value', 0.0))
-    if tp == 'op':
-        op = node.get('op')
-        ch = node.get('children') or []
-        if op == 'add':
-            return '(' + ' + '.join(_expr_of(c) for c in ch) + ')'
-        if op == 'sub':
-            if len(ch) == 0:
-                return '0'
-            if len(ch) == 1:
-                return _expr_of(ch[0])
-            return '(' + ' - '.join(_expr_of(c) for c in ch) + ')'
-        if op == 'mul':
-            return '(' + ' * '.join(_expr_of(c) for c in ch) + ')'
-        if op == 'div':
-            a = _expr_of(ch[0]) if len(ch) >= 1 else '1'
-            b = _expr_of(ch[1]) if len(ch) >= 2 else '1'
-            return f"({a} / {b})"
-    return '0'
-
-def _latex_of(node: dict) -> str:
-    # 生成 LaTeX（MathJax）
-    tp = node.get('type')
-    if tp == 'var':
-        coef = node.get('coef', None)
-        name = node.get('name')
-        if coef is None:
-            return f"\\text{{{name}}}"
-        return f"({_fmt_num(coef)} \\cdot \\text{{{name}}})"
-    if tp == 'const':
-        return _fmt_num(node.get('value', 0.0))
-    if tp == 'op':
-        op = node.get('op')
-        ch = node.get('children') or []
-        if op == 'add':
-            return '(' + ' + '.join(_latex_of(c) for c in ch) + ')'
-        if op == 'sub':
-            if len(ch) == 0:
-                return '0'
-            if len(ch) == 1:
-                return _latex_of(ch[0])
-            return '(' + ' - '.join(_latex_of(c) for c in ch) + ')'
-        if op == 'mul':
-            return '(' + ' \\cdot '.join(_latex_of(c) for c in ch) + ')'
-        if op == 'div':
-            a = _latex_of(ch[0]) if len(ch) >= 1 else '1'
-            b = _latex_of(ch[1]) if len(ch) >= 2 else '1'
-            return f"\\cfrac{{{a}}}{{{b}}}"
-    return '0'
-
-def _collect_constants(node: dict, bag: list):
-    # 提取数字常量（包括变量系数），用于 constants 模块展示
-    tp = node.get('type')
-    if tp == 'const':
-        bag.append(float(node.get('value', 0)))
-        return
-    if tp == 'var':
-        coef = node.get('coef', None)
-        if coef is not None:
-            bag.append(float(coef))
-        return
-    if tp == 'op':
-        for ch in node.get('children') or []:
-            _collect_constants(ch, bag)
-
-def _constants_dict_from_tree(node: dict) -> dict:
-    nums = []
-    _collect_constants(node, nums)
-    # 按出现顺序去重
-    ordered = []
-    seen = set()
-    for v in nums:
-        if v not in seen:
-            seen.add(v)
-            ordered.append(v)
-    consts = {}
-    for i, v in enumerate(ordered):
-        consts[f'c{{{i}}}'] = float(v)
-    return consts
-
-def _impact_map_from_tree(node: dict) -> dict:
-    mp = {}
-    _collect_impact_map(node, mp)
-    return mp
-
-def _op_label(op: str) -> str:
-    return 'Addition' if op == 'add' else 'Subtraction' if op == 'sub' else 'Multiplication' if op == 'mul' else 'Division' if op == 'div' else str(op)
-
-def _merge_dict(a: dict, b: dict):
-    for k, v in (b or {}).items():
-        if k in a and isinstance(a[k], dict) and isinstance(v, dict):
-            _merge_dict(a[k], v)
-        else:
-            a[k] = v
-
-def _impact_nested_from_tree(node: dict, wrap_root: bool = True) -> dict:
-    """将规范树转换为前端可消费的 impact_tree 嵌套结构。
-    规则：
-    - 变量/常量叶子 → { 'label': weight }
-    - 运算节点 → { OpLabel: merged_children }
-    同类运算子树合并到同一 OpLabel 下，避免重复键。
-    """
-    tp = isinstance(node, dict) and node.get('type')
-    if tp == 'var' or tp == 'const':
-        return { _leaf_label(node): float(node.get('w', 0) or 0) }
-    if tp == 'op':
-        op = node.get('op')
-        label = _op_label(op)
-        merged = {}
-        for ch in node.get('children') or []:
-            sub = _impact_nested_from_tree(ch, wrap_root=False)
-            # 子为运算 → 必须包在其自身的OpLabel下
-            if isinstance(ch, dict) and ch.get('type') == 'op':
-                sub_label = _op_label(ch.get('op'))
-                if sub_label not in merged:
-                    merged[sub_label] = {}
-                _merge_dict(merged[sub_label], sub.get(sub_label) if sub_label in sub else sub)
-            else:
-                _merge_dict(merged, sub)
-        return { label: merged } if wrap_root else { label: merged }
-    return {}
-
-# ============
-# 规范化的15步树定义（根据 docs/mock/impact 转写，略化为可渲染且与权重键一致的结构）
-# 提示：为保证演示稳定，部分步骤使用一致的结构但替换了关键系数/常量；
-# 结构差异较大的第5步/第7步使用了顶层缩放与偏移包裹。
-# ============
-
-def _step_tree_1():
-    return _node_op('add',
-        _node_op('div', _node_const(1, 0), _node_op('mul', _node_const(-28.494, 0.076351789675616), _node_var('HYP'))),
-        _node_op('div',
-            _node_op('mul', _node_const(0.00653, 0.0208902884673897), _node_var('VR')),
-            _node_op('add', _node_var('HYP', -1.9105, 0.210102360045851), _node_const(5.4189, 0))
-        ),
-        _node_op('div',
-            _node_op('mul',
-                _node_op('add', _node_var('QA', 0.6015, 0.0117584596321174), _node_var('HYP', 2.3379, 0.0228735360067907), _node_var('CA', 1.2977, 0.113928459255378), _node_const(10.458, 0)),
-                _node_op('mul', _node_const(0.078141, 0), _node_var('MA', None, 0.108972688038807), _node_op('add', _node_var('UA', 1.2053, 0.108144059957083), _node_var('OA', 1.4812, 0.00688842480665586), _node_const(-1.9323, 0))),
-                _node_const(0.0053559, 0)
-            ),
-            _node_var('VR', 2.9628, 0.279624923755845)
-        ),
-        _node_const(0.93054, 0)
-    )
-
-def _step_tree_2():
-    return _node_op('add',
-        _node_op('div', _node_const(1, 0), _node_op('mul', _node_const(-28.494, 0.0763517896756718), _node_var('HYP'))),
-        _node_op('div',
-            _node_op('mul', _node_const(0.00653, 0.0208902884673899), _node_var('VR')),
-            _node_op('add', _node_var('HYP', -1.9105, 0.210102360045851), _node_const(5.4189, 0))
-        ),
-        _node_op('div',
-            _node_op('mul',
-                _node_op('add', _node_var('QA', 0.6015, 0.0117584596321172), _node_var('HYP', 2.3379, 0.0228735360067907), _node_var('CA', 1.2977, 0.113928459255378), _node_const(10.458, 0)),
-                _node_op('mul', _node_const(-0.078141, 0), _node_var('MA', None, 0.108972688038807), _node_op('add', _node_var('UA', 1.2053, 0.108144059957083), _node_var('OA', 1.4812, 0.00688842480665564), _node_const(-1.9323, 0))),
-                _node_const(0.0053559, 0)
-            ),
-            _node_var('VR', 2.9628, 0.279624923755845)
-        ),
-        _node_const(0.93054, 0)
-    )
-
-def _step_tree_3():
-    return _node_op('add',
-        _node_op('div',
-            _node_op('mul', _node_const(0.00653, 0.0208902884673897), _node_var('VR')),
-            _node_op('add', _node_var('HYP', -1.9105, 0.210102360045851), _node_const(5.4189, 0))
-        ),
-        _node_op('div',
-            _node_op('mul',
-                _node_op('add', _node_var('HYP', 2.3379, 0.0228735360067904), _node_var('CA', 1.2977, 0.113928459255379), _node_var('QA', 0.6015, 0.0117584596321172), _node_const(10.458, 0)),
-                _node_op('mul', _node_const(-0.078141, 0), _node_var('MA', None, 0.108972688038807), _node_op('add', _node_var('UA', 1.2053, 0.108144059957083), _node_var('OA', 1.4812, 0.00688842480665564), _node_const(-1.9323, 0))),
-                _node_const(0.0053559, 0)
-            ),
-            _node_var('VR', 2.9628, 0.279624923755845)
-        ),
-        _node_op('div', _node_const(1, 0), _node_op('mul', _node_const(-28.494, 0.076351789675672), _node_var('HYP'))),
-        _node_const(0.93054, 0)
-    )
-
-def _step_tree_4():
-    return _node_op('add',
-        _node_op('div', _node_const(1, 0), _node_op('mul', _node_const(-28.494, 0.0763517896756716), _node_var('HYP'))),
-        _node_op('div',
-            _node_op('mul', _node_const(0.00653, 0.0208902884673897), _node_var('VR')),
-            _node_op('add', _node_var('HYP', -1.9105, 0.210102360045851), _node_const(5.4189, 0))
-        ),
-        _node_op('div',
-            _node_op('mul',
-                _node_op('add', _node_var('QA', 0.6015, 0.0117584596321174), _node_var('HYP', 2.3379, 0.0228735360067907), _node_var('CA', 1.2977, 0.113928459255378), _node_const(10.458, 0)),
-                _node_op('mul', _node_const(-0.078141, 0), _node_var('MA', None, 0.108972688038807), _node_op('add', _node_var('UA', 1.2053, 0.108144059957083), _node_var('OA', 1.4812, 0.00688842480665586), _node_const(-1.9323, 0))),
-                _node_const(0.0053559, 0)
-            ),
-            _node_var('VR', 2.9628, 0.279624923755845)
-        ),
-        _node_const(0.93054, 0)
-    )
-
-def _step_tree_5():
-    inner_add = _node_op('add',
-        _node_op('div', _node_const(1, 0), _node_op('mul', _node_const(-28.494, 0.0733317696147618), _node_var('HYP'))),
-        _node_op('div', _node_op('mul', _node_const(0.00653, 0.0208950935373927), _node_var('VR')), _node_op('add', _node_var('HYP', -1.9105, 0.247577708475269), _node_const(5.4189, 0))),
-        _node_op('div',
-            _node_op('mul',
-                _node_op('add', _node_var('QA', 0.6015, 0.00534718638286213), _node_var('HYP', 2.3379, 0.0283254630009195), _node_var('CA', 1.2977, 0.121817221428969), _node_const(10.458, 0)),
-                _node_op('mul', _node_const(-0.078141, 0), _node_var('MA', None, 0.0812579052747987), _node_op('add', _node_var('UA', 1.2053, 0.137119380648784), _node_const(-1.9323, 0))),
-                _node_const(0.0053559, 0)
-            ),
-            _node_var('VR', 2.9628, 0.275874028734677)
-        ),
-        _node_const(0.93054, 0)
-    )
-    return _node_op('add', _node_op('mul', inner_add, _node_const(1.1499, 0)), _node_const(-0.14436, 0))
-
-def _step_tree_6():
-    return _node_op('add',
-        _node_op('div', _node_const(1, 0), _node_op('mul', _node_const(-24.78, 0.0733317696147628), _node_var('HYP'))),
-        _node_op('div', _node_op('mul', _node_const(0.0075089, 0.0208950935373935), _node_var('VR')), _node_op('add', _node_var('HYP', -1.9105, 0.24757770847527), _node_const(5.4189, 0))),
-        _node_op('div',
-            _node_op('mul',
-                _node_op('add', _node_var('HYP', 2.3379, 0.0283254630009203), _node_var('CA', 1.2977, 0.121817221428969), _node_var('QA', 0.6015, 0.0053471863828628), _node_const(10.458, 0)),
-                _node_op('mul', _node_const(-0.078141, 0), _node_var('MA', None, 0.0812579052747997), _node_op('add', _node_var('UA', 1.2053, 0.137119380648785), _node_const(-1.9323, 0))),
-                _node_const(0.0061587, 0)
-            ),
-            _node_var('VR', 2.9628, 0.275874028734678)
-        ),
-        _node_const(0.92566, 0)
-    )
-
-def _step_tree_7():
-    inner_add = _node_op('add',
-        _node_op('div', _node_op('mul', _node_const(0.0075089, 0.0196564510771616), _node_var('VR')), _node_op('add', _node_var('HYP', -1.9105, 0.255861250843903), _node_const(5.4189, 0))),
-        _node_op('div',
-            _node_op('mul',
-                _node_op('add', _node_var('HYP', 2.3379, 0.0245600888604456), _node_var('CA', 1.2977, 0.134997651842973), _node_const(10.458, 0)),
-                _node_op('mul', _node_const(-0.078141, 0), _node_var('MA', None, 0.0915664689038374), _node_op('add', _node_var('UA', 1.2053, 0.139791872958965), _node_const(-1.9323, 0))),
-                _node_const(0.0061587, 0)
-            ),
-            _node_var('VR', 2.9628, 0.264262090594079)
-        ),
-        _node_op('div', _node_const(1, 0), _node_op('mul', _node_const(-24.78, 0.0996617689752506), _node_var('HYP'))),
-        _node_const(0.92566, 0)
-    )
-    return _node_op('add', _node_op('mul', inner_add, _node_const(1.0627, 0)), _node_const(-0.059992, 0))
-
-def _step_tree_late_common(vr_small_coef: float, hyp_div: float, 
-                           include_oa: bool, ua_w: float, ma_w: float,
-                           hyp2_w: float, ca_w: float, mul_k: float,
-                           offset_const: float):
-    # 用于步骤8及之后的共用结构（略化）：
-    add2 = _node_op('add', _node_var('HYP', 2.3379, hyp2_w), _node_var('CA', 1.2977, ca_w), _node_const(10.458, 0))
-    if include_oa:
-        inner_add = _node_op('add', _node_var('UA', 1.2053, ua_w), _node_const(-1.9323, 0))
-    else:
-        inner_add = _node_op('add', _node_var('UA', 1.2053, ua_w), _node_const(-1.9323, 0))
-    return _node_op('add',
-        _node_op('div',
-            _node_op('mul', add2, _node_op('mul', _node_const(-0.078141, 0), _node_var('MA', None, ma_w), inner_add), _node_const(mul_k, 0)),
-            _node_var('VR', 2.9628, 0.264262090594078)
-        ),
-        _node_op('div', _node_const(1, 0), _node_op('mul', _node_const(hyp_div, 0.0996617689752507), _node_var('HYP'))),
-        _node_op('div', _node_op('mul', _node_const(vr_small_coef, 0.0196564510771614), _node_var('VR')), _node_op('add', _node_var('HYP', -1.9105, 0.255861250843903), _node_const(5.4189, 0))),
-        _node_const(offset_const, 0)
-    )
-
-def _step_tree_8():
-    return _step_tree_late_common(0.0079795, -23.318, False, 0.139791872958965, 0.0915664689038371, 0.0245600888604455, 0.134997651842973, 0.0065447, 0.92369)
-
-def _step_tree_9():
-    return _step_tree_late_common(0.0079795, -23.318, False, 0.139791872958965, 0.091566468903837, 0.0245600888604458, 0.134997651842973, 0.0065447, 0.92369)
-
-def _step_tree_10():
-    return _step_tree_late_common(0.0079795, -23.318, False, 0.139791872958965, 0.0915664689038371, 0.0245600888604455, 0.134997651842973, 0.0065447, 0.92369)
-
-def _step_tree_11():
-    return _step_tree_late_common(0.0079795, -23.318, False, 0.139791872958965, 0.0915664689038371, 0.0245600888604455, 0.134997651842973, 0.0065447, 0.92369)
-
-def _step_tree_12():
-    return _step_tree_late_common(0.0079795, -23.318, False, 0.139791872958965, 0.091566468903837, 0.0245600888604458, 0.134997651842973, 0.0065447, 0.92369)
-
-def _step_tree_13():
-    return _step_tree_late_common(0.0079795, -23.318, False, 0.139791872958965, 0.0915664689038371, 0.0245600888604455, 0.134997651842973, 0.0065447, 0.92369)
-
-def _step_tree_14():
-    return _step_tree_late_common(0.0079795, -23.318, False, 0.139791872958965, 0.0915664689038371, 0.0245600888604455, 0.134997651842973, 0.0065447, 0.92369)
-
-def _step_tree_15():
-    return _step_tree_late_common(0.0079795, -23.318, False, 0.139791872958965, 0.091566468903837, 0.0245600888604458, 0.134997651842973, 0.0065447, 0.92369)
-
-MOCK_IMPACT_TREES = [
-    None,
-    _step_tree_1(),
-    _step_tree_2(),
-    _step_tree_3(),
-    _step_tree_4(),
-    _step_tree_5(),
-    _step_tree_6(),
-    _step_tree_7(),
-    _step_tree_8(),
-    _step_tree_9(),
-    _step_tree_10(),
-    _step_tree_11(),
-    _step_tree_12(),
-    _step_tree_13(),
-    _step_tree_14(),
-    _step_tree_15(),
-]
-
 def load_data_models():
     """加载所有数据模型"""
     models = []
@@ -1598,6 +1485,11 @@ def update_data_model_file(model_id, file_type):
                         reg_content['impact_tree'] = data['impact_tree']
                     # 表达式树操作驱动的指标轮换/撤销
                     action = (data or {}).get('expr_tree_action')
+                    # 初始化基线 impact_tree 与 expression（用于撤销回到初始状态）
+                    if 'baseline_impact_tree' not in reg_content and reg_content.get('impact_tree') is not None:
+                        reg_content['baseline_impact_tree'] = reg_content.get('impact_tree')
+                    if 'baseline_expression' not in reg_content and reg_content.get('expression'):
+                        reg_content['baseline_expression'] = reg_content.get('expression')
                     # 初始化基线指标和特征权重
                     if 'baseline_detailed_metrics' not in reg_content:
                         reg_content['baseline_detailed_metrics'] = reg_content.get('detailed_metrics') or {}
@@ -1612,82 +1504,59 @@ def update_data_model_file(model_id, file_type):
                         if idx > 0:
                             seq_metrics = MOCK_INDICATORS_SEQUENCE[idx]
                             seq_weights = MOCK_WEIGHTS_SEQUENCE[idx]
-                            # 同步：表达式树与公式（大改造 - 使用内嵌的IMPACT树序列）
-                            try:
-                                step_tree = MOCK_IMPACT_TREES[idx]
-                                if isinstance(step_tree, dict):
-                                    # 影响力嵌套结构（供前端着色/定位）
-                                    reg_content['impact_tree'] = _impact_nested_from_tree(step_tree)
-                                    # 表达式（文本与LaTeX）
-                                    expr_text = _expr_of(step_tree)
-                                    latex = _latex_of(step_tree)
-                                    # 常数表（用于“常数定义”列表）
-                                    consts = _constants_dict_from_tree(step_tree)
-                                    reg_content['expression_text'] = expr_text
-                                    reg_content['expression'] = latex  # 复用字段保持前端兼容
-                                    reg_content['expression_latex'] = latex
-                                    reg_content['constants'] = consts
-                            except Exception as _:
-                                pass
+                            seq_impact = MOCK_IMPACT_SEQUENCE[idx]
                             if isinstance(seq_metrics, dict):
                                 reg_content['detailed_metrics'] = seq_metrics
                                 model.setdefault('metadata', {})['pearson_r_test'] = seq_metrics.get('pearson_r_test')
                                 model['metadata']['pearson_r_training'] = seq_metrics.get('pearson_r_training')
                             if isinstance(seq_weights, list):
                                 reg_content['feature_importance'] = seq_weights
+                            if isinstance(seq_impact, dict):
+                                # 同步SVG树与表达式
+                                reg_content['impact_tree'] = seq_impact.get('impact_tree')
+                                expr = seq_impact.get('expression')
+                                if expr:
+                                    reg_content['expression'] = expr
+                                    # 为避免前端优先使用旧的 LaTeX 覆盖 expression，这里清空 expression_latex
+                                    reg_content['expression_latex'] = ''
                         model.setdefault('metadata', {})['expr_tree_op_index'] = new_index
                     elif action == 'undo':
                         new_index = max(0, op_index - 1)
                         if new_index == 0:
                             base = reg_content.get('baseline_detailed_metrics') or {}
                             base_weights = reg_content.get('baseline_feature_importance') or []
+                            base_impact = reg_content.get('baseline_impact_tree')
+                            base_expr = reg_content.get('baseline_expression')
                             if base:
                                 reg_content['detailed_metrics'] = base
                                 model.setdefault('metadata', {})['pearson_r_test'] = base.get('pearson_r_test')
                                 model['metadata']['pearson_r_training'] = base.get('pearson_r_training')
                             if base_weights:
                                 reg_content['feature_importance'] = base_weights
-                            # 回到基线：如果有基线impact_tree/公式则恢复；否则保持现状
-                            try:
-                                base_impact = reg_content.get('baseline_impact_tree')
-                                base_expr_text = reg_content.get('baseline_expression_text')
-                                base_expr_latex = reg_content.get('baseline_expression_latex')
-                                base_consts = reg_content.get('baseline_constants')
-                                if base_impact:
-                                    reg_content['impact_tree'] = base_impact
-                                if base_expr_text:
-                                    reg_content['expression_text'] = base_expr_text
-                                if base_expr_latex:
-                                    reg_content['expression'] = base_expr_latex
-                                    reg_content['expression_latex'] = base_expr_latex
-                                if base_consts:
-                                    reg_content['constants'] = base_consts
-                            except Exception:
-                                pass
+                            if base_impact is not None:
+                                reg_content['impact_tree'] = base_impact
+                            if base_expr:
+                                reg_content['expression'] = base_expr
+                            # 基线恢复同样清空 expression_latex，交由前端根据 expression 生成
+                            reg_content['expression_latex'] = ''
                         else:
                             # 对超过 15 的索引进行截断（>=15 视同第15次的指标），支持无限撤销
                             idx = new_index if new_index <= 15 else 15
                             seq_metrics = MOCK_INDICATORS_SEQUENCE[idx]
                             seq_weights = MOCK_WEIGHTS_SEQUENCE[idx]
-                            try:
-                                step_tree = MOCK_IMPACT_TREES[idx]
-                                if isinstance(step_tree, dict):
-                                    reg_content['impact_tree'] = _impact_nested_from_tree(step_tree)
-                                    expr_text = _expr_of(step_tree)
-                                    latex = _latex_of(step_tree)
-                                    consts = _constants_dict_from_tree(step_tree)
-                                    reg_content['expression_text'] = expr_text
-                                    reg_content['expression'] = latex
-                                    reg_content['expression_latex'] = latex
-                                    reg_content['constants'] = consts
-                            except Exception:
-                                pass
+                            seq_impact = MOCK_IMPACT_SEQUENCE[idx]
                             if isinstance(seq_metrics, dict):
                                 reg_content['detailed_metrics'] = seq_metrics
                                 model.setdefault('metadata', {})['pearson_r_test'] = seq_metrics.get('pearson_r_test')
                                 model['metadata']['pearson_r_training'] = seq_metrics.get('pearson_r_training')
                             if isinstance(seq_weights, list):
                                 reg_content['feature_importance'] = seq_weights
+                            if isinstance(seq_impact, dict):
+                                reg_content['impact_tree'] = seq_impact.get('impact_tree')
+                                expr = seq_impact.get('expression')
+                                if expr:
+                                    reg_content['expression'] = expr
+                                    reg_content['expression_latex'] = ''
                         model.setdefault('metadata', {})['expr_tree_op_index'] = new_index
                     else:
                         # 允许直接设置详细指标（不建议在表达式树操作路径外使用）
@@ -1695,28 +1564,11 @@ def update_data_model_file(model_id, file_type):
                             reg_content['detailed_metrics'] = data['detailed_metrics']
                         if 'feature_importance' in data and isinstance(data['feature_importance'], list):
                             reg_content['feature_importance'] = data['feature_importance']
-                        if 'impact_tree' in data and isinstance(data['impact_tree'], dict):
-                            reg_content['impact_tree'] = data['impact_tree']
-                        if 'expression_text' in data and isinstance(data['expression_text'], str):
-                            reg_content['expression_text'] = data['expression_text']
-                        if 'expression_latex' in data and isinstance(data['expression_latex'], str):
-                            reg_content['expression_latex'] = data['expression_latex']
-                        if 'constants' in data and isinstance(data['constants'], dict):
-                            reg_content['constants'] = data['constants']
                     if 'updated_at' in data:
                         reg_content['updated_at'] = data['updated_at']
                     
                     # 写回文件
                     with open(reg_filepath, 'w', encoding='utf-8') as f:
-                        # 首次建立基线（以便无限撤销时回退）
-                        if 'baseline_impact_tree' not in reg_content and reg_content.get('impact_tree'):
-                            reg_content['baseline_impact_tree'] = reg_content['impact_tree']
-                        if 'baseline_expression_text' not in reg_content and reg_content.get('expression_text'):
-                            reg_content['baseline_expression_text'] = reg_content['expression_text']
-                        if 'baseline_expression_latex' not in reg_content and reg_content.get('expression_latex'):
-                            reg_content['baseline_expression_latex'] = reg_content['expression_latex']
-                        if 'baseline_constants' not in reg_content and reg_content.get('constants'):
-                            reg_content['baseline_constants'] = reg_content['constants']
                         json.dump(reg_content, f, ensure_ascii=False, indent=2)
                     # 若有更新元数据（pearson_r_* / expr_tree_op_index），同步保存主模型文件
                     save_data_model(model)
