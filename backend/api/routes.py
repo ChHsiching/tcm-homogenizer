@@ -1563,8 +1563,15 @@ def update_data_model_file(model_id, file_type):
                     # 若有更新元数据（pearson_r_* / expr_tree_op_index / symbolic_regression.impact_tree），同步保存主模型文件
                     save_data_model(model)
                     
+                    # 构造统一的摘要返回，便于前端无需再次请求即可刷新
+                    try:
+                        with open(reg_filepath, 'r', encoding='utf-8') as rf:
+                            reg_after = json.load(rf)
+                    except Exception:
+                        reg_after = reg_content
+                    summary = build_expr_tree_summary_from_reg(model, reg_after)
                     logger.info(f"回归模型文件已更新: {reg_filename}")
-                    return jsonify({'success': True, 'message': '回归模型文件更新成功'})
+                    return jsonify({'success': True, 'message': '回归模型文件更新成功', 'result': summary, 'op_index': model.get('metadata', {}).get('expr_tree_op_index', 0)})
                 else:
                     return jsonify({
                         'success': False,
