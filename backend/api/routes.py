@@ -1490,6 +1490,8 @@ def update_data_model_file(model_id, file_type):
                         reg_content['baseline_impact_tree'] = reg_content.get('impact_tree')
                     if 'baseline_expression' not in reg_content and reg_content.get('expression'):
                         reg_content['baseline_expression'] = reg_content.get('expression')
+                    if 'baseline_expression_text' not in reg_content and reg_content.get('expression_text'):
+                        reg_content['baseline_expression_text'] = reg_content.get('expression_text')
                     # 初始化基线指标和特征权重
                     if 'baseline_detailed_metrics' not in reg_content:
                         reg_content['baseline_detailed_metrics'] = reg_content.get('detailed_metrics') or {}
@@ -1519,6 +1521,7 @@ def update_data_model_file(model_id, file_type):
                                     reg_content['expression'] = expr
                                     # 为避免前端优先使用旧的 LaTeX 覆盖 expression，这里清空 expression_latex
                                     reg_content['expression_latex'] = ''
+                                    reg_content['expression_text'] = expr
                         model.setdefault('metadata', {})['expr_tree_op_index'] = new_index
                     elif action == 'undo':
                         new_index = max(0, op_index - 1)
@@ -1539,6 +1542,8 @@ def update_data_model_file(model_id, file_type):
                                 reg_content['expression'] = base_expr
                             # 基线恢复同样清空 expression_latex，交由前端根据 expression 生成
                             reg_content['expression_latex'] = ''
+                            if reg_content.get('baseline_expression_text'):
+                                reg_content['expression_text'] = reg_content['baseline_expression_text']
                         else:
                             # 对超过 15 的索引进行截断（>=15 视同第15次的指标），支持无限撤销
                             idx = new_index if new_index <= 15 else 15
@@ -1557,6 +1562,7 @@ def update_data_model_file(model_id, file_type):
                                 if expr:
                                     reg_content['expression'] = expr
                                     reg_content['expression_latex'] = ''
+                                    reg_content['expression_text'] = expr
                         model.setdefault('metadata', {})['expr_tree_op_index'] = new_index
                     else:
                         # 允许直接设置详细指标（不建议在表达式树操作路径外使用）

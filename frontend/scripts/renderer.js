@@ -777,6 +777,8 @@ function wireToolbarActions(container, getSvg) {
                     if (updated) {
                         if (updated.impact_tree) {
                             window.TREE_IMPACT_DATA = updated.impact_tree;
+                        } else {
+                            window.TREE_IMPACT_DATA = null;
                         }
                         await renderExpressionTree(updated);
                     }
