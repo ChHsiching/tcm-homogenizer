@@ -771,24 +771,34 @@ function wireToolbarActions(container, getSvg) {
                     throw new Error(`回归模型文件更新失败: ${regModelResp.status}`);
                 }
                 
-                // 优先使用后端直接返回的统一摘要，避免额外请求
-                let updatedSummary = null;
+                // 2.1 优先使用后端直接返回的统一摘要
                 try {
-                    const sj = await regModelResp.json();
-                    if (sj && sj.success && sj.result) {
-                        updatedSummary = sj.result;
+                    const payload = await regModelResp.json().catch(() => null);
+                    const updated = payload && payload.success && payload.result ? payload.result : null;
+                    const opIndex = (payload && typeof payload.op_index === 'number') ? payload.op_index : null;
+                    if (updated) {
+                        if (updated.impact_tree) {
+                            window.TREE_IMPACT_DATA = updated.impact_tree;
+                        }
+                        displayExpressionTreeSummary(updated);
+                        await renderExpressionTree(updated);
+                        if (opIndex !== null) {
+                            window.__exprOpCount__ = Math.max(0, Number(opIndex) || 0);
+                            if (window.__updateExprOpCounter__) window.__updateExprOpCounter__(0);
+                        }
+                    } else {
+                        const fallback = await fetchExpressionTreeSummary({ model_id: modelId });
+                        if (fallback) {
+                            displayExpressionTreeSummary(fallback);
+                        }
                     }
-                } catch (_) {}
-                
-                // 3. 读取最新摘要以刷新左侧性能与详细指标
-                try {
-                    const summaryToUse = updatedSummary || await fetchExpressionTreeSummary({ model_id: modelId });
-                    if (summaryToUse) {
-                        displayExpressionTreeSummary(summaryToUse);
-                        await renderExpressionTree(summaryToUse);
-                    }
-                } catch (e2) {
-                    console.warn('刷新摘要失败，已忽略:', e2);
+                } catch (e) {
+                    try {
+                        const fallback = await fetchExpressionTreeSummary({ model_id: modelId });
+                        if (fallback) {
+                            displayExpressionTreeSummary(fallback);
+                        }
+                    } catch (_) {}
                 }
 
                 console.log('✅ 表达式树修改已同步到数据库并刷新指标');

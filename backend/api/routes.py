@@ -1563,15 +1563,20 @@ def update_data_model_file(model_id, file_type):
                     # 若有更新元数据（pearson_r_* / expr_tree_op_index / symbolic_regression.impact_tree），同步保存主模型文件
                     save_data_model(model)
                     
-                    # 构造统一的摘要返回，便于前端无需再次请求即可刷新
+                    # 构造统一的摘要返回，便于前端直接刷新
                     try:
-                        with open(reg_filepath, 'r', encoding='utf-8') as rf:
-                            reg_after = json.load(rf)
+                        summary = build_expr_tree_summary_from_reg(model, reg_content)
                     except Exception:
-                        reg_after = reg_content
-                    summary = build_expr_tree_summary_from_reg(model, reg_after)
+                        summary = {
+                            'id': model.get('id'),
+                            'expression': reg_content.get('expression') or reg_content.get('expression_text') or '0',
+                            'feature_importance': reg_content.get('feature_importance') or [],
+                            'impact_tree': reg_content.get('impact_tree') or None,
+                            'detailed_metrics': reg_content.get('detailed_metrics') or {}
+                        }
+                    op_idx = model.get('metadata', {}).get('expr_tree_op_index', 0)
                     logger.info(f"回归模型文件已更新: {reg_filename}")
-                    return jsonify({'success': True, 'message': '回归模型文件更新成功', 'result': summary, 'op_index': model.get('metadata', {}).get('expr_tree_op_index', 0)})
+                    return jsonify({'success': True, 'message': '回归模型文件更新成功', 'result': summary, 'op_index': op_idx})
                 else:
                     return jsonify({
                         'success': False,
