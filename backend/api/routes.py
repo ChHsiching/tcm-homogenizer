@@ -689,7 +689,6 @@ MOCK_WEIGHTS_SEQUENCE = [None] + [
 MOCK_IMPACT_TREE_SEQUENCE = [None] + [
     # 1
     {
-        'Addition': {
         '1': 0,
         '-28.494 * HYP': 0.076351789675616,
         '0.40832 * HYP': 0.076351789675616,
@@ -708,11 +707,9 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '0.0053559': 0,
         '2.9628 * VR': 0.279624923755845,
         '0.93054': 0
-    }
     },
     # 2
     {
-        'Addition': {
         '1': 0,
         '-28.494 * HYP': 0.0763517896756718,
         '0.40832 * HYP': 0.0763517896756718,
@@ -731,11 +728,9 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '0.0053559': 0,
         '2.9628 * VR': 0.279624923755845,
         '0.93054': 0
-    }
     },
     # 3
     {
-        'Addition': {
         '1': 0,
         '-28.494 * HYP': 0.076351789675672,
         '0.40832 * HYP': 0.076351789675672,
@@ -754,11 +749,9 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '0.0053559': 0,
         '2.9628 * VR': 0.279624923755845,
         '0.93054': 0
-    }
     },
     # 4
     {
-        'Addition': {
         '1': 0,
         '-28.494 * HYP': 0.0763517896756716,
         '0.40832 * HYP': 0.0763517896756716,
@@ -777,11 +770,9 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '0.0053559': 0,
         '2.9628 * VR': 0.279624923755845,
         '0.93054': 0
-    }
     },
     # 5
     {
-        'Addition': {
         '1': 0,
         '-28.494 * HYP': 0.0733317696147618,
         '0.40832 * HYP': 0.0733317696147618,
@@ -798,11 +789,9 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '2.9628 * VR': 0.275874028734677,
         '0.0053559': 0,
         '0.93054': 0
-    }
     },
     # 6
     {
-        'Addition': {
         '1': 0,
         '-24.78 * HYP': 0.0733317696147628,
         '0.40832 * HYP': 0.0733317696147628,
@@ -819,11 +808,9 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '2.9628 * VR': 0.275874028734678,
         '0.0061587': 0,
         '0.92566': 0
-    }
     },
     # 7
     {
-        'Addition': {
         '1': 0,
         '-24.78 * HYP': 0.0996617689752506,
         '0.40832 * HYP': 0.0996617689752506,
@@ -839,11 +826,9 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '2.9628 * VR': 0.264262090594079,
         '0.0061587': 0,
         '0.92566': 0
-    }
     },
     # 8
     {
-        'Addition': {
         '1': 0,
         '-23.318 * HYP': 0.0996617689752501,
         '0.40832 * HYP': 0.0996617689752501,
@@ -859,11 +844,9 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '2.9628 * VR': 0.264262090594078,
         '0.0065447': 0,
         '0.92369': 0
-    }
     },
     # 9
     {
-        'Addition': {
         '1': 0,
         '-23.318 * HYP': 0.0996617689752507,
         '0.40832 * HYP': 0.0996617689752507,
@@ -879,11 +862,9 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '2.9628 * VR': 0.264262090594078,
         '0.0065447': 0,
         '0.92369': 0
-    }
     },
     # 10
     {
-        'Addition': {
         '1': 0,
         '-23.318 * HYP': 0.0996617689752504,
         '0.40832 * HYP': 0.0996617689752504,
@@ -899,11 +880,9 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '2.9628 * VR': 0.264262090594078,
         '0.0065447': 0,
         '0.92369': 0
-    }
     },
     # 11
     {
-        'Addition': {
         '1': 0,
         '-23.318 * HYP': 0.0996617689752501,
         '0.40832 * HYP': 0.0996617689752501,
@@ -919,11 +898,9 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '2.9628 * VR': 0.264262090594078,
         '0.0065447': 0,
         '0.92369': 0
-    }
     },
     # 12
     {
-        'Addition': {
         '1': 0,
         '-23.318 * HYP': 0.0996617689752507,
         '0.40832 * HYP': 0.0996617689752507,
@@ -939,11 +916,9 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '2.9628 * VR': 0.264262090594078,
         '0.0065447': 0,
         '0.92369': 0
-    }
     },
     # 13
     {
-        'Addition': {
         '1': 0,
         '-23.318 * HYP': 0.0996617689752504,
         '0.40832 * HYP': 0.0996617689752504,
@@ -959,11 +934,9 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '2.9628 * VR': 0.264262090594078,
         '0.0065447': 0,
         '0.92369': 0
-    }
     },
     # 14
     {
-        'Addition': {
         '1': 0,
         '-23.318 * HYP': 0.0996617689752501,
         '0.40832 * HYP': 0.0996617689752501,
@@ -979,11 +952,9 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '2.9628 * VR': 0.264262090594078,
         '0.0065447': 0,
         '0.92369': 0
-    }
     },
     # 15
     {
-        'Addition': {
         '1': 0,
         '-23.318 * HYP': 0.0996617689752507,
         '0.40832 * HYP': 0.0996617689752507,
@@ -999,7 +970,6 @@ MOCK_IMPACT_TREE_SEQUENCE = [None] + [
         '2.9628 * VR': 0.264262090594078,
         '0.0065447': 0,
         '0.92369': 0
-    }
     },
 ]
 
@@ -1025,6 +995,42 @@ def load_data_models():
                     logger.error(f"加载数据模型文件 {filename} 失败: {e}")
     return models
 
+def build_expr_tree_summary_from_reg(model: dict, reg_json: dict) -> dict:
+    """构造与 /expression-tree/summary 相同结构的返回体，方便前后端统一使用。
+    以回归模型文件为主来源，辅以主模型的元数据兜底。
+    """
+    try:
+        return {
+            'id': model.get('id'),
+            'expression': (reg_json or {}).get('expression') or (reg_json or {}).get('expression_text') or model.get('expression') or (
+                "(((((1.9105 * HYP + ((((0.6015 * QA + 0.42745 * HYP) + 1.2977 * CA) - (-10.458))))"
+                " * (-1.9323 + -0.078141 * MA * (((-1.9323 + 1.4812 * OA) + 0.59744 * UA) + 0.60783 * UA)))"
+                " / (2.9628 * VR) - 2.6756 / (0.40832 * HYP)) + (1.2192 * VR) / (5.4189 - 1.9105 * HYP))"
+                " * 0.0053559 + 0.93054)"
+            ),
+            'expression_latex': (reg_json or {}).get('expression_latex') or (
+                r"HDL =  \left(  \left(  \left(  \cfrac{  \left( c_{0}  \cdot\text{HYP} +  \left(  \left(  \left( c_{1}  \cdot\text{QA} + c_{2}  \cdot\text{HYP} \right)  + c_{3}  \cdot\text{CA} \right)  - c_{4} \right)  \right)  \cdot  \left( c_{5} + c_{6}  \cdot\text{MA}  \cdot  \left(  \left(  \left( c_{7} + c_{8}  \cdot\text{OA} \right)  + c_{9}  \cdot\text{UA} \right)  + c_{10}  \cdot\text{UA} \right)  \right) }{c_{11}  \cdot\text{VR} }  -  \cfrac{ c_{12}}{c_{13}  \cdot\text{HYP} }  \right)  +  \cfrac{ c_{14}  \cdot\text{VR}}{ \left( c_{15} - c_{16}  \cdot\text{HYP} \right)  }  \right)  \cdot c_{17} + c_{18} \right)"
+            ),
+            'target_variable': (reg_json or {}).get('target_variable') or model.get('target_column', 'Y'),
+            'constants': (reg_json or {}).get('constants') or model.get('constants') or {},
+            'pearson_r_test': (reg_json or {}).get('detailed_metrics', {}).get('pearson_r_test') or model.get('metadata', {}).get('pearson_r_test'),
+            'pearson_r_training': (reg_json or {}).get('detailed_metrics', {}).get('pearson_r_training') or model.get('metadata', {}).get('pearson_r_training'),
+            'mse': (reg_json or {}).get('mse') or model.get('metadata', {}).get('mse_score', 0.12),
+            'feature_importance': (reg_json or {}).get('feature_importance') or model.get('feature_importance') or [],
+            'impact_tree': (reg_json or {}).get('impact_tree') or model.get('symbolic_regression', {}).get('impact_tree') or None,
+            'detailed_metrics': (reg_json or {}).get('detailed_metrics') or model.get('detailed_metrics') or {},
+            'data_model_id': model.get('id')
+        }
+    except Exception:
+        # 出错兜底，返回最小体
+        return {
+            'id': model.get('id'),
+            'expression': (reg_json or {}).get('expression') or '0',
+            'feature_importance': (reg_json or {}).get('feature_importance') or [],
+            'impact_tree': (reg_json or {}).get('impact_tree') or None,
+            'detailed_metrics': (reg_json or {}).get('detailed_metrics') or {},
+            'data_model_id': model.get('id')
+        }
 @symbolic_regression_bp.route('/expression-tree/summary', methods=['POST'])
 def expression_tree_summary():
     """表达式树页面左侧摘要（空壳模拟）。
@@ -1059,63 +1065,8 @@ def expression_tree_summary():
                     except Exception as _:
                         reg_json = None
 
-                    # 合并字段：优先使用回归模型JSON，其次模型元数据，最后给出合理兜底
-                    result = {
-                        'id': model.get('id'),
-                        'expression': (reg_json or {}).get('expression_text') or (reg_json or {}).get('expression') or model.get('expression') or (
-                            "(((((1.9105 * HYP + ((((0.6015 * QA + 0.42745 * HYP) + 1.2977 * CA) - (-10.458))))"
-                            " * (-1.9323 + -0.078141 * MA * (((-1.9323 + 1.4812 * OA) + 0.59744 * UA) + 0.60783 * UA)))"
-                            " / (2.9628 * VR) - 2.6756 / (0.40832 * HYP)) + (1.2192 * VR) / (5.4189 - 1.9105 * HYP))"
-                            " * 0.0053559 + 0.93054)"
-                        ),
-                        'target_variable': (reg_json or {}).get('target_variable') or model.get('target_column', 'Y'),
-                        'constants': (reg_json or {}).get('constants') or model.get('constants') or {
-                            'c{0}': 1.9105,
-                            'c{1}': 0.6015,
-                            'c{2}': 0.42745,
-                            'c{3}': 1.2977,
-                            'c{4}': -10.458,
-                            'c{5}': -1.9323,
-                            'c{6}': -0.078141,
-                            'c{7}': -1.9323,
-                            'c{8}': 1.4812,
-                            'c{9}': 0.59744,
-                            'c{10}': 0.60783,
-                            'c{11}': 2.9628,
-                            'c{12}': 2.6756,
-                            'c{13}': 0.40832,
-                            'c{14}': 1.2192,
-                            'c{15}': 5.4189,
-                            'c{16}': 1.9105,
-                            'c{17}': 0.0053559,
-                            'c{18}': 0.93054,
-                        },
-                        'expression_latex': (reg_json or {}).get('expression_latex') or (
-                            r"HDL =  \left(  \left(  \left(  \cfrac{  \left( c_{0}  \cdot\text{HYP} +  \left(  \left(  \left( c_{1}  \cdot\text{QA} + c_{2}  \cdot\text{HYP} \right)  + c_{3}  \cdot\text{CA} \right)  - c_{4} \right)  \right)  \cdot  \left( c_{5} + c_{6}  \cdot\text{MA}  \cdot  \left(  \left(  \left( c_{7} + c_{8}  \cdot\text{OA} \right)  + c_{9}  \cdot\text{UA} \right)  + c_{10}  \cdot\text{UA} \right)  \right) }{c_{11}  \cdot\text{VR} }  -  \cfrac{ c_{12}}{c_{13}  \cdot\text{HYP} }  \right)  +  \cfrac{ c_{14}  \cdot\text{VR}}{ \left( c_{15} - c_{16}  \cdot\text{HYP} \right)  }  \right)  \cdot c_{17} + c_{18} \right)"
-                        ),
-                        'pearson_r_test': (reg_json or {}).get('detailed_metrics', {}).get('pearson_r_test') or model.get('metadata', {}).get('pearson_r_test'),
-                        'pearson_r_training': (reg_json or {}).get('detailed_metrics', {}).get('pearson_r_training') or model.get('metadata', {}).get('pearson_r_training'),
-                        'mse': (reg_json or {}).get('mse') or model.get('metadata', {}).get('mse_score', 0.12),
-                        'feature_importance': (reg_json or {}).get('feature_importance') or model.get('feature_importance') or [],
-                        'impact_tree': (reg_json or {}).get('impact_tree') or model.get('symbolic_regression', {}).get('impact_tree') or None,
-                        'detailed_metrics': (reg_json or {}).get('detailed_metrics') or model.get('detailed_metrics') or {
-                            "average_relative_error_test": 2.74596305113801,
-                            "average_relative_error_training": 2.3574806852981,
-                            "mean_absolute_error_test": 0.020585454497077455,
-                            "mean_absolute_error_training": 0.018182586660249116,
-                            "mean_squared_error_test": 0.00073464638025446652,
-                            "mean_squared_error_training": 0.00053687909383770213,
-                            "model_depth": 14,
-                            "model_length": 39,
-                            "normalized_mean_squared_error_test": 0.14358163045309325,
-                            "normalized_mean_squared_error_training": 0.12666355569075077,
-                            "pearson_r_test": 0.86776941659869866,
-                            "pearson_r_training": 0.87333644430924906,
-                            "root_mean_squared_error_test": 0.027104360908430703,
-                            "root_mean_squared_error_training": 0.023170651562649292
-                        },
-                        'data_model_id': model.get('id')
-                    }
+                    # 合并字段：统一构造体，保证与初始摘要结构一致
+                    result = build_expr_tree_summary_from_reg(model, reg_json)
 
         # 3) 兜底固定示例（改为复杂表达式）
         if result is None:
@@ -1533,7 +1484,7 @@ def update_data_model_file(model_id, file_type):
                     # impact_tree 将在表达式树操作分支中由模拟序列统一覆盖；
                     # 仅当非表达式树操作路径时，才考虑直接写入
                     direct_set_impact_tree = 'impact_tree' in data
-                    # 表达式树操作驱动的指标轮换/撤销
+                    # 表达式树操作驱动的指标/影响力树/特征权重 轮换/撤销
                     action = (data or {}).get('expr_tree_action')
                     # 初始化基线：指标、特征权重、影响力树
                     if 'baseline_detailed_metrics' not in reg_content:
@@ -1541,11 +1492,7 @@ def update_data_model_file(model_id, file_type):
                     if 'baseline_feature_importance' not in reg_content:
                         reg_content['baseline_feature_importance'] = reg_content.get('feature_importance') or []
                     if 'baseline_impact_tree' not in reg_content:
-                        # 规范化：若已有 impact_tree 不是以 Addition 根包裹，包裹之
-                        base_it = reg_content.get('impact_tree') or {}
-                        if base_it and 'Addition' not in base_it and isinstance(base_it, dict):
-                            base_it = {'Addition': base_it}
-                        reg_content['baseline_impact_tree'] = base_it
+                        reg_content['baseline_impact_tree'] = reg_content.get('impact_tree') or {}
                     op_index = int(model.get('metadata', {}).get('expr_tree_op_index', 0) or 0)
                     new_index = op_index
                     if action in ('delete', 'simplify', 'optimize'):
@@ -1563,8 +1510,9 @@ def update_data_model_file(model_id, file_type):
                             if isinstance(seq_weights, list):
                                 reg_content['feature_importance'] = seq_weights
                             if isinstance(seq_impact, dict):
-                                # 统一包裹为 { 'Addition': { ... } } 结构
-                                reg_content['impact_tree'] = seq_impact if 'Addition' in seq_impact else {'Addition': seq_impact}
+                                reg_content['impact_tree'] = seq_impact
+                                # 同步主模型中的 symbolic_regression.impact_tree，确保 expression_tree_summary 读取一致
+                                model.setdefault('symbolic_regression', {})['impact_tree'] = seq_impact
                         model.setdefault('metadata', {})['expr_tree_op_index'] = new_index
                     elif action == 'undo':
                         new_index = max(0, op_index - 1)
@@ -1579,7 +1527,8 @@ def update_data_model_file(model_id, file_type):
                             if base_weights:
                                 reg_content['feature_importance'] = base_weights
                             if isinstance(base_impact, dict):
-                                reg_content['impact_tree'] = base_impact if 'Addition' in base_impact else {'Addition': base_impact}
+                                reg_content['impact_tree'] = base_impact
+                                model.setdefault('symbolic_regression', {})['impact_tree'] = base_impact
                         else:
                             # 对超过 15 的索引进行截断（>=15 视同第15次的指标），支持无限撤销
                             idx = new_index if new_index <= 15 else 15
@@ -1593,7 +1542,8 @@ def update_data_model_file(model_id, file_type):
                             if isinstance(seq_weights, list):
                                 reg_content['feature_importance'] = seq_weights
                             if isinstance(seq_impact, dict):
-                                reg_content['impact_tree'] = seq_impact if 'Addition' in seq_impact else {'Addition': seq_impact}
+                                reg_content['impact_tree'] = seq_impact
+                                model.setdefault('symbolic_regression', {})['impact_tree'] = seq_impact
                         model.setdefault('metadata', {})['expr_tree_op_index'] = new_index
                     else:
                         # 允许直接设置详细指标（不建议在表达式树操作路径外使用）
@@ -1602,15 +1552,15 @@ def update_data_model_file(model_id, file_type):
                         if 'feature_importance' in data and isinstance(data['feature_importance'], list):
                             reg_content['feature_importance'] = data['feature_importance']
                         if direct_set_impact_tree:
-                            it = data['impact_tree']
-                            reg_content['impact_tree'] = it if (isinstance(it, dict) and 'Addition' in it) else {'Addition': it}
+                            reg_content['impact_tree'] = data['impact_tree']
+                            model.setdefault('symbolic_regression', {})['impact_tree'] = data['impact_tree']
                     if 'updated_at' in data:
                         reg_content['updated_at'] = data['updated_at']
                     
                     # 写回文件
                     with open(reg_filepath, 'w', encoding='utf-8') as f:
                         json.dump(reg_content, f, ensure_ascii=False, indent=2)
-                    # 若有更新元数据（pearson_r_* / expr_tree_op_index），同步保存主模型文件
+                    # 若有更新元数据（pearson_r_* / expr_tree_op_index / symbolic_regression.impact_tree），同步保存主模型文件
                     save_data_model(model)
                     
                     logger.info(f"回归模型文件已更新: {reg_filename}")
